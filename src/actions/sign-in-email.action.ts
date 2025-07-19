@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { APIError } from "better-auth/api";
 
 export async function signInEmailAction(formData: FormData) {
   const email = String(formData.get("email"));
@@ -21,8 +22,8 @@ export async function signInEmailAction(formData: FormData) {
 
     return { error: null };
   } catch (err) {
-    if (err instanceof Error) {
-      return { error: "Oops! Something went wrong while logging in" };
+    if (err instanceof APIError) {
+      return { error: err.message };
     }
 
     return { error: "Internal Server Error" };
