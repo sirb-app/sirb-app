@@ -18,6 +18,9 @@ export const auth = betterAuth({
       verify: verifyPassword,
     },
   },
+  // hooks: {
+  // here we can add hooks to the auth process
+  // }
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
   },
