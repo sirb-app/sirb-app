@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInEmailAction } from "@/actions/sign-in-email.action";
+import Link from "next/link";
 
 export const LoginForm = () => {
   const [isPending, setIsPending] = useState(false);
@@ -38,7 +39,16 @@ export const LoginForm = () => {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex justify-between items-center gap-2">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            href="/auth/forgot-password"
+            className="text-sm italic text-muted-foreground hover:text-foreground"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
         <Input type="password" id="password" name="password" />
       </div>
 

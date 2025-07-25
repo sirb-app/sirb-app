@@ -25,8 +25,8 @@ export const RegisterForm = () => {
       toast.error(error);
       setIsPending(false);
     } else {
-      toast.success("Registration complete. You're all set.");
-      router.push("/auth/login");
+      toast.success("Registration complete. Please verify your email.");
+      router.push("/auth/register/success");
     }
   }
 
