@@ -1,6 +1,6 @@
 "use server";
 
-import transporter from "@/lib/nodemailer";
+import resend from "@/lib/resend";
 
 const styles = {
   container:
@@ -23,8 +23,8 @@ export async function sendEmailAction({
   };
 }) {
   const mailOptions = {
-    from: process.env.NODEMAILER_USER,
-    to,
+    from: "Sirb <onboarding@resend.dev>",
+    to: [to],
     subject: `Sirb - ${subject}`,
     html: `
     <div style="${styles.container}">
@@ -36,7 +36,7 @@ export async function sendEmailAction({
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await resend.emails.send(mailOptions);
     return { success: true };
   } catch (err) {
     console.error("[SendEmail]:", err);
