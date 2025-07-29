@@ -6,9 +6,9 @@ import { TrashIcon } from "lucide-react";
 import { deleteUserAction } from "@/actions/delete-user.action";
 import { toast } from "sonner";
 
-interface DeleteUserButtonProps {
+type DeleteUserButtonProps = {
   userId: string;
-}
+};
 
 export const DeleteUserButton = ({ userId }: DeleteUserButtonProps) => {
   const [isPending, setIsPending] = useState(false);

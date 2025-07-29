@@ -4,9 +4,9 @@ import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-interface PageProps {
+type PageProps = {
   searchParams: Promise<{ token: string }>;
-}
+};
 
 export default async function Page({ searchParams }: PageProps) {
   const token = (await searchParams).token;

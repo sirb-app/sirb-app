@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-interface UserRoleSelectProps {
+type UserRoleSelectProps = {
   userId: string;
   role: UserRole;
-}
+};
 
 export const UserRoleSelect = ({ userId, role }: UserRoleSelectProps) => {
   const [isPending, setIsPending] = useState(false);

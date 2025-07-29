@@ -2,33 +2,42 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { forgetPassword } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const ForgotPasswordSchema = z.object({
+  email: z.email("Please enter a valid email address"),
+});
+
+type ForgotPasswordFormData = z.infer<typeof ForgotPasswordSchema>;
 
 export const ForgotPasswordForm = () => {
-  const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
-  async function handleSubmit(evt: React.FormEvent<HTMLFormElement>) {
-    evt.preventDefault();
-    const formData = new FormData(evt.currentTarget);
-    const email = String(formData.get("email"));
+  const form = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(ForgotPasswordSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
 
-    if (!email) return toast.error("Please enter your email.");
-
+  async function handleSubmit(data: ForgotPasswordFormData) {
     await forgetPassword({
-      email,
+      ...data,
       redirectTo: "/auth/reset-password",
       fetchOptions: {
-        onRequest: () => {
-          setIsPending(true);
-        },
-        onResponse: () => {
-          setIsPending(false);
-        },
         onError: ctx => {
           toast.error(ctx.error.message);
         },
@@ -41,15 +50,33 @@ export const ForgotPasswordForm = () => {
   }
 
   return (
-    <form className="max-w-sm w-full space-y-4" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="email">Email</Label>
-        <Input type="email" id="email" name="email" />
-      </div>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="max-w-sm w-full space-y-4"
+      >
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input type="email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Button type="submit" disabled={isPending}>
-        Send Reset Link
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? "Sending..." : "Send Reset Link"}
+        </Button>
+      </form>
+    </Form>
   );
 };

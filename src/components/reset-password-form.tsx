@@ -2,43 +2,53 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { resetPassword } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-interface ResetPasswordFormProps {
+const ResetPasswordSchema = z
+  .object({
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string(),
+  })
+  .refine(data => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+type ResetPasswordFormData = z.infer<typeof ResetPasswordSchema>;
+
+type ResetPasswordFormProps = {
   token: string;
-}
+};
 
 export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
-  const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
-  async function handleSubmit(evt: React.FormEvent<HTMLFormElement>) {
-    evt.preventDefault();
-    const formData = new FormData(evt.currentTarget);
+  const form = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(ResetPasswordSchema),
+    defaultValues: {
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
 
-    const password = String(formData.get("password"));
-    if (!password) return toast.error("Please enter your password.");
-
-    const confirmPassword = String(formData.get("confirmPassword"));
-
-    if (password !== confirmPassword) {
-      return toast.error("Passwords do not match.");
-    }
-
+  async function handleSubmit(data: ResetPasswordFormData) {
     await resetPassword({
-      newPassword: password,
+      newPassword: data.newPassword,
       token,
       fetchOptions: {
-        onRequest: () => {
-          setIsPending(true);
-        },
-        onResponse: () => {
-          setIsPending(false);
-        },
         onError: ctx => {
           toast.error(ctx.error.message);
         },
@@ -51,20 +61,47 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
   }
 
   return (
-    <form className="max-w-sm w-full space-y-4" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="password">New Password</Label>
-        <Input type="password" id="password" name="password" />
-      </div>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="max-w-sm w-full space-y-4"
+      >
+        <FormField
+          control={form.control}
+          name="newPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>New Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <Input type="password" id="confirmPassword" name="confirmPassword" />
-      </div>
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirm Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Button type="submit" disabled={isPending}>
-        Reset Password
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? "Resetting..." : "Reset Password"}
+        </Button>
+      </form>
+    </Form>
   );
 };

@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth-client";
 import { toast } from "sonner";
 
-interface SignInOauthButtonProps {
+type SignInOauthButtonProps = {
   provider: "google" | "github";
   signUp?: boolean;
-}
+};
 
 export const SignInOauthButton = ({
   provider,

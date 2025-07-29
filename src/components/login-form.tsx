@@ -1,60 +1,107 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInEmailAction } from "@/actions/sign-in-email.action";
 import Link from "next/link";
+import { signIn } from "@/lib/auth-client";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const LoginSchema = z.object({
+  email: z.email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormData = z.infer<typeof LoginSchema>;
 
 export const LoginForm = () => {
-  const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
-  async function handleSubmit(evt: React.FormEvent<HTMLFormElement>) {
-    evt.preventDefault();
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(LoginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-    setIsPending(true);
-
-    const formData = new FormData(evt.currentTarget);
-
-    const { error } = await signInEmailAction(formData);
-
-    if (error) {
-      toast.error(error);
-      setIsPending(false);
-    } else {
-      toast.success("Login successful. Good to have you back.");
-      router.push("/profile");
-    }
+  async function handleSubmit(data: LoginFormData) {
+    await signIn.email(data, {
+      onSuccess: () => {
+        toast.success("Login successful. Good to have you back.");
+        router.push("/profile");
+      },
+      onError: ctx => {
+        if (ctx.error.status === 403) {
+          router.push("/auth/verify?error=email_not_verified");
+        } else {
+          toast.error(ctx.error.message);
+        }
+      },
+    });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm w-full space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input type="email" id="email" name="email" />
-      </div>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="max-w-sm w-full space-y-4"
+      >
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input type="email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="space-y-2">
-        <div className="flex justify-between items-center gap-2">
-          <Label htmlFor="password">Password</Label>
-          <Link
-            href="/auth/forgot-password"
-            className="text-sm italic text-muted-foreground hover:text-foreground"
-          >
-            Forgot password?
-          </Link>
-        </div>
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex justify-between items-center">
+                <FormLabel>Password</FormLabel>
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-sm italic text-muted-foreground hover:text-foreground"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        <Input type="password" id="password" name="password" />
-      </div>
-
-      <Button type="submit" className="w-full" disabled={isPending}>
-        Login
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? "Signing in..." : "Login"}
+        </Button>
+      </form>
+    </Form>
   );
 };

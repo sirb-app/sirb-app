@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 
-interface PageProps {
+type PageProps = {
   searchParams: Promise<{ error: string }>;
-}
+};
 
 export default async function Page({ searchParams }: PageProps) {
   const sp = await searchParams;

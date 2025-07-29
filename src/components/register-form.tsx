@@ -1,55 +1,110 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signUpEmailAction } from "@/actions/sign-up-email.action";
+import { signUp } from "@/lib/auth-client";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const RegisterSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+type RegisterFormData = z.infer<typeof RegisterSchema>;
 
 export const RegisterForm = () => {
-  const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
-  async function handleSubmit(evt: React.FormEvent<HTMLFormElement>) {
-    evt.preventDefault();
+  const form = useForm<RegisterFormData>({
+    resolver: zodResolver(RegisterSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  });
 
-    setIsPending(true);
-
-    const formData = new FormData(evt.currentTarget);
-
-    const { error } = await signUpEmailAction(formData);
-
-    if (error) {
-      toast.error(error);
-      setIsPending(false);
-    } else {
-      toast.success("Registration complete. Please verify your email.");
-      router.push("/auth/register/success");
-    }
+  async function handleSubmit(data: RegisterFormData) {
+    await signUp.email(data, {
+      onSuccess: () => {
+        toast.success("Registration complete. Please verify your email.");
+        router.push("/auth/register/success");
+      },
+      onError: ctx => {
+        toast.error(ctx.error.message);
+      },
+    });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm w-full space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" name="name" />
-      </div>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="max-w-sm w-full space-y-4"
+      >
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input type="email" id="email" name="email" />
-      </div>
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input type="email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input type="password" id="password" name="password" />
-      </div>
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Button type="submit" className="w-full" disabled={isPending}>
-        Register
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? "Creating account..." : "Register"}
+        </Button>
+      </form>
+    </Form>
   );
 };

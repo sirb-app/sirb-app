@@ -1,48 +1,121 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { changePasswordAction } from "@/actions/change-password.action";
 import { toast } from "sonner";
+import { changePassword } from "@/lib/auth-client";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const ChangePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z
+      .string()
+      .min(8, "New password must be at least 8 characters"),
+    confirmPassword: z.string(),
+  })
+  .refine(data => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"], // Error shows on confirmPassword field
+  });
+
+type ChangePasswordFormData = z.infer<typeof ChangePasswordSchema>;
 
 export const ChangePasswordForm = () => {
-  const [isPending, setIsPending] = useState(false);
+  const form = useForm<ChangePasswordFormData>({
+    resolver: zodResolver(ChangePasswordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
 
-  async function handleSubmit(evt: React.FormEvent<HTMLFormElement>) {
-    evt.preventDefault();
-    const formData = new FormData(evt.target as HTMLFormElement);
-
-    setIsPending(true);
-
-    const { error } = await changePasswordAction(formData);
-
-    if (error) {
-      toast.error(error);
-    } else {
-      toast.success("Password changed successfully");
-      (evt.target as HTMLFormElement).reset();
-    }
-
-    setIsPending(false);
+  async function handleSubmit(data: ChangePasswordFormData) {
+    // Only send the fields that the API needs
+    await changePassword(
+      {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Password changed successfully");
+          form.reset();
+        },
+        onError: ctx => {
+          toast.error(ctx.error.message);
+        },
+      }
+    );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm w-full space-y-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="currentPassword">Current Password</Label>
-        <Input type="password" id="currentPassword" name="currentPassword" />
-      </div>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="max-w-sm w-full space-y-4"
+      >
+        <FormField
+          control={form.control}
+          name="currentPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Current Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="newPassword">New Password</Label>
-        <Input type="password" id="newPassword" name="newPassword" />
-      </div>
+        <FormField
+          control={form.control}
+          name="newPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>New Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Button type="submit" disabled={isPending}>
-        Change Password
-      </Button>
-    </form>
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirm New Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? "Changing..." : "Change Password"}
+        </Button>
+      </form>
+    </Form>
   );
 };

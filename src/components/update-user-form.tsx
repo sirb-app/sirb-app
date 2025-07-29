@@ -8,10 +8,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updateUser } from "@/lib/auth-client";
 
-interface UpdateUserFormProps {
+type UpdateUserFormProps = {
   name: string;
   image: string;
-}
+};
 
 export const UpdateUserForm = ({ name, image }: UpdateUserFormProps) => {
   const [isPending, setIsPending] = useState(false);
