@@ -44,7 +44,9 @@ export const LoginForm = () => {
       },
       onError: ctx => {
         if (ctx.error.status === 403) {
-          router.push("/auth/verify?error=email_not_verified");
+          toast.info("We've sent you a verification link to your email!", {
+            duration: 6000,
+          });
         } else {
           toast.error(ctx.error.message);
         }

@@ -42,8 +42,10 @@ export const ForgotPasswordForm = () => {
           toast.error(ctx.error.message);
         },
         onSuccess: () => {
-          toast.success("Reset link sent to your email.");
-          router.push("/auth/forgot-password/success");
+          toast.success("Reset link sent to your email!", {
+            duration: 6000,
+          });
+          router.push("/auth/login");
         },
       },
     });

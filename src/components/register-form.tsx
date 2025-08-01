@@ -40,8 +40,13 @@ export const RegisterForm = () => {
   async function handleSubmit(data: RegisterFormData) {
     await signUp.email(data, {
       onSuccess: () => {
-        toast.success("Registration complete. Please verify your email.");
-        router.push("/auth/register/success");
+        toast.success(
+          "Account created! We've sent you a verification link to your email!",
+          {
+            duration: 6000,
+          }
+        );
+        router.push("/auth/login");
       },
       onError: ctx => {
         toast.error(ctx.error.message);
