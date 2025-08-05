@@ -25,7 +25,7 @@ export default async function Page() {
       <div className="px-8 py-16 container mx-auto max-w-screen-lg space-y-8">
         <div className="space-y-4">
           <Button size="icon" asChild>
-            <Link href="/profile">
+            <Link href="/app/profile">
               <ArrowLeftIcon />
             </Link>
           </Button>
@@ -55,7 +55,7 @@ export default async function Page() {
     <div className="px-8 py-16 container mx-auto max-w-screen-lg space-y-8">
       <div className="space-y-4">
         <Button size="icon" asChild>
-          <Link href="/profile">
+          <Link href="/app/profile">
             <ArrowLeftIcon />
           </Link>
         </Button>
