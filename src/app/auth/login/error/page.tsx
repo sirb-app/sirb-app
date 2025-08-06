@@ -10,7 +10,7 @@ export default async function Page({ searchParams }: PageProps) {
   const sp = await searchParams;
 
   return (
-    <div className="px-8 py-16 container mx-auto max-w-screen-lg space-y-8">
+    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
       <div className="space-y-4">
         <Button size="icon" asChild>
           <Link href="/auth/login">
