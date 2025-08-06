@@ -3,11 +3,11 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
-import { prisma } from "@/lib/prisma";
-import { hashPassword, verifyPassword } from "@/lib/argon2";
-import { UserRole } from "@/generated/prisma";
-import { ac, roles } from "@/lib/permissions";
 import { sendEmailAction } from "@/actions/send-email.action";
+import { UserRole } from "@/generated/prisma";
+import { hashPassword, verifyPassword } from "@/lib/argon2";
+import { ac, roles } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -48,7 +48,7 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       const link = new URL(url);
-      link.searchParams.set("callbackURL", "/app/profile");
+      link.searchParams.set("callbackURL", "/profile");
 
       await sendEmailAction({
         to: user.email,

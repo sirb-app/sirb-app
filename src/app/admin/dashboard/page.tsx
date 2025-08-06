@@ -22,15 +22,15 @@ export default async function Page() {
 
   if (session.user.role !== "ADMIN") {
     return (
-      <div className="px-8 py-16 container mx-auto max-w-screen-lg space-y-8">
+      <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
         <div className="space-y-4">
           <Button size="icon" asChild>
-            <Link href="/app/profile">
+            <Link href="/profile">
               <ArrowLeftIcon />
             </Link>
           </Button>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="p-2 rounded-md text-lg bg-red-600 text-white font-bold">
+          <p className="rounded-md bg-red-600 p-2 text-lg font-bold text-white">
             FORBIDDEN
           </p>
         </div>
@@ -52,23 +52,23 @@ export default async function Page() {
   });
 
   return (
-    <div className="px-8 py-16 container mx-auto max-w-screen-lg space-y-8">
+    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
       <div className="space-y-4">
         <Button size="icon" asChild>
-          <Link href="/app/profile">
+          <Link href="/profile">
             <ArrowLeftIcon />
           </Link>
         </Button>
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="p-2 rounded-md text-lg bg-green-600 text-white font-bold">
+        <p className="rounded-md bg-green-600 p-2 text-lg font-bold text-white">
           ACCESS GRANTED
         </p>
       </div>
 
       <div className="w-full overflow-x-auto">
-        <table className="table-auto min-w-full whitespace-nowrap">
+        <table className="min-w-full table-auto whitespace-nowrap">
           <thead>
-            <tr className="border-b text-sm text-left">
+            <tr className="border-b text-left text-sm">
               <th className="px-4 py-2">ID</th>
               <th className="px-4 py-2">Name</th>
               <th className="px-4 py-2">Email</th>
@@ -79,7 +79,7 @@ export default async function Page() {
 
           <tbody>
             {sortedUsers.map(user => (
-              <tr key={user.id} className="border-b text-sm text-left">
+              <tr key={user.id} className="border-b text-left text-sm">
                 <td className="px-4 py-2">{user.id.slice(0, 8)}</td>
                 <td className="px-4 py-2">{user.name}</td>
                 <td className="px-4 py-2">{user.email}</td>

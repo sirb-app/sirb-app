@@ -1,14 +1,6 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { signIn } from "@/lib/auth-client";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -17,6 +9,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { signIn } from "@/lib/auth-client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 const LoginSchema = z.object({
   email: z.email("Please enter a valid email address"),
@@ -40,7 +40,7 @@ export const LoginForm = () => {
     await signIn.email(data, {
       onSuccess: () => {
         toast.success("Login successful. Good to have you back.");
-        router.push("/app/profile");
+        router.push("/profile");
       },
       onError: ctx => {
         if (ctx.error.status === 403) {
@@ -58,7 +58,7 @@ export const LoginForm = () => {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleSubmit)}
-        className="max-w-sm w-full space-y-4"
+        className="w-full max-w-sm space-y-4"
       >
         <FormField
           control={form.control}
@@ -79,11 +79,11 @@ export const LoginForm = () => {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <FormLabel>Password</FormLabel>
                 <Link
                   href="/auth/forgot-password"
-                  className="text-sm italic text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground text-sm italic"
                 >
                   Forgot password?
                 </Link>

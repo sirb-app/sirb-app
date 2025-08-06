@@ -15,7 +15,7 @@ export const GetStartedButton = () => {
     );
   }
 
-  const href = session ? "/app/profile" : "/auth/login";
+  const href = session ? "/profile" : "/auth/login";
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -27,7 +27,7 @@ export const GetStartedButton = () => {
         <p className="flex items-center gap-2">
           <span
             data-role={session.user.role}
-            className="size-4 rounded-full animate-pulse data-[role=USER]:bg-blue-600 data-[role=ADMIN]:bg-red-600"
+            className="size-4 animate-pulse rounded-full data-[role=ADMIN]:bg-red-600 data-[role=USER]:bg-blue-600"
           />
           Welcome back, {session.user.name}! 👋
         </p>

@@ -27,7 +27,7 @@ export default async function Page() {
   });
 
   return (
-    <div className="px-8 py-16 container mx-auto max-w-screen-lg space-y-8">
+    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
       <div className="space-y-4">
         <Button size="icon" asChild>
           <Link href="/">
@@ -39,7 +39,7 @@ export default async function Page() {
         <div className="flex items-center gap-2">
           {session.user.role === "ADMIN" && (
             <Button size="sm" asChild>
-              <Link href="/app/admin/dashboard">Admin Dashboard</Link>
+              <Link href="/admin/dashboard">Admin Dashboard</Link>
             </Button>
           )}
 
@@ -60,21 +60,21 @@ export default async function Page() {
         <img
           src={session.user.image}
           alt="User Image"
-          className="size-24 border border-primary rounded-md object-cover"
+          className="border-primary size-24 rounded-md border object-cover"
         />
       ) : (
-        <div className="size-24 border border-primary rounded-md bg-primary text-primary-foreground flex items-center justify-center">
-          <span className="uppercase text-lg font-bold">
+        <div className="border-primary bg-primary text-primary-foreground flex size-24 items-center justify-center rounded-md border">
+          <span className="text-lg font-bold uppercase">
             {session.user.name.slice(0, 2)}
           </span>
         </div>
       )}
 
-      <pre className="text-sm overflow-clip">
+      <pre className="overflow-clip text-sm">
         {JSON.stringify(session, null, 2)}
       </pre>
 
-      <div className="space-y-4 p-4 rounded-b-md  border border-t-8 border-blue-600">
+      <div className="space-y-4 rounded-b-md border border-t-8 border-blue-600 p-4">
         <h2 className="text-2xl font-bold">Update User</h2>
 
         <UpdateUserForm
@@ -83,7 +83,7 @@ export default async function Page() {
         />
       </div>
 
-      <div className="space-y-4 p-4 rounded-b-md  border border-t-8 border-red-600">
+      <div className="space-y-4 rounded-b-md border border-t-8 border-red-600 p-4">
         <h2 className="text-2xl font-bold">Change Password</h2>
 
         <ChangePasswordForm />
