@@ -19,7 +19,7 @@ export const SignInOauthButton = ({
   async function handleClick() {
     await signIn.social({
       provider,
-      callbackURL: "/profile",
+      callbackURL: "/dashboard",
       errorCallbackURL: "/auth/login/error",
       fetchOptions: {
         onRequest: () => {
