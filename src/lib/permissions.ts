@@ -1,6 +1,6 @@
 import { UserRole } from "@/generated/prisma";
 import { createAccessControl } from "better-auth/plugins/access";
-import { defaultStatements, adminAc } from "better-auth/plugins/admin/access";
+import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
 
 const statements = {
   ...defaultStatements,
