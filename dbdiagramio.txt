@@ -1,0 +1,460 @@
+// SIRB MVP DATABASE SCHEMA - IMPLEMENTED VERSION
+// Updated to match actual Prisma schema implementation
+
+// ENUMS
+enum user_role {
+  USER
+  ADMIN
+}
+
+enum content_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum content_type {
+  VIDEO
+  FILE
+  QUIZ
+}
+
+enum vote_type {
+  LIKE
+  DISLIKE
+}
+
+enum report_status {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum report_reason {
+  SPAM
+  INAPPROPRIATE
+  WRONG_INFO
+  HARASSMENT
+  COPYRIGHT
+  OTHER
+}
+
+enum question_type {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum completion_type {
+  AUTO
+  MANUAL
+}
+
+// USERS & AUTHENTICATION (Better-Auth tables - UUIDs)
+Table users {
+  id varchar [pk] // UUID from better-auth
+  created_at datetime
+  updated_at datetime
+  name varchar
+  email varchar [unique]
+  email_verified boolean
+  image varchar [null]
+  role user_role [default: 'USER']
+  banned boolean [null]
+  ban_reason varchar [null]
+  ban_expires datetime [null]
+  total_points int [default: 0] // denormalized for performance
+
+  indexes {
+    (email) [unique]
+  }
+}
+
+Table sessions {
+  id varchar [pk] // UUID
+  created_at datetime
+  updated_at datetime
+  expires_at datetime
+  token varchar [unique]
+  ip_address varchar [null]
+  user_agent varchar [null]
+  impersonated_by varchar [null]
+  user_id varchar [ref: > users.id]
+}
+
+Table accounts {
+  id varchar [pk] // UUID
+  created_at datetime
+  updated_at datetime
+  account_id varchar
+  provider_id varchar
+  access_token varchar [null]
+  refresh_token varchar [null]
+  id_token varchar [null]
+  access_token_expires_at datetime [null]
+  refresh_token_expires_at datetime [null]
+  scope varchar [null]
+  password varchar [null]
+  user_id varchar [ref: > users.id]
+}
+
+Table verifications {
+  id varchar [pk] // UUID
+  created_at datetime [null]
+  updated_at datetime [null]
+  identifier varchar
+  value varchar
+  expires_at datetime
+}
+
+// ACADEMIC HIERARCHY (Integer IDs for clean URLs)
+Table universities {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  name varchar
+  code varchar [unique] // e.g. "MIT", "Stanford"
+
+  indexes {
+    (code) [unique]
+  }
+}
+
+Table colleges {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  name varchar
+  university_id int [ref: > universities.id]
+
+  indexes {
+    (university_id)
+  }
+}
+
+Table subjects {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  name varchar
+  code varchar
+  description text [null]
+  college_id int [ref: > colleges.id]
+
+  indexes {
+    (college_id)
+    (code, college_id) [unique] // same subject code per college
+  }
+}
+
+Table chapters {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  title varchar // e.g. "Chapter 1: Arrays"
+  description text [null]
+  sequence int // ordering within subject
+  subject_id int [ref: > subjects.id]
+
+  indexes {
+    (subject_id, sequence) [unique]
+    (subject_id) // for listing chapters
+  }
+}
+
+// UNIFIED CONTENT SYSTEM
+Table content {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  title varchar
+  description text [null]
+  content_type content_type
+  url varchar [null] // YouTube URL or file storage URL, null for quizzes
+  sequence int // ordering within chapter
+  status content_status [default: 'PENDING']
+  rejection_reason text [null]
+  moderator_notes text [null]
+  chapter_id int [ref: > chapters.id]
+  contributor_id varchar [ref: > users.id] // UUID reference
+
+  // Metadata fields (merged from content_metadata)
+  duration int [null] // seconds for videos
+  file_size bigint [null] // bytes for files
+  mime_type varchar [null] // for files
+  youtube_video_id varchar [null] // extracted from URL for embedding
+
+  indexes {
+    (chapter_id, sequence) [unique]
+    (chapter_id, status) // for approved content listing
+    (contributor_id) // for user's content
+    (status) // for moderation queues
+  }
+}
+
+Table content_votes {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  vote_type vote_type
+  user_id varchar [ref: > users.id] // UUID reference
+  content_id int [ref: > content.id]
+
+  indexes {
+    (user_id, content_id) [unique]
+    (content_id, vote_type) // for vote counting
+  }
+}
+
+// QUIZ SYSTEM
+Table quizzes {
+  content_id int [pk, ref: > content.id] // One-to-one with content
+  instructions text [null]
+  time_limit int [null] // minutes, null = no limit
+  attempts_allowed int [default: -1] // -1 = unlimited
+  pass_score float [null] // 0.0 to 1.0, null = no pass requirement
+}
+
+Table quiz_questions {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  question_text text
+  question_type question_type
+  points int [default: 1]
+  sequence int // question order within quiz
+  quiz_id int [ref: > quizzes.content_id]
+
+  indexes {
+    (quiz_id, sequence) [unique]
+    (quiz_id) // for loading quiz questions
+  }
+}
+
+Table quiz_options {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  option_text text
+  is_correct boolean [default: false]
+  sequence int // option order within question
+  question_id int [ref: > quiz_questions.id]
+
+  indexes {
+    (question_id) // for loading question options
+    (question_id, sequence) [unique]
+  }
+}
+
+Table user_quiz_attempts {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  score float [null] // 0.0 to 1.0, calculated after completion
+  max_score int // total points possible
+  started_at datetime [default: `now()`]
+  completed_at datetime [null] // null = in progress
+  user_id varchar [ref: > users.id] // UUID reference
+  quiz_id int [ref: > quizzes.content_id]
+
+  indexes {
+    (user_id, quiz_id) // for user's attempts on specific quiz
+    (quiz_id) // for quiz statistics
+  }
+}
+
+Table user_answers {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  selected_option_id int [ref: > quiz_options.id, null] // for multiple_choice/true_false
+  text_answer text [null] // for short_answer
+  is_correct boolean [null] // calculated after submission
+  attempt_id int [ref: > user_quiz_attempts.id]
+  question_id int [ref: > quiz_questions.id]
+
+  indexes {
+    (attempt_id, question_id) [unique]
+    (attempt_id) // for loading attempt answers
+  }
+}
+
+// ENROLLMENT & PROGRESS
+Table enrollments {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  enrolled_at datetime [default: `now()`]
+  user_id varchar [ref: > users.id] // UUID reference
+  subject_id int [ref: > subjects.id]
+
+  indexes {
+    (user_id, subject_id) [unique]
+    (subject_id) // for subject enrollment counts
+    (user_id) // for user's enrolled subjects
+  }
+}
+
+Table user_progress {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  completed_at datetime [null] // null = not completed
+  last_accessed datetime [default: `now()`]
+  last_position int [default: 0] // seconds into video for YouTube progress
+  completion_percentage int [default: 0] // 0-100, for partial progress
+  user_id varchar [ref: > users.id] // UUID reference
+  content_id int [ref: > content.id]
+
+  indexes {
+    (user_id, content_id) [unique]
+    (user_id, completed_at) // for user progress queries
+    (content_id) // for content completion statistics
+  }
+}
+
+Table chapter_completions {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  completed_at datetime [null] // null = not completed
+  completion_type completion_type [default: 'AUTO'] // 'manual' or 'auto'
+  user_id varchar [ref: > users.id] // UUID reference
+  chapter_id int [ref: > chapters.id]
+
+  indexes {
+    (user_id, chapter_id) [unique]
+    (user_id) // for user's completed chapters
+    (chapter_id) // for chapter completion statistics
+  }
+}
+
+// ENGAGEMENT FEATURES
+Table comments {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  text text
+  is_announcement boolean [default: false] // for moderator/contributor announcements
+  is_pinned boolean [default: false]
+  is_deleted boolean [default: false] // soft delete
+  edited_at datetime [null]
+  user_id varchar [ref: > users.id] // UUID reference
+  content_id int [ref: > content.id]
+  parent_comment_id int [ref: > comments.id, null] // for replies
+
+  indexes {
+    (content_id, is_deleted, created_at) // for content comments
+    (parent_comment_id) // for loading replies
+    (content_id, is_pinned, is_announcement) // for pinned/announcement comments
+  }
+}
+
+Table comment_votes {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  vote_type vote_type
+  user_id varchar [ref: > users.id] // UUID reference
+  comment_id int [ref: > comments.id]
+
+  indexes {
+    (user_id, comment_id) [unique]
+    (comment_id, vote_type) // for vote counting
+  }
+}
+
+// MODERATION & REPORTING
+Table subject_moderators {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  user_id varchar [ref: > users.id] // UUID reference
+  subject_id int [ref: > subjects.id]
+
+  indexes {
+    (user_id, subject_id) [unique]
+    (subject_id) // for finding moderators of a subject
+    (user_id) // for user's moderated subjects
+  }
+}
+
+Table reports {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  reason report_reason
+  description text [null]
+  status report_status [default: 'PENDING']
+  resolution_notes text [null]
+  resolved_at datetime [null]
+  reporter_user_id varchar [ref: > users.id] // UUID reference
+  reported_content_id int [ref: > content.id, null]
+  reported_comment_id int [ref: > comments.id, null]
+  reported_user_id varchar [ref: > users.id, null]
+  resolved_by varchar [ref: > users.id, null] // UUID reference
+
+  indexes {
+    (status, created_at) // for moderation queue
+    (reporter_user_id) // for user's reports
+    (reported_content_id) // for content reports
+    (reported_comment_id) // for comment reports
+    (reported_user_id) // for user reports
+    (resolved_by) // for moderator activity
+  }
+}
+
+// POINTS SYSTEM (Industry Standard - Date-based)
+Table user_points {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  points int [default: 0]
+  earned_at datetime [default: `now()`]
+  reason varchar [null] // "content_approved", "quiz_completed", "helpful_comment", etc.
+  user_id varchar [ref: > users.id] // UUID reference
+  subject_id int [ref: > subjects.id, null] // null for global points
+
+  indexes {
+    (user_id, earned_at) // for user point history
+    (subject_id, earned_at) // for subject leaderboards
+    (earned_at) // for global leaderboards
+  }
+}
+
+// FUTURE: TAG SYSTEM (For when we want to implement content tagging)
+Table tags {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  updated_at datetime
+  name varchar [unique]
+  slug varchar [unique] // URL-friendly version
+  description text [null]
+  color varchar [null] // hex color for UI
+  
+  indexes {
+    (name) [unique]
+    (slug) [unique]
+  }
+}
+
+Table content_tags {
+  id int [pk, increment]
+  created_at datetime [default: `now()`]
+  content_id int [ref: > content.id]
+  tag_id int [ref: > tags.id]
+
+  indexes {
+    (content_id, tag_id) [unique]
+    (content_id) // for content tags
+    (tag_id) // for tag's content
+  }
+}
+
+// KEY DESIGN DECISIONS MADE:
+// 1. Mixed ID strategy: UUIDs for auth tables (better-auth), integers for content (clean URLs)
+// 2. No denormalized vote counts: Calculate from vote tables for consistency
+// 3. Date-based points: Industry standard, flexible aggregation
+// 4. Merged content metadata: Avoid unnecessary JOINs
+// 5. Soft deletion for comments: Preserve conversation flow
+// 6. Strategic indexing: Optimized for real-world query patterns

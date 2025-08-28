@@ -13,18 +13,47 @@ enum UserRole {
   ADMIN
 }
 
-model Post {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum ContentType {
+  VIDEO
+  FILE
+  QUIZ
+}
 
-  title   String
-  content String
+enum ContentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+enum VoteType {
+  LIKE
+  DISLIKE
+}
 
-  @@map("posts")
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum CompletionType {
+  AUTO
+  MANUAL
+}
+
+enum ReportReason {
+  SPAM
+  INAPPROPRIATE
+  WRONG_INFO
+  HARASSMENT
+  COPYRIGHT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
 }
 
 model User {
@@ -40,10 +69,33 @@ model User {
   banned        Boolean?
   banReason     String?
   banExpires    DateTime?
+  totalPoints   Int       @default(0) // denormalized for performance
 
   sessions Session[]
   accounts Account[]
-  posts    Post[]
+
+  // Content system relations
+  contributions Content[]
+  contentVotes  ContentVote[]
+
+  // Quiz system relations
+  quizAttempts UserQuizAttempt[]
+
+  // Progress tracking relations
+  enrollments        Enrollment[]
+  userProgress       UserProgress[]
+  chapterCompletions ChapterCompletion[]
+
+  // Engagement relations
+  comments     Comment[]
+  commentVotes CommentVote[]
+
+  // Moderation & reporting relations
+  userPoints        UserPoints[]
+  moderatedSubjects SubjectModerator[]
+  reportsSubmitted  Report[]           @relation("ReportedBy")
+  reportsReceived   Report[]           @relation("ReportedUser")
+  reportsResolved   Report[]           @relation("ResolvedBy")
 
   @@map("users")
 }
@@ -96,4 +148,402 @@ model Verification {
   expiresAt  DateTime
 
   @@map("verifications")
+}
+
+// ACADEMIC HIERARCHY
+
+model University {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name String
+  code String @unique
+
+  colleges College[]
+
+  @@map("universities")
+}
+
+model College {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name         String
+  universityId Int
+
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  subjects   Subject[]
+
+  @@index([universityId])
+  @@map("colleges")
+}
+
+model Subject {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name        String
+  code        String
+  description String?
+  collegeId   Int
+
+  college     College            @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  chapters    Chapter[]
+  enrollments Enrollment[]
+  moderators  SubjectModerator[]
+  userPoints  UserPoints[]
+
+  @@unique([code, collegeId])
+  @@index([collegeId])
+  @@map("subjects")
+}
+
+model Chapter {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  description String?
+  sequence    Int
+  subjectId   Int
+
+  subject            Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  content            Content[]
+  chapterCompletions ChapterCompletion[]
+
+  @@unique([subjectId, sequence])
+  @@index([subjectId])
+  @@map("chapters")
+}
+
+// CONTENT SYSTEM
+
+model Content {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title           String
+  description     String?
+  contentType     ContentType
+  url             String? // YouTube URL or file storage URL, null for quizzes
+  sequence        Int // ordering within chapter
+  status          ContentStatus @default(PENDING)
+  rejectionReason String?
+  moderatorNotes  String?
+  chapterId       Int
+  contributorId   String // UUID reference to User
+
+  // Metadata (conditional based on content type)
+  duration       Int? // seconds for videos
+  fileSize       BigInt? // bytes for files
+  mimeType       String? // for files (image/pdf/etc)
+  youtubeVideoId String? // extracted from URL for embedding
+
+  // Relations
+  chapter      Chapter        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributor  User           @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  votes        ContentVote[]
+  quiz         Quiz? // One-to-one relation for quiz content
+  userProgress UserProgress[]
+  comments     Comment[]
+  reports      Report[]
+
+  @@unique([chapterId, sequence]) // prevent duplicate ordering
+  @@index([chapterId, status]) // "approved content for chapter X"
+  @@index([contributorId]) // "user's content"
+  @@index([status]) // "pending moderation queue"
+  @@map("content")
+}
+
+model ContentVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType  VoteType
+  userId    String // UUID reference to User
+  contentId Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentId]) // one vote per user per content
+  @@index([contentId, voteType]) // for counting votes by type
+  @@map("content_votes")
+}
+
+// QUIZ SYSTEM
+
+model Quiz {
+  contentId       Int     @id // One-to-one with Content
+  instructions    String?
+  timeLimit       Int? // minutes, null = no limit
+  attemptsAllowed Int     @default(-1) // -1 = unlimited
+  passScore       Float? // 0.0 to 1.0, null = no pass requirement
+
+  content   Content           @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  UserQuizAttempt[]
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questionText String
+  questionType QuestionType
+  points       Int          @default(1)
+  sequence     Int // question order within quiz
+  quizId       Int
+
+  quiz    Quiz         @relation(fields: [quizId], references: [contentId], onDelete: Cascade)
+  options QuizOption[]
+  answers UserAnswer[]
+
+  @@unique([quizId, sequence]) // prevent duplicate question ordering
+  @@index([quizId]) // for loading quiz questions
+  @@map("quiz_questions")
+}
+
+model QuizOption {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  optionText String
+  isCorrect  Boolean @default(false)
+  sequence   Int // option order within question
+  questionId Int
+
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers  UserAnswer[]
+
+  @@unique([questionId, sequence]) // prevent duplicate option ordering
+  @@index([questionId]) // for loading question options
+  @@map("quiz_options")
+}
+
+model UserQuizAttempt {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  score       Float? // 0.0 to 1.0, calculated after completion
+  maxScore    Int // total points possible
+  startedAt   DateTime  @default(now())
+  completedAt DateTime? // null = in progress
+  userId      String // UUID reference to User
+  quizId      Int
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz    Quiz         @relation(fields: [quizId], references: [contentId], onDelete: Cascade)
+  answers UserAnswer[]
+
+  @@index([userId, quizId]) // for user's attempts on specific quiz
+  @@index([quizId]) // for quiz statistics
+  @@map("user_quiz_attempts")
+}
+
+model UserAnswer {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  selectedOptionId Int? // for multiple_choice/true_false
+  textAnswer       String? // for short_answer
+  isCorrect        Boolean? // calculated after submission
+  attemptId        Int
+  questionId       Int
+
+  attempt  UserQuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question QuizQuestion    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  option   QuizOption?     @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+
+  @@unique([attemptId, questionId]) // one answer per question per attempt
+  @@index([attemptId]) // for loading attempt answers
+  @@map("user_answers")
+}
+
+// PROGRESS TRACKING
+
+model Enrollment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enrolledAt DateTime @default(now())
+  userId     String // UUID reference to User
+  subjectId  Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId]) // one enrollment per user per subject
+  @@index([subjectId]) // for subject enrollment counts
+  @@index([userId]) // for user's enrolled subjects
+  @@map("enrollments")
+}
+
+model UserProgress {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  completedAt          DateTime? // null = not completed
+  lastAccessed         DateTime  @default(now())
+  lastPosition         Int       @default(0) // seconds into video for YouTube progress
+  completionPercentage Int       @default(0) // 0-100, for partial progress
+  userId               String // UUID reference to User
+  contentId            Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentId]) // one progress record per user per content
+  @@index([userId, completedAt]) // for user progress queries
+  @@index([contentId]) // for content completion statistics
+  @@map("user_progress")
+}
+
+model ChapterCompletion {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  completedAt    DateTime? // null = not completed
+  completionType CompletionType @default(AUTO) // 'manual' or 'auto'
+  userId         String // UUID reference to User
+  chapterId      Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chapterId]) // one completion record per user per chapter
+  @@index([userId]) // for user's completed chapters
+  @@index([chapterId]) // for chapter completion statistics
+  @@map("chapter_completions")
+}
+
+// ENGAGEMENT FEATURES
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  text            String
+  isAnnouncement  Boolean   @default(false) // for moderator/contributor announcements
+  isPinned        Boolean   @default(false)
+  isDeleted       Boolean   @default(false) // soft delete
+  editedAt        DateTime?
+  userId          String // UUID reference to User
+  contentId       Int
+  parentCommentId Int? // for replies
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content       Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  parentComment Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       Comment[]     @relation("CommentReplies")
+  votes         CommentVote[]
+  reports       Report[]
+
+  @@index([contentId, isDeleted, createdAt]) // for content comments (excluding deleted)
+  @@index([parentCommentId]) // for loading replies
+  @@index([contentId, isPinned, isAnnouncement]) // for featured comments
+  @@map("comments")
+}
+
+model CommentVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType  VoteType
+  userId    String // UUID reference to User
+  commentId Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId]) // one vote per user per comment
+  @@index([commentId, voteType]) // for counting votes by type
+  @@map("comment_votes")
+}
+
+// MODERATION & REPORTING
+
+model SubjectModerator {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String // UUID reference to User
+  subjectId Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId]) // one moderator role per user per subject
+  @@index([subjectId]) // for finding moderators of a subject
+  @@index([userId]) // for user's moderated subjects
+  @@map("subject_moderators")
+}
+
+model Report {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reason            ReportReason
+  description       String?
+  status            ReportStatus @default(PENDING)
+  resolutionNotes   String?
+  resolvedAt        DateTime?
+  reporterUserId    String // UUID reference to User
+  reportedContentId Int? // One of these three must be non-null
+  reportedCommentId Int?
+  reportedUserId    String?
+  resolvedBy        String? // UUID reference to User (admin/moderator)
+
+  reporter        User     @relation("ReportedBy", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reportedContent Content? @relation(fields: [reportedContentId], references: [id], onDelete: SetNull)
+  reportedComment Comment? @relation(fields: [reportedCommentId], references: [id], onDelete: SetNull)
+  reportedUser    User?    @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  resolver        User?    @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt]) // for moderation queue
+  @@index([reporterUserId]) // for user's reports
+  @@index([reportedContentId]) // for content reports
+  @@index([reportedCommentId]) // for comment reports
+  @@index([reportedUserId]) // for user reports
+  @@index([resolvedBy]) // for moderator activity
+  @@map("reports")
+}
+
+model UserPoints {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  points    Int      @default(0)
+  earnedAt  DateTime @default(now())
+  reason    String? // "content_approved", "quiz_completed", "helpful_comment", etc.
+  userId    String // UUID reference to User
+  subjectId Int? // null for global points
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, earnedAt]) // for user point history
+  @@index([subjectId, earnedAt]) // for subject leaderboards
+  @@index([earnedAt]) // for global leaderboards
+  @@map("user_points")
 }

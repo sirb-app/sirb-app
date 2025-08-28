@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { deleteUserAction } from "@/actions/delete-user.action";
 import { Button } from "@/components/ui/button";
 import { TrashIcon } from "lucide-react";
-import { deleteUserAction } from "@/actions/delete-user.action";
+import { useState } from "react";
 import { toast } from "sonner";
 
 type DeleteUserButtonProps = {

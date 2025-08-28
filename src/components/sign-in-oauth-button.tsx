@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth-client";
+import { useState } from "react";
 import { toast } from "sonner";
 
 type SignInOauthButtonProps = {
@@ -19,7 +19,7 @@ export const SignInOauthButton = ({
   async function handleClick() {
     await signIn.social({
       provider,
-      callbackURL: "/profile",
+      callbackURL: "/dashboard",
       errorCallbackURL: "/auth/login/error",
       fetchOptions: {
         onRequest: () => {
