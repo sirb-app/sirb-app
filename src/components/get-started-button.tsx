@@ -10,7 +10,7 @@ export const GetStartedButton = () => {
   if (isPending) {
     return (
       <Button size="lg" className="opacity-50" asChild>
-        <span>Get Started</span>
+        <span className="font-bold">إبدأ الآن</span>
       </Button>
     );
   }
@@ -20,16 +20,18 @@ export const GetStartedButton = () => {
   return (
     <div className="flex flex-col items-center gap-4">
       <Button size="lg" asChild>
-        <Link href={href}>Get Started</Link>
+        <Link href={href}>
+          <span className="font-bold">إبدأ الآن</span>
+        </Link>
       </Button>
 
       {session && (
         <p className="flex items-center gap-2">
           <span
             data-role={session.user.role}
-            className="size-4 animate-pulse rounded-full data-[role=ADMIN]:bg-red-600 data-[role=USER]:bg-blue-600"
+            className="data-[role=ADMIN]:bg-destructive data-[role=USER]:bg-primary size-4 animate-pulse rounded-full"
           />
-          Welcome back, {session.user.name}! 👋
+          حياك الله, {session.user.name}! 👋
         </p>
       )}
     </div>

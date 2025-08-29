@@ -30,8 +30,8 @@ export default async function Page() {
             </Link>
           </Button>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="rounded-md bg-red-600 p-2 text-lg font-bold text-white">
-            FORBIDDEN
+          <p className="bg-destructive text-destructive-foreground rounded-md p-2 text-lg font-bold">
+            أنت لست مسؤولاً
           </p>
         </div>
       </div>
@@ -60,8 +60,8 @@ export default async function Page() {
           </Link>
         </Button>
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="rounded-md bg-green-600 p-2 text-lg font-bold text-white">
-          ACCESS GRANTED
+        <p className="bg-primary text-primary-foreground rounded-md p-2 text-lg font-bold">
+          مرحباً بك في لوحة التحكم
         </p>
       </div>
 
