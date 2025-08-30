@@ -7,7 +7,7 @@ import "./globals.css";
 const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
   variable: "--font-ibm-plex-sans-arabic",
   subsets: ["arabic"],
-  weight: ["100", "200", "300", "400", "500", "600", "700"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default function RootLayout({
         className={`${ibmPlexSansArabic.variable} bg-background font-sans antialiased`}
       >
         <Navigation />
-        <main>{children}</main>
+        <main className="pt-6">{children}</main>
         <Toaster position="top-center" richColors />
       </body>
     </html>

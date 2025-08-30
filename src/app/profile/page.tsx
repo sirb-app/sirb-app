@@ -74,7 +74,7 @@ export default async function Page() {
         {JSON.stringify(session, null, 2)}
       </pre>
 
-      <div className="space-y-4 rounded-b-md border border-t-8 border-blue-600 p-4">
+      <div className="border-primary space-y-4 rounded-b-md border border-t-8 p-4">
         <h2 className="text-2xl font-bold">Update User</h2>
 
         <UpdateUserForm
@@ -83,7 +83,7 @@ export default async function Page() {
         />
       </div>
 
-      <div className="space-y-4 rounded-b-md border border-t-8 border-red-600 p-4">
+      <div className="border-destructive space-y-4 rounded-b-md border border-t-8 p-4">
         <h2 className="text-2xl font-bold">Change Password</h2>
 
         <ChangePasswordForm />

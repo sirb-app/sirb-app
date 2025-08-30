@@ -1,0 +1,289 @@
+---
+description: General guidelines on building nextjs projects
+alwaysApply: false
+---
+
+# Cursor Rules for Modern Next.js + TypeScript Projects
+
+## Project Architecture & Structure
+
+### Directory Organization
+
+- Use the `src/` directory pattern for source code
+- Organize by feature/domain rather than by type
+- Keep UI components in `src/components/ui/` for reusable elements (Shadcn)
+- Place business logic in `src/lib/` directory
+- Use `src/app/` for Next.js 15 App Router pages
+
+### File Naming Conventions
+
+- Use kebab-case for file names: `pet-form.tsx`, `auth-form.tsx`
+- Use PascalCase for component names: `PetForm`, `AuthForm`
+- Use camelCase for utility functions and variables
+- Prefix API routes with descriptive names
+
+## TypeScript & Type Safety
+
+### Strict TypeScript Configuration
+
+- Enable strict mode in `tsconfig.json`
+- Use `noEmit: true` for Next.js projects
+- Configure path aliases: `@/*` maps to `./src/*`
+- Use `moduleResolution: "bundler"` for Next.js 15
+
+### Type Definitions
+
+- Always define proper types (prefer types than interfaces)
+- Use Zod schemas for runtime validation and type inference
+- Export types from dedicated `types.ts` files
+- Use `z.infer<typeof schema>` for automatic type generation
+- Prefer `Readonly<>` for props when possible
+
+### Example Type Pattern:
+
+```typescript
+export interface ComponentProps {
+  readonly children: React.ReactNode;
+  className?: string;
+}
+
+export type TFormData = z.infer<typeof formSchema>;
+```
+
+## React & Next.js Patterns
+
+### Component Structure
+
+- Use functional components with hooks
+- Implement `forwardRef` for components that need refs
+- Always include `displayName` for forwardRef components
+- Use `"use client"` directive only when necessary
+- Prefer server components by default
+
+### Form Handling
+
+- Use `react-hook-form` with `zodResolver` for validation
+- Implement proper error handling and display
+- Use controlled inputs with proper TypeScript types
+- Handle form submission with async/await patterns
+
+## Styling & UI
+
+### Tailwind CSS Patterns
+
+- Use the `cn()` utility function for conditional classes
+- Implement component variants using `class-variance-authority`
+- Use semantic color names (zinc, slate) for consistency
+- Implement responsive design with Tailwind breakpoints
+- Use CSS custom properties for theme values
+
+### Component Variants Pattern:
+
+```typescript
+const buttonVariants = cva("base-classes", {
+  variants: {
+    variant: {
+      default: "default-classes",
+      destructive: "destructive-classes",
+      outline: "outline-classes",
+    },
+    size: {
+      default: "h-10 px-6 py-2",
+      sm: "h-8 px-3 text-xs",
+      lg: "h-10 px-8",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+    size: "default",
+  },
+});
+```
+
+### UI Component Guidelines
+
+- Shadcn UI components in `src/components/ui/`
+- Use Radix UI primitives for accessibility (Actually Shadcn uses them by default)
+- Implement proper ARIA labels and roles
+- Use semantic HTML elements
+- Ensure keyboard navigation support
+
+## Database & Data Layer
+
+### Prisma Patterns
+
+- Use descriptive model names (User, Pet)
+- Implement proper relationships with foreign keys
+- Include `createdAt` and `updatedAt` timestamps
+- Use proper field types and constraints
+
+### Database Operations
+
+- Implement proper error handling for database operations
+- Use transactions when multiple operations need to be atomic
+- Implement proper data validation before database writes
+- Use Prisma's type-safe query builder
+
+## Security & Validation
+
+### Input Validation
+
+- Use Zod schemas for all form inputs
+- Implement server-side validation for all API endpoints
+- Sanitize user inputs before processing
+- Use proper error messages without exposing system details
+
+### Authentication Security
+
+- Hash passwords using argon2
+- Implement proper session management
+- Use environment variables for sensitive configuration
+- Implement rate limiting for authentication endpoints
+
+## Code Quality & Standards
+
+### ESLint Configuration
+
+- Extend Next.js core web vitals rules
+- Use TypeScript-aware linting
+- Enforce consistent code formatting
+
+### Import Organization
+
+- Group imports by type: React, external libraries, internal modules
+- Use absolute imports with `@/` alias
+- Sort imports alphabetically within groups
+
+### Error Handling
+
+- Use proper try-catch blocks for async operations
+- Implement user-friendly error messages
+- Log errors appropriately for debugging
+- Handle edge cases gracefully
+
+## Performance & Optimization
+
+### Next.js Optimizations
+
+- Use server components when possible
+- Implement proper image optimization
+- Use dynamic imports for code splitting
+- Optimize bundle size with tree shaking
+
+### React Optimizations
+
+- Use `useMemo` and `useCallback` appropriately
+- Implement proper dependency arrays
+- Avoid unnecessary re-renders
+- Use React.memo for expensive components
+
+## Testing & Development
+
+### Development Workflow
+
+- Use TypeScript strict mode
+- Implement proper error boundaries
+- Use React DevTools for debugging
+- Test components in isolation
+
+### Code Organization Principles
+
+- Single responsibility principle for components
+- Separation of concerns between UI and business logic
+- Consistent error handling patterns
+- Reusable utility functions
+
+## Environment & Configuration
+
+### Environment Variables
+
+- Use `.env` for local development
+- Never commit sensitive information
+- Use proper environment variable validation
+- Implement fallback values where appropriate
+
+### Build Configuration
+
+- Configure PostCSS for Tailwind CSS
+- Use proper TypeScript compilation settings
+- Implement proper asset optimization
+- Configure proper development and production builds
+
+## Accessibility & UX
+
+### Accessibility Standards
+
+- Implement proper ARIA labels
+- Ensure keyboard navigation support
+- Use semantic HTML elements
+- Test with screen readers
+
+### User Experience
+
+- Implement proper loading states
+- Use toast notifications for user feedback
+- Implement proper form validation feedback
+- Ensure responsive design across devices
+
+## Documentation & Comments
+
+### Code Documentation
+
+- Use JSDoc comments for complex functions
+- Document component props and usage
+- Include examples for reusable components
+- Maintain up-to-date README files
+
+### Inline Comments
+
+- Comment complex business logic
+- Explain non-obvious implementation details
+- Document workarounds or temporary solutions
+- Use clear, concise language
+
+## Git & Version Control
+
+### Commit Standards
+
+- Use conventional commit messages
+- Keep commits focused and atomic
+- Include proper commit descriptions
+- Use feature branches for development
+
+### Code Review
+
+- Review for security vulnerabilities
+- Ensure proper error handling
+- Check for accessibility issues
+- Verify TypeScript type safety
+
+## Deployment & Production
+
+### Production Considerations
+
+- Implement proper error logging
+- Use production-ready database connections
+- Configure proper security headers
+- Implement monitoring and alerting
+
+### Environment Management
+
+- Use different configurations for dev/staging/prod
+- Implement proper secret management
+- Use environment-specific feature flags
+- Monitor performance metrics
+
+## Best Practices Summary
+
+1. **Type Safety First**: Always use TypeScript with strict mode
+2. **Component Composition**: Build reusable, composable components
+3. **Form Validation**: Use Zod schemas for runtime validation
+4. **Error Handling**: Implement proper error boundaries and user feedback
+5. **Performance**: Optimize for Core Web Vitals
+6. **Accessibility**: Ensure inclusive design from the start
+7. **Security**: Validate all inputs and implement proper authentication
+8. **Testing**: Write tests for critical business logic
+9. **Documentation**: Keep code self-documenting and well-commented
+10. **Consistency**: Follow established patterns throughout the codebase
+
+Remember: These rules are guidelines that promote consistency, maintainability, and best practices. Adapt them to your specific project needs while maintaining the core principles of type safety, security, and user experience.

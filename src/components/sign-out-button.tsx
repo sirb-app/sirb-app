@@ -6,7 +6,25 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export const SignOutButton = () => {
+type SignOutButtonProps = {
+  variant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link";
+  size?: "default" | "sm" | "lg" | "icon";
+  className?: string;
+  children?: React.ReactNode;
+};
+
+export const SignOutButton = ({
+  variant = "destructive",
+  size = "sm",
+  className,
+  children = "تسجيل الخروج",
+}: SignOutButtonProps) => {
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
@@ -33,11 +51,12 @@ export const SignOutButton = () => {
   return (
     <Button
       onClick={handleClick}
-      size="sm"
-      variant="destructive"
+      size={size}
+      variant={variant}
       disabled={isPending}
+      className={className}
     >
-      Sign Out
+      {children}
     </Button>
   );
 };

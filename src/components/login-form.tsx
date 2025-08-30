@@ -40,7 +40,7 @@ export const LoginForm = () => {
     await signIn.email(data, {
       onSuccess: () => {
         toast.success("Login successful. Good to have you back.");
-        router.push("/dashboard");
+        router.push("/");
       },
       onError: ctx => {
         if (ctx.error.status === 403) {
