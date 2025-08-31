@@ -11,6 +11,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+/**
+ * Client-side React component that renders a theme selection dropdown (Light / Dark / System).
+ *
+ * Renders a button trigger with animated sun/moon icons and a dropdown menu. Selecting an item calls `setTheme` from next-themes with `"light"`, `"dark"`, or `"system"` to apply the chosen theme. Includes an accessible label ("Toggle theme") on the trigger.
+ *
+ * @returns The dropdown toggle UI as a JSX element.
+ */
 export function ModeToggle() {
   const { setTheme } = useTheme();
 
