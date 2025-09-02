@@ -1,4 +1,6 @@
+import { ModeToggle } from "@/components/mode-toggle";
 import { Navigation } from "@/components/navigation";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
@@ -21,13 +23,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body
         className={`${ibmPlexSansArabic.variable} bg-background font-sans antialiased`}
       >
-        <Navigation />
-        <main className="pt-6">{children}</main>
-        <Toaster position="top-center" richColors />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Navigation />
+          <div className="fixed">
+            <ModeToggle />
+          </div>
+          <main className="pt-6">{children}</main>
+          <Toaster position="top-center" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );
