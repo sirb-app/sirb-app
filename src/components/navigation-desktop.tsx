@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { BookOpen, ChevronDown, LogOut, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ModeToggle } from "./mode-toggle";
 import { SignOutButton } from "./sign-out-button";
 
 const routes = [
@@ -53,6 +54,7 @@ export const NavigationDesktopAuth = ({
 }: NavigationDesktopAuthProps) => {
   return (
     <div className="hidden items-center gap-3 md:flex">
+      <ModeToggle />
       {isPending && !user ? (
         <>
           <Skeleton className="h-8 w-16" />

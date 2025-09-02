@@ -1,4 +1,3 @@
-import { ModeToggle } from "@/components/mode-toggle";
 import { Navigation } from "@/components/navigation";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -34,9 +33,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Navigation />
-          <div className="fixed">
-            <ModeToggle />
-          </div>
           <main className="pt-6">{children}</main>
           <Toaster position="top-center" richColors />
         </ThemeProvider>

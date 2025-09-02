@@ -14,6 +14,7 @@ import { BookOpen, LogIn, LogOut, Menu, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { ModeToggle } from "./mode-toggle";
 import { SignOutButton } from "./sign-out-button";
 
 const routes = [
@@ -154,6 +155,14 @@ export const NavigationMobile = ({
                   </div>
                 </>
               )}
+            </div>
+          </div>
+          <div className="border-border flex flex-col gap-3 border-t pt-6">
+            <h3 className="text-muted-foreground px-3 text-sm font-medium tracking-wide uppercase">
+              المظهر
+            </h3>
+            <div className="px-3">
+              <ModeToggle />
             </div>
           </div>
         </div>
