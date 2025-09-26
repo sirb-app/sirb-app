@@ -1,7 +1,7 @@
-export default function Page() {
-  // TODO:
-  // - Primary goal: Manage universities, colleges, and subjects.
-  // - Data/entities: universities, colleges, subjects, import/export helpers.
-  // - Permissions: ADMIN only.
-  return null;
+import { listUniversitiesAction } from "@/actions/university.actions";
+import UniversitiesManager from "./universities-manager";
+
+export default async function Page() {
+  const universities = await listUniversitiesAction();
+  return <UniversitiesManager universities={universities} />;
 }

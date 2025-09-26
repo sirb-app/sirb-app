@@ -24,6 +24,7 @@ const routes = [
 ];
 
 type NavigationMobileProps = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any;
   isPending: boolean;
 };
