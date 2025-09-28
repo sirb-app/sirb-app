@@ -1,6 +1,8 @@
 import { getUniversityByCodeAction } from "@/actions/university.actions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CollegeManager } from "./college-manager";
+import { UniversitySettingsCard } from "./university-settings-card";
 
 export default async function UniversityByCodePage({
   params,
@@ -35,45 +37,16 @@ export default async function UniversityByCodePage({
         </Link>
       </div>
 
-      <section className="space-y-4">
-        <h2 className="text-xl font-semibold">الكليات</h2>
-        {university.colleges.length === 0 && (
-          <p className="text-muted-foreground text-sm">لا توجد كليات بعد.</p>
-        )}
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* TODO: improve below code after college addition logic*/}
-          {university.colleges.map(college => (
-            <li
-              key={college.id}
-              className="bg-card rounded-lg border p-4 shadow-sm"
-            >
-              <h3 className="mb-1 font-medium">{college.name}</h3>
-              <p className="text-muted-foreground mb-2 text-xs">
-                المواد: {college.subjects.length}
-              </p>
-              {college.subjects.length > 0 && (
-                <ul className="text-xs leading-5">
-                  {college.subjects.slice(0, 6).map(s => (
-                    <li key={s.id} className="truncate">
-                      {s.name}
-                    </li>
-                  ))}
-                  {college.subjects.length > 6 && (
-                    <li className="text-muted-foreground">… المزيد</li>
-                  )}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <CollegeManager
+        universityId={university.id}
+        colleges={university.colleges}
+      />
 
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold">إدارة</h2>
-        <p className="text-muted-foreground text-sm">
-          general management tools and settings for the uni and maybe colleges.
-        </p>
-      </section>
+      <UniversitySettingsCard
+        universityId={university.id}
+        name={university.name}
+        code={university.code}
+      />
     </div>
   );
 }

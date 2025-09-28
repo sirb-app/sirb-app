@@ -21,7 +21,9 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 type UniversityWithRelations = Prisma.UniversityGetPayload<{
-  include: { colleges: { include: { subjects: true } } };
+  include: {
+    colleges: { include: { _count: { select: { subjects: true } } } };
+  };
 }>;
 interface UniversitiesManagerProps {
   universities: UniversityWithRelations[];
@@ -67,7 +69,6 @@ export default function UniversitiesManager({
           av = a[field] as typeof av;
           bv = b[field] as typeof bv;
         }
-        // Normalize Dates to timestamps for comparison
         if (av instanceof Date) av = av.getTime();
         if (bv instanceof Date) bv = bv.getTime();
         if (typeof av === "string" && typeof bv === "string") {
