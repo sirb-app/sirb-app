@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Prisma } from "@/generated/prisma";
 import { MoreVertical, Plus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -39,11 +40,13 @@ type College = UniversityWithColleges["colleges"][number];
 
 interface CollegeManagerProps {
   universityId: number;
+  universityCode: string;
   colleges: UniversityWithColleges["colleges"];
 }
 
 export function CollegeManager({
   universityId,
+  universityCode,
   colleges,
 }: CollegeManagerProps) {
   const router = useRouter();
@@ -169,12 +172,20 @@ export function CollegeManager({
               className="bg-card rounded-lg border p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="leading-6 font-medium">{college.name}</h3>
+                <Link
+                  href={`/admin/universities/${encodeURIComponent(
+                    universityCode
+                  )}/colleges/${college.id}`}
+                  className="min-w-0 flex-1"
+                  aria-label={`عرض الكلية ${college.name}`}
+                >
+                  <h3 className="leading-6 font-medium group-hover:underline">
+                    {college.name}
+                  </h3>
                   <p className="text-muted-foreground mt-1 text-xs">
                     المواد: {college._count?.subjects ?? 0}
                   </p>
-                </div>
+                </Link>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button

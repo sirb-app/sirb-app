@@ -186,3 +186,14 @@ export async function deleteCollegeAction(
     return { error: "فشل حذف الكلية" };
   }
 }
+
+export async function getCollegeByIdAction(id: number) {
+  if (!Number.isInteger(id)) return null;
+  return prisma.college.findUnique({
+    where: { id },
+    include: {
+      university: true,
+      _count: { select: { subjects: true } },
+    },
+  });
+}

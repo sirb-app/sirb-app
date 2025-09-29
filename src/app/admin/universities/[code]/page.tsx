@@ -39,6 +39,7 @@ export default async function UniversityByCodePage({
 
       <CollegeManager
         universityId={university.id}
+        universityCode={university.code}
         colleges={university.colleges}
       />
 
