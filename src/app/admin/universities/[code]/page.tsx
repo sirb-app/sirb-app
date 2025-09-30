@@ -1,8 +1,8 @@
 import { getUniversityByCodeAction } from "@/actions/university.actions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CollegeManager } from "./college-manager";
-import { UniversityHeaderActions } from "./university-settings-card";
+import { CollegeManager } from "./_components/college-manager";
+import { UniversityHeaderActions } from "./_components/university-header-actions";
 
 export default async function UniversityByCodePage({
   params,

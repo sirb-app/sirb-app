@@ -1,5 +1,5 @@
 import { listUniversitiesAction } from "@/actions/university.actions";
-import UniversitiesManager from "./universities-manager";
+import UniversitiesManager from "./_components/universities-manager";
 
 export default async function Page() {
   const universities = await listUniversitiesAction();
