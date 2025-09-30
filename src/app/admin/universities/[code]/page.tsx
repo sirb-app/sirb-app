@@ -2,7 +2,7 @@ import { getUniversityByCodeAction } from "@/actions/university.actions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CollegeManager } from "./college-manager";
-import { UniversitySettingsCard } from "./university-settings-card";
+import { UniversityHeaderActions } from "./university-settings-card";
 
 export default async function UniversityByCodePage({
   params,
@@ -20,10 +20,17 @@ export default async function UniversityByCodePage({
   return (
     <div className="space-y-6 p-6" dir="rtl">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {university.name}
-          </h1>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">
+              {university.name}
+            </h1>
+            <UniversityHeaderActions
+              universityId={university.id}
+              name={university.name}
+              code={university.code}
+            />
+          </div>
           <p className="text-muted-foreground mt-1 text-sm">
             الكود: {university.code}
           </p>
@@ -41,12 +48,6 @@ export default async function UniversityByCodePage({
         universityId={university.id}
         universityCode={university.code}
         colleges={university.colleges}
-      />
-
-      <UniversitySettingsCard
-        universityId={university.id}
-        name={university.name}
-        code={university.code}
       />
     </div>
   );

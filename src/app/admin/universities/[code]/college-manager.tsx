@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Prisma } from "@/generated/prisma";
+import { slugify } from "@/lib/utils";
 import { MoreVertical, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -166,60 +167,66 @@ export function CollegeManager({
         <p className="text-muted-foreground text-sm">لا توجد كليات بعد.</p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {colleges.map(college => (
-            <li
-              key={college.id}
-              className="bg-card rounded-lg border p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <Link
-                  href={`/admin/universities/${encodeURIComponent(
-                    universityCode
-                  )}/colleges/${college.id}`}
-                  className="min-w-0 flex-1"
-                  aria-label={`عرض الكلية ${college.name}`}
-                >
-                  <h3 className="leading-6 font-medium group-hover:underline">
-                    {college.name}
-                  </h3>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    المواد: {college._count?.subjects ?? 0}
-                  </p>
-                </Link>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-foreground"
-                      aria-label={`إجراءات الكلية ${college.name}`}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="text-right">
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        setTargetCollege(college);
-                        setEditOpen(true);
-                      }}
-                    >
-                      تعديل
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onSelect={() => {
-                        setTargetCollege(college);
-                        setDeleteOpen(true);
-                      }}
-                    >
-                      حذف
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </li>
-          ))}
+          {colleges.map(college => {
+            const slug = slugify(college.name);
+            return (
+              <li
+                key={college.id}
+                className="bg-card rounded-lg border p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    href={`/admin/universities/${encodeURIComponent(
+                      universityCode
+                    )}/colleges/${encodeURIComponent(slug)}`}
+                    className="group min-w-0 flex-1"
+                    aria-label={`عرض الكلية ${college.name}`}
+                  >
+                    <h3 className="leading-6 font-medium group-hover:underline">
+                      {college.name}
+                    </h3>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      المواد:{" "}
+                      {new Intl.NumberFormat("ar-SA-u-nu-latn").format(
+                        college._count?.subjects ?? 0
+                      )}
+                    </p>
+                  </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label={`إجراءات الكلية ${college.name}`}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="text-right">
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setTargetCollege(college);
+                          setEditOpen(true);
+                        }}
+                      >
+                        تعديل
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => {
+                          setTargetCollege(college);
+                          setDeleteOpen(true);
+                        }}
+                      >
+                        حذف
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

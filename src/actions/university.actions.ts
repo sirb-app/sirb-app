@@ -52,6 +52,9 @@ export async function createUniversityAction(
   const code = rawCode.trim().toUpperCase();
   if (!name) return { error: "حقل الاسم مطلوب" };
   if (!code) return { error: "حقل الكود مطلوب" };
+  if (!/^[A-Z0-9]+$/.test(code)) {
+    return { error: "الكود يجب أن يكون بالإنجليزية بدون مسافات أو رموز" };
+  }
   try {
     const data = await prisma.university.create({ data: { name, code } });
     revalidatePath("/admin/universities");
@@ -84,6 +87,9 @@ export async function updateUniversityAction(
   const code = rawCode.trim().toUpperCase();
   if (!name) return { error: "حقل الاسم مطلوب" };
   if (!code) return { error: "حقل الكود مطلوب" };
+  if (!/^[A-Z0-9]+$/.test(code)) {
+    return { error: "الكود يجب أن يكون بالإنجليزية بدون مسافات أو رموز" };
+  }
   try {
     const data = await prisma.university.update({
       where: { id },

@@ -168,6 +168,8 @@ export default function UniversitiesManager({
                     required
                     disabled={isPending}
                     className="uppercase"
+                    pattern="[A-Za-z0-9]+"
+                    title="استخدم حروف إنجليزية وأرقام فقط بدون مسافات"
                   />
                 </div>
                 <DialogFooter>
@@ -251,7 +253,11 @@ export default function UniversitiesManager({
                 <span className="col-span-2 font-medium tracking-tight break-words whitespace-normal group-hover:underline">
                   {uni.name}
                 </span>
-                <span className="text-sm">{uni.colleges.length}</span>
+                <span className="text-sm">
+                  {new Intl.NumberFormat("ar-SA-u-nu-latn").format(
+                    uni.colleges.length
+                  )}
+                </span>
                 <span className="hidden text-sm sm:inline-block">
                   {new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
                     year: "numeric",

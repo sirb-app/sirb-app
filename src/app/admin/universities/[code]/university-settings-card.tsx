@@ -2,45 +2,64 @@
 
 import { updateUniversityAction } from "@/actions/university.actions";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PenLine } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-interface UniversitySettingsCardProps {
+interface UniversityHeaderActionsProps {
   universityId: number;
   name: string;
   code: string;
 }
 
-export function UniversitySettingsCard({
+export function UniversityHeaderActions({
   universityId,
   name,
   code,
-}: UniversitySettingsCardProps) {
+}: UniversityHeaderActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
 
   return (
-    <section className="space-y-4" dir="rtl">
-      <div>
-        <h2 className="text-xl font-semibold">إعدادات الجامعة</h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          حدّث بيانات الجامعة الأساسية.
-        </p>
-      </div>
-      <div className="bg-card rounded-lg border p-6 shadow-sm">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="تعديل بيانات الجامعة"
+          disabled={isPending}
+        >
+          <PenLine className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl">
+        <DialogHeader>
+          <DialogTitle>تعديل بيانات الجامعة</DialogTitle>
+        </DialogHeader>
         <form
           className="space-y-4"
           onSubmit={event => {
             event.preventDefault();
-            const form = event.currentTarget;
-            const formData = new FormData(form);
+            const formData = new FormData(event.currentTarget);
             startTransition(async () => {
               const res = await updateUniversityAction(universityId, formData);
               if (!("error" in res) || res.error === null) {
                 toast.success("تم تحديث بيانات الجامعة");
+                setOpen(false);
                 router.refresh();
               } else if (res.error) {
                 toast.error(res.error);
@@ -68,16 +87,26 @@ export function UniversitySettingsCard({
                 required
                 disabled={isPending}
                 className="uppercase"
+                pattern="[A-Za-z0-9]+"
+                title="استخدم حروف إنجليزية وأرقام فقط بدون مسافات"
               />
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+          <DialogFooter className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={isPending}
+            >
+              إلغاء
             </Button>
-          </div>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "جارٍ الحفظ..." : "حفظ"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </section>
+      </DialogContent>
+    </Dialog>
   );
 }
