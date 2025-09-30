@@ -69,7 +69,7 @@ export default async function CollegeBySlugPage({
         <div className="flex items-center gap-3">
           <Link
             href={`/admin/universities/${encodeURIComponent(college.university.code)}`}
-            className="text-primary z-50 text-sm hover:underline"
+            className="text-primary text-sm hover:underline"
           >
             ← الرجوع للجامعة
           </Link>

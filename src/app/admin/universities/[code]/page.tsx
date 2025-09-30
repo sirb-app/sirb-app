@@ -37,7 +37,7 @@ export default async function UniversityByCodePage({
         </div>
         <Link
           href="/admin/universities"
-          className="text-primary z-50 text-sm hover:underline"
+          className="text-primary text-sm hover:underline"
           aria-label="الرجوع إلى قائمة الجامعات"
         >
           ← الرجوع

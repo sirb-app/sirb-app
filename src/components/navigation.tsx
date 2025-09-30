@@ -12,14 +12,12 @@ export const Navigation = () => {
   return (
     <>
       {/* Background mask to hide content scrolling behind nav */}
-      <div className="bg-background sticky top-0 z-40 h-4 w-full">
-        <div className="mx-auto max-w-[1200px] px-3 md:px-8 lg:px-[150px]">
-          <div className="h-full w-full" />
-        </div>
+      <div className="sticky top-0 h-4 w-full">
+        <div className="bg-background absolute inset-0 -z-10" />
       </div>
-      <nav className="sticky top-4 z-50 w-full">
+      <nav className="pointer-events-none sticky top-4 isolate z-50 w-full">
         <div className="mx-auto max-w-[1200px] px-3 md:px-8 lg:px-[150px]">
-          <div className="bg-card rounded-lg border px-4 py-3 shadow-md md:px-6 md:py-4">
+          <div className="bg-card pointer-events-auto rounded-lg border px-4 py-3 shadow-md md:px-6 md:py-4">
             <div className="flex flex-row-reverse items-center justify-between md:flex-row">
               {/* Logo */}
               <Link href="/" className="text-foreground text-xl font-bold">
