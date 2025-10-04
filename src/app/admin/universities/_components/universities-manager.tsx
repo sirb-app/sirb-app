@@ -1,6 +1,14 @@
 "use client";
 
 import { createUniversityAction } from "@/actions/university.actions";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +33,7 @@ type UniversityWithRelations = Prisma.UniversityGetPayload<{
     colleges: { include: { _count: { select: { subjects: true } } } };
   };
 }>;
+
 interface UniversitiesManagerProps {
   universities: UniversityWithRelations[];
 }
@@ -48,7 +57,7 @@ export default function UniversitiesManager({
   }, [search]);
 
   const filtered: UniversityWithRelations[] = useMemo(() => {
-    let items: UniversityWithRelations[] = data;
+    let items = data;
     if (debounced.trim()) {
       const q = debounced.toLowerCase();
       items = items.filter(
@@ -83,11 +92,41 @@ export default function UniversitiesManager({
     return items;
   }, [data, debounced, sort]);
 
+  const totals = useMemo(() => {
+    const totalUniversities = data.length;
+    let totalColleges = 0;
+    let totalSubjects = 0;
+
+    for (const uni of data) {
+      totalColleges += uni.colleges.length;
+      for (const college of uni.colleges) {
+        totalSubjects += college._count.subjects;
+      }
+    }
+
+    return { totalUniversities, totalColleges, totalSubjects };
+  }, [data]);
+
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat("ar-SA-u-nu-latn"),
+    []
+  );
+
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }),
+    []
+  );
+
   const toggleSort = (field: "name" | "code" | "colleges" | "createdAt") => {
     setSort(prev => {
       if (!prev || prev.field !== field) return { field, dir: "asc" };
       if (prev.dir === "asc") return { field, dir: "desc" };
-      return null; // third click clears sort
+      return null;
     });
   };
 
@@ -110,81 +149,126 @@ export default function UniversitiesManager({
 
   return (
     <div className="space-y-6 p-6" dir="rtl">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">إدارة الجامعات</h1>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:w-64">
-            <Search
-              className="text-muted-foreground absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2"
-              aria-hidden="true"
-            />
-            <Input
-              placeholder="بحث بالاسم أو الكود"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pr-2 pl-8"
-              aria-label="بحث"
-            />
+      <div className="space-y-4">
+        <Breadcrumb className="text-muted-foreground">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/admin">لوحة التحكم</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>إدارة الجامعات</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              إدارة الجامعات
+            </h1>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                className="whitespace-nowrap"
-                aria-label="إضافة جامعة جديدة"
-              >
-                <Plus className="ml-2 h-4 w-4" />
-                إضافة جامعة
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>جامعة جديدة</DialogTitle>
-                <DialogDescription>أدخل معلومات الجامعة.</DialogDescription>
-              </DialogHeader>
-              <form
-                action={onSubmit}
-                className="space-y-6"
-                onSubmit={e => {
-                  if (isPending) e.preventDefault();
-                }}
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="name">الاسم</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    required
-                    disabled={isPending}
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="code">الكود</Label>
-                  <Input
-                    id="code"
-                    name="code"
-                    required
-                    disabled={isPending}
-                    className="uppercase"
-                    pattern="[A-Za-z0-9]+"
-                    title="استخدم حروف إنجليزية وأرقام فقط بدون مسافات"
-                  />
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="secondary">
-                      إلغاء
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-64">
+              <Search
+                className="text-muted-foreground absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2"
+                aria-hidden="true"
+              />
+              <Input
+                placeholder="بحث بالاسم أو الكود"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pr-2 pl-8"
+                aria-label="بحث"
+              />
+            </div>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  className="whitespace-nowrap"
+                  aria-label="إضافة جامعة جديدة"
+                >
+                  <Plus className="ml-2 h-4 w-4" />
+                  إضافة جامعة
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>جامعة جديدة</DialogTitle>
+                  <DialogDescription>أدخل معلومات الجامعة.</DialogDescription>
+                </DialogHeader>
+                <form
+                  action={onSubmit}
+                  className="space-y-6"
+                  onSubmit={e => {
+                    if (isPending) e.preventDefault();
+                  }}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="name">الاسم</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      required
+                      disabled={isPending}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="code">الكود</Label>
+                    <Input
+                      id="code"
+                      name="code"
+                      required
+                      disabled={isPending}
+                      className="uppercase"
+                      pattern="[A-Za-z0-9]+"
+                      title="استخدم حروف إنجليزية وأرقام فقط بدون مسافات"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="secondary">
+                        إلغاء
+                      </Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isPending}>
+                      {isPending ? "جارٍ الحفظ..." : "حفظ"}
                     </Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={isPending}>
-                    {isPending ? "جارٍ الحفظ..." : "حفظ"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="bg-card rounded-lg border p-4 shadow-sm">
+          <p className="text-muted-foreground text-xs font-medium">
+            عدد الجامعات
+          </p>
+          <p className="text-foreground mt-2 text-lg font-semibold">
+            {numberFormatter.format(totals.totalUniversities)}
+          </p>
+        </div>
+        <div className="bg-card rounded-lg border p-4 shadow-sm">
+          <p className="text-muted-foreground text-xs font-medium">
+            إجمالي الكليات
+          </p>
+          <p className="text-foreground mt-2 text-lg font-semibold">
+            {numberFormatter.format(totals.totalColleges)}
+          </p>
+        </div>
+        <div className="bg-card rounded-lg border p-4 shadow-sm">
+          <p className="text-muted-foreground text-xs font-medium">
+            إجمالي المواد
+          </p>
+          <p className="text-foreground mt-2 text-lg font-semibold">
+            {numberFormatter.format(totals.totalSubjects)}
+          </p>
         </div>
       </div>
 
@@ -254,16 +338,10 @@ export default function UniversitiesManager({
                   {uni.name}
                 </span>
                 <span className="text-sm">
-                  {new Intl.NumberFormat("ar-SA-u-nu-latn").format(
-                    uni.colleges.length
-                  )}
+                  {numberFormatter.format(uni.colleges.length)}
                 </span>
                 <span className="hidden text-sm sm:inline-block">
-                  {new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
-                    year: "numeric",
-                    month: "2-digit",
-                    day: "2-digit",
-                  }).format(new Date(uni.createdAt))}
+                  {dateFormatter.format(new Date(uni.createdAt))}
                 </span>
               </Link>
             </li>

@@ -107,13 +107,14 @@ export function CollegeManager({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">الكليات</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            أضف أو عدّل كليات الجامعة.
-          </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="whitespace-nowrap" aria-label="إضافة كلية جديدة">
+            <Button
+              id="create-college"
+              className="whitespace-nowrap"
+              aria-label="إضافة كلية جديدة"
+            >
               <Plus className="ml-2 h-4 w-4" />
               إضافة كلية
             </Button>

@@ -105,9 +105,6 @@ export function SubjectsManager({ collegeId, subjects }: SubjectsManagerProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">المواد</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            إدارة المواد التابعة للكلية.
-          </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>

@@ -1,3 +1,12 @@
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -48,31 +57,64 @@ export default async function CollegeBySlugPage({
 
   return (
     <div className="space-y-6 p-6" dir="rtl">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
-              {college.name}
-            </h1>
-            <CollegeHeaderActions
-              collegeId={college.id}
-              universityId={college.universityId}
-              universityCode={college.university.code}
-              initialName={college.name}
-            />
+      <div className="space-y-4">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/admin">لوحة التحكم</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/admin/universities">إدارة الجامعات</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link
+                  href={`/admin/universities/${encodeURIComponent(college.university.code)}`}
+                >
+                  {college.university.name}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{college.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">
+                {college.name}
+              </h1>
+              <CollegeHeaderActions
+                collegeId={college.id}
+                universityId={college.universityId}
+                universityCode={college.university.code}
+                initialName={college.name}
+              />
+            </div>
+            <p className="text-muted-foreground text-sm">
+              الجامعة: {college.university.name} | كود الجامعة:{" "}
+              {college.university.code}
+            </p>
           </div>
-          <p className="text-muted-foreground mt-1 text-sm">
-            الجامعة: {college.university.name} | كود الجامعة:{" "}
-            {college.university.code}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/admin/universities/${encodeURIComponent(college.university.code)}`}
-            className="text-primary text-sm hover:underline"
-          >
-            ← الرجوع للجامعة
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link
+                href={`/admin/universities/${encodeURIComponent(college.university.code)}`}
+              >
+                ← الرجوع للجامعة
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
