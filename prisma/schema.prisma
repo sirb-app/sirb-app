@@ -56,6 +56,17 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum DocumentStatus {
+  UPLOADED // can upload but choose not to process for now
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+enum DocumentType {
+  SLIDES
+}
+
 model User {
   id        String   @id @default(uuid())
   createdAt DateTime
@@ -96,6 +107,9 @@ model User {
   reportsSubmitted  Report[]           @relation("ReportedBy")
   reportsReceived   Report[]           @relation("ReportedUser")
   reportsResolved   Report[]           @relation("ResolvedBy")
+
+  // RAG document system
+  uploadedDocuments Document[]
 
   @@map("users")
 }
@@ -195,6 +209,7 @@ model Subject {
   enrollments Enrollment[]
   moderators  SubjectModerator[]
   userPoints  UserPoints[]
+  documents   Document[]
 
   @@unique([code, collegeId])
   @@index([collegeId])
@@ -214,8 +229,10 @@ model Chapter {
   subject            Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   content            Content[]
   chapterCompletions ChapterCompletion[]
+  documents          Document[]
 
   @@unique([subjectId, sequence])
+  @@unique([id, subjectId])
   @@index([subjectId])
   @@map("chapters")
 }
@@ -546,4 +563,91 @@ model UserPoints {
   @@index([subjectId, earnedAt]) // for subject leaderboards
   @@index([earnedAt]) // for global leaderboards
   @@map("user_points")
+}
+
+// RAG SYSTEM
+
+// TODO: Currently focused on course slides for MVP.
+// Future expansion: user-uploaded past exams, assignments, open-domain books
+model Document {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title        String
+  description  String?
+  documentType DocumentType   @default(SLIDES) // for future filtering (exams, assignments, etc.)
+  status       DocumentStatus @default(UPLOADED)
+  fileName     String
+  fileSize     BigInt
+  mimeType     String
+
+  fileUrl String
+
+  processingError String?
+  processedAt     DateTime?
+  retryCount      Int       @default(0)
+  totalChunks     Int       @default(0)
+  totalPages      Int?
+  totalImages     Int       @default(0)
+
+  subjectId    Int
+  chapterId    Int?
+  uploadedById String
+
+  subject    Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter    Chapter?        @relation(fields: [chapterId, subjectId], references: [id, subjectId], onDelete: Cascade)
+  uploadedBy User            @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  chunks     DocumentChunk[]
+  images     DocumentImage[]
+
+  @@index([subjectId, status])
+  @@index([chapterId])
+  @@index([uploadedById])
+  @@index([status])
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chunkText  String
+  chunkIndex Int
+  pageNumber Int? // primary/starting page (chunks may span multiple pages)
+
+  vectorId String // reference to vector database entry
+
+  documentId String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@index([vectorId])
+  @@map("document_chunks")
+}
+
+model DocumentImage {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  imageUrl      String
+  pageNumber    Int
+  caption       String?
+  aiDescription String?
+  width         Int?
+  height        Int?
+  mimeType      String
+  fileSize      Int?
+
+  documentId String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, pageNumber])
+  @@index([documentId])
+  @@map("document_images")
 }
