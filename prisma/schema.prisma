@@ -188,6 +188,7 @@ model Subject {
   name        String
   code        String
   description String?
+  imageUrl    String? // Subject cover image
   collegeId   Int
 
   college     College            @relation(fields: [collegeId], references: [id], onDelete: Cascade)
