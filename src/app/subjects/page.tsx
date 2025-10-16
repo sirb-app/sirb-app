@@ -97,10 +97,8 @@ async function getFiltersData() {
 
 export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;
-  const [
-    { subjects, totalCount, totalPages, currentPage },
-    { universities, colleges },
-  ] = await Promise.all([getSubjects(params), getFiltersData()]);
+  const [{ subjects, totalPages, currentPage }, { universities, colleges }] =
+    await Promise.all([getSubjects(params), getFiltersData()]);
 
   return (
     <div className="container mx-auto max-w-6xl px-3 py-8 md:px-8 lg:px-16">
@@ -110,15 +108,6 @@ export default async function Page({ searchParams }: PageProps) {
           <SearchFilters universities={universities} colleges={colleges} />
         </Suspense>
       </section>
-
-      {/* Results Count */}
-      {totalCount > 0 && (
-        <div className="text-muted-foreground mb-6 text-sm font-medium">
-          عرض {(currentPage - 1) * SUBJECTS_PER_PAGE + 1} -{" "}
-          {Math.min(currentPage * SUBJECTS_PER_PAGE, totalCount)} من{" "}
-          {totalCount} مقرر دراسي
-        </div>
-      )}
 
       {/* Subject List */}
       <section className="mb-12">

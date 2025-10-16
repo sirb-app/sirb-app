@@ -11,7 +11,7 @@ import {
 import type { Prisma } from "@/generated/prisma";
 import { Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type University = Prisma.UniversityGetPayload<{
   select: { id: true; name: true; code: true };
@@ -32,7 +32,6 @@ export default function SearchFilters({
 }: SearchFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
 
   // Initialize state from URL params
   const [search, setSearch] = useState(searchParams.get("search") || "");
@@ -43,41 +42,70 @@ export default function SearchFilters({
     searchParams.get("college") || "all"
   );
 
+  // Debounce timer ref
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
   // Filter colleges based on selected university
   const filteredColleges =
     universityId === "all"
       ? colleges
       : colleges.filter(c => c.universityId === Number(universityId));
 
-  // Update URL when filters change
+  // Debounced URL update function
+  const updateUrl = useCallback(
+    (searchValue: string, uniId: string, collId: string) => {
+      const params = new URLSearchParams();
+
+      if (searchValue) params.set("search", searchValue);
+      if (uniId !== "all") params.set("university", uniId);
+      if (collId !== "all") params.set("college", collId);
+      // Always reset to page 1 when filters change
+      params.set("page", "1");
+
+      const queryString = params.toString();
+      const newUrl = queryString ? `/subjects?${queryString}` : "/subjects";
+
+      router.push(newUrl, { scroll: false });
+    },
+    [router]
+  );
+
+  // Debounced search effect
   useEffect(() => {
-    const params = new URLSearchParams();
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
 
-    if (search) params.set("search", search);
-    if (universityId !== "all") params.set("university", universityId);
-    if (collegeId !== "all") params.set("college", collegeId);
-    // Always reset to page 1 when filters change
-    params.set("page", "1");
+    // Set new timer for search (300ms delay)
+    debounceTimerRef.current = setTimeout(() => {
+      updateUrl(search, universityId, collegeId);
+    }, 300);
 
-    const queryString = params.toString();
-    const newUrl = queryString ? `/subjects?${queryString}` : "/subjects";
+    // Cleanup
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [search, updateUrl, universityId, collegeId]);
 
-    startTransition(() => {
-      router.push(newUrl);
-    });
-  }, [search, universityId, collegeId, router]);
-
-  // Reset college when university changes
-  useEffect(() => {
-    if (universityId !== "all") {
-      const isCollegeInUniversity = filteredColleges.some(
+  // Immediate update for university dropdown (with college reset logic)
+  const handleUniversityChange = (value: string) => {
+    setUniversityId(value);
+    // Reset college if not in selected university
+    if (value !== "all") {
+      const collegesInUni = colleges.filter(
+        c => c.universityId === Number(value)
+      );
+      const isCollegeInUni = collegesInUni.some(
         c => c.id === Number(collegeId)
       );
-      if (!isCollegeInUniversity) {
+      if (!isCollegeInUni) {
         setCollegeId("all");
       }
     }
-  }, [universityId, collegeId, filteredColleges]);
+  };
 
   return (
     <div className="space-y-4">
@@ -93,15 +121,14 @@ export default function SearchFilters({
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="h-10 pr-10 pl-4"
-            disabled={isPending}
           />
         </div>
 
         {/* Filters - side by side on mobile, compact on desktop */}
-        <div className="flex gap-3">
+        <div className="flex min-w-0 gap-3">
           {/* University Filter */}
-          <Select value={universityId} onValueChange={setUniversityId}>
-            <SelectTrigger className="h-10 w-full md:w-[180px]">
+          <Select value={universityId} onValueChange={handleUniversityChange}>
+            <SelectTrigger className="h-10 min-w-0 flex-1 md:w-[200px] md:flex-none">
               <SelectValue placeholder="الجامعة" />
             </SelectTrigger>
             <SelectContent>
@@ -111,7 +138,7 @@ export default function SearchFilters({
                   key={university.id}
                   value={university.id.toString()}
                 >
-                  {university.name}
+                  جامعة {university.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -123,14 +150,14 @@ export default function SearchFilters({
             onValueChange={setCollegeId}
             disabled={universityId === "all"}
           >
-            <SelectTrigger className="h-10 w-full md:w-[180px]">
+            <SelectTrigger className="h-10 min-w-0 flex-1 md:w-[200px] md:flex-none">
               <SelectValue placeholder="الكلية" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">جميع الكليات</SelectItem>
               {filteredColleges.map(college => (
                 <SelectItem key={college.id} value={college.id.toString()}>
-                  {college.name}
+                  كلية {college.name}
                 </SelectItem>
               ))}
             </SelectContent>
