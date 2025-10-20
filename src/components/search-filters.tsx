@@ -128,7 +128,10 @@ export default function SearchFilters({
         <div className="flex min-w-0 gap-3">
           {/* University Filter */}
           <Select value={universityId} onValueChange={handleUniversityChange}>
-            <SelectTrigger className="h-10 min-w-0 flex-1 md:w-[200px] md:flex-none">
+            <SelectTrigger
+              className="h-10 w-full min-w-0 flex-1 md:w-[200px] md:flex-none"
+              dir="rtl"
+            >
               <SelectValue placeholder="الجامعة" />
             </SelectTrigger>
             <SelectContent>
@@ -150,7 +153,10 @@ export default function SearchFilters({
             onValueChange={setCollegeId}
             disabled={universityId === "all"}
           >
-            <SelectTrigger className="h-10 min-w-0 flex-1 md:w-[200px] md:flex-none">
+            <SelectTrigger
+              className="h-10 w-full min-w-0 flex-1 md:w-[200px] md:flex-none"
+              dir="rtl"
+            >
               <SelectValue placeholder="الكلية" />
             </SelectTrigger>
             <SelectContent>

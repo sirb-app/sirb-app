@@ -5,10 +5,18 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { prisma } from "@/lib/prisma";
 import { Search } from "lucide-react";
 import Image from "next/image";
 
-export default function Page() {
+export default async function Page() {
+  const universities = await prisma.university.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, code: true },
+  });
+
+  const firstUniversity = universities[0];
+
   return (
     <div className="flex h-dvh items-center justify-center">
       <div className="mx-auto w-full px-3 md:px-8 lg:px-[150px]">
@@ -27,7 +35,7 @@ export default function Page() {
           <div className="col-span-4 flex justify-center md:col-span-8 lg:col-span-12">
             <div className="flex w-full max-w-2xl items-center gap-2 md:gap-3 lg:gap-4">
               {/* University Selector using shadcn Select */}
-              <Select defaultValue="imamu">
+              <Select defaultValue={firstUniversity?.id.toString()}>
                 <SelectTrigger className="min-w-[90px] data-[size=default]:h-12 md:min-w-[100px] data-[size=default]:md:h-14">
                   <div className="flex items-center gap-2">
                     <Image
@@ -41,30 +49,23 @@ export default function Page() {
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="imamu">
-                    <div className="flex items-center gap-2">
-                      <Image
-                        src="/imamu-logo.png"
-                        alt="شعار الجامعة"
-                        width={32}
-                        height={32}
-                        className="h-6 w-6 object-contain"
-                      />
-                      <span>جامعة الإمام محمد بن سعود</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="imamu2">
-                    <div className="flex items-center gap-2">
-                      <Image
-                        src="/imamu-logo.png"
-                        alt="شعار الجامعة"
-                        width={32}
-                        height={32}
-                        className="h-6 w-6 object-contain"
-                      />
-                      <span>جامعة الإمام محمد بن سعود</span>
-                    </div>
-                  </SelectItem>
+                  {universities.map(university => (
+                    <SelectItem
+                      key={university.id}
+                      value={university.id.toString()}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src="/imamu-logo.png"
+                          alt={`شعار ${university.name}`}
+                          width={32}
+                          height={32}
+                          className="h-6 w-6 object-contain"
+                        />
+                        <span>جامعة {university.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
