@@ -1,10 +1,5 @@
 "use client";
 
-import {
-  createSubjectAction,
-  deleteSubjectAction,
-  updateSubjectAction,
-} from "@/actions/subject.actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,51 +19,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Prisma } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
-import { MoreVertical } from "lucide-react";
-import Link from "next/link";
+import { MoreVertical, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-const chaptersLabel = (count: number) => {
-  if (count === 0) return "بدون فصول";
-  if (count === 1) return "فصل واحد";
-  if (count === 2) return "فصلان";
-  if (count <= 10) return `${count} فصول`;
-  return `${count} فصل`;
-};
-
-type SubjectWithCounts = Prisma.SubjectGetPayload<{
-  include: { _count: { select: { chapters: true } } };
+type ChapterWithCounts = Prisma.ChapterGetPayload<{
+  include: { _count: { select: { content: true } } };
 }>;
 
-interface SubjectsManagerProps {
-  collegeId: number;
-  universityCode: string;
-  collegeSlug: string;
-  subjects: SubjectWithCounts[];
+interface ChaptersManagerProps {
+  subjectId: number;
+  chapters: ChapterWithCounts[];
 }
 
-export function SubjectsManager({
-  collegeId,
-  universityCode,
-  collegeSlug,
-  subjects,
-}: SubjectsManagerProps) {
+export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [targetSubject, setTargetSubject] = useState<SubjectWithCounts | null>(
+  const [targetChapter, setTargetChapter] = useState<ChapterWithCounts | null>(
     null
   );
 
   const handleCreate = (formData: FormData, form: HTMLFormElement) => {
     startTransition(async () => {
-      const res = await createSubjectAction(formData);
+      const { createChapterAction } = await import("@/actions/chapter.actions");
+      const res = await createChapterAction(formData);
       if (!("error" in res) || res.error === null) {
-        toast.success("تمت إضافة المادة");
+        toast.success("تمت إضافة الفصل");
         form.reset();
         setCreateOpen(false);
         router.refresh();
@@ -79,14 +59,15 @@ export function SubjectsManager({
   };
 
   const handleUpdate = (formData: FormData, form: HTMLFormElement) => {
-    if (!targetSubject) return;
+    if (!targetChapter) return;
     startTransition(async () => {
-      const res = await updateSubjectAction(targetSubject.id, formData);
+      const { updateChapterAction } = await import("@/actions/chapter.actions");
+      const res = await updateChapterAction(targetChapter.id, formData);
       if (!("error" in res) || res.error === null) {
-        toast.success("تم تحديث المادة");
+        toast.success("تم تحديث الفصل");
         form.reset();
         setEditOpen(false);
-        setTargetSubject(null);
+        setTargetChapter(null);
         router.refresh();
       } else if (res.error) {
         toast.error(res.error);
@@ -95,13 +76,14 @@ export function SubjectsManager({
   };
 
   const handleDelete = () => {
-    if (!targetSubject) return;
+    if (!targetChapter) return;
     startTransition(async () => {
-      const res = await deleteSubjectAction(targetSubject.id, collegeId);
+      const { deleteChapterAction } = await import("@/actions/chapter.actions");
+      const res = await deleteChapterAction(targetChapter.id, subjectId);
       if (!("error" in res) || res.error === null) {
-        toast.success("تم حذف المادة");
+        toast.success("تم حذف الفصل");
         setDeleteOpen(false);
-        setTargetSubject(null);
+        setTargetChapter(null);
         router.refresh();
       } else if (res.error) {
         toast.error(res.error);
@@ -111,19 +93,20 @@ export function SubjectsManager({
 
   return (
     <section className="space-y-4" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">المواد</h2>
+          <h2 className="text-xl font-semibold">الفصول</h2>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="whitespace-nowrap" aria-label="إضافة مادة جديدة">
-              إضافة مادة
+            <Button className="whitespace-nowrap" aria-label="إضافة فصل جديد">
+              <Plus className="ml-2 h-4 w-4" />
+              إضافة فصل
             </Button>
           </DialogTrigger>
           <DialogContent dir="rtl">
             <DialogHeader>
-              <DialogTitle>مادة جديدة</DialogTitle>
+              <DialogTitle>فصل جديد</DialogTitle>
             </DialogHeader>
             <form
               className="space-y-4"
@@ -131,43 +114,42 @@ export function SubjectsManager({
                 event.preventDefault();
                 const form = event.currentTarget;
                 const formData = new FormData(form);
-                formData.set("collegeId", String(collegeId));
+                formData.set("subjectId", String(subjectId));
                 handleCreate(formData, form);
               }}
             >
-              <input type="hidden" name="collegeId" value={collegeId} />
+              <input type="hidden" name="subjectId" value={subjectId} />
               <div className="space-y-2">
-                <Label htmlFor="new-subject-name">اسم المادة</Label>
+                <Label htmlFor="new-chapter-title">عنوان الفصل</Label>
                 <Input
-                  id="new-subject-name"
-                  name="name"
+                  id="new-chapter-title"
+                  name="title"
                   required
                   disabled={isPending}
+                  autoFocus
                   placeholder="مثال: مقدمة في البرمجة"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-subject-code">كود المادة</Label>
+                <Label htmlFor="new-chapter-sequence">الترتيب</Label>
                 <Input
-                  id="new-subject-code"
-                  name="code"
+                  id="new-chapter-sequence"
+                  name="sequence"
+                  type="number"
+                  min="1"
                   required
                   disabled={isPending}
-                  className="uppercase"
-                  pattern="[A-Za-z0-9]+"
-                  title="استخدم حروف إنجليزية وأرقام فقط بدون مسافات"
-                  placeholder="مثال: CS101"
+                  defaultValue={chapters.length + 1}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-subject-description">
+                <Label htmlFor="new-chapter-description">
                   وصف مختصر (اختياري)
                 </Label>
                 <textarea
-                  id="new-subject-description"
+                  id="new-chapter-description"
                   name="description"
                   disabled={isPending}
-                  placeholder="وصف يساعد الطلبة على فهم محتوى المادة"
                   rows={3}
                   className={cn(
                     "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground",
@@ -195,74 +177,69 @@ export function SubjectsManager({
         </Dialog>
       </div>
 
-      {subjects.length === 0 ? (
-        <p className="text-muted-foreground text-sm">لم تتم إضافة مواد بعد.</p>
+      {chapters.length === 0 ? (
+        <p className="text-muted-foreground text-sm">لم تتم إضافة فصول بعد.</p>
       ) : (
-        <ul className="grid gap-4 lg:grid-cols-2">
-          {subjects.map(subject => {
-            return (
-              <li
-                key={subject.id}
-                className="bg-card rounded-lg border p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    href={`/admin/universities/${encodeURIComponent(universityCode)}/colleges/${encodeURIComponent(collegeSlug)}/subjects/${encodeURIComponent(subject.code)}`}
-                    className="group min-w-0 flex-1 space-y-2"
-                    aria-label={`عرض تفاصيل المادة ${subject.name}`}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg leading-6 font-semibold group-hover:underline">
-                        {subject.name}
-                      </h3>
-                      <span className="bg-muted text-muted-foreground rounded px-2 py-1 text-xs font-medium uppercase">
-                        {subject.code}
-                      </span>
-                    </div>
-                    {subject.description ? (
-                      <p className="text-muted-foreground text-sm leading-relaxed">
-                        {subject.description}
-                      </p>
-                    ) : null}
-                    <p className="text-muted-foreground text-xs">
-                      {chaptersLabel(subject._count?.chapters ?? 0)}
+        <ul className="space-y-3">
+          {chapters.map(chapter => (
+            <li
+              key={chapter.id}
+              className="bg-card rounded-lg border p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-primary text-primary-foreground flex h-6 w-6 items-center justify-center rounded text-xs font-semibold">
+                      {chapter.sequence}
+                    </span>
+                    <h3 className="font-semibold">{chapter.title}</h3>
+                  </div>
+                  {chapter.description && (
+                    <p className="text-muted-foreground text-sm">
+                      {chapter.description}
                     </p>
-                  </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label={`إجراءات المادة ${subject.name}`}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="text-right">
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setTargetSubject(subject);
-                          setEditOpen(true);
-                        }}
-                      >
-                        تعديل
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onSelect={() => {
-                          setTargetSubject(subject);
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        حذف
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  )}
+                  <p className="text-muted-foreground text-xs">
+                    المحتوى:{" "}
+                    {new Intl.NumberFormat("ar-SA-u-nu-latn").format(
+                      chapter._count?.content ?? 0
+                    )}
+                  </p>
                 </div>
-              </li>
-            );
-          })}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`إجراءات الفصل ${chapter.title}`}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="text-right">
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setTargetChapter(chapter);
+                        setEditOpen(true);
+                      }}
+                    >
+                      تعديل
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={() => {
+                        setTargetChapter(chapter);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      حذف
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </li>
+          ))}
         </ul>
       )}
 
@@ -270,58 +247,57 @@ export function SubjectsManager({
         open={editOpen}
         onOpenChange={open => {
           setEditOpen(open);
-          if (!open) setTargetSubject(null);
+          if (!open) setTargetChapter(null);
         }}
       >
         <DialogContent dir="rtl">
           <DialogHeader>
-            <DialogTitle>تعديل المادة</DialogTitle>
+            <DialogTitle>تعديل الفصل</DialogTitle>
           </DialogHeader>
           <form
-            key={targetSubject?.id ?? "edit"}
+            key={targetChapter?.id ?? "edit"}
             className="space-y-4"
             onSubmit={event => {
               event.preventDefault();
-              if (!targetSubject) return;
+              if (!targetChapter) return;
               const form = event.currentTarget;
               const formData = new FormData(form);
-              formData.set("collegeId", String(collegeId));
+              formData.set("subjectId", String(subjectId));
               handleUpdate(formData, form);
             }}
           >
-            <input type="hidden" name="collegeId" value={collegeId} />
+            <input type="hidden" name="subjectId" value={subjectId} />
             <div className="space-y-2">
-              <Label htmlFor="edit-subject-name">اسم المادة</Label>
+              <Label htmlFor="edit-chapter-title">عنوان الفصل</Label>
               <Input
-                id="edit-subject-name"
-                name="name"
+                id="edit-chapter-title"
+                name="title"
                 required
                 disabled={isPending}
-                defaultValue={targetSubject?.name ?? ""}
+                defaultValue={targetChapter?.title ?? ""}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-subject-code">كود المادة</Label>
+              <Label htmlFor="edit-chapter-sequence">الترتيب</Label>
               <Input
-                id="edit-subject-code"
-                name="code"
+                id="edit-chapter-sequence"
+                name="sequence"
+                type="number"
+                min="1"
                 required
                 disabled={isPending}
-                defaultValue={targetSubject?.code ?? ""}
-                className="uppercase"
-                pattern="[A-Za-z0-9]+"
-                title="استخدم حروف إنجليزية وأرقام فقط بدون مسافات"
+                defaultValue={targetChapter?.sequence ?? 1}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-subject-description">
+              <Label htmlFor="edit-chapter-description">
                 وصف مختصر (اختياري)
               </Label>
               <textarea
-                id="edit-subject-description"
+                id="edit-chapter-description"
                 name="description"
                 disabled={isPending}
-                defaultValue={targetSubject?.description ?? ""}
+                defaultValue={targetChapter?.description ?? ""}
                 rows={3}
                 className={cn(
                   "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground",
@@ -352,13 +328,17 @@ export function SubjectsManager({
         open={deleteOpen}
         onOpenChange={open => {
           setDeleteOpen(open);
-          if (!open) setTargetSubject(null);
+          if (!open) setTargetChapter(null);
         }}
       >
         <DialogContent dir="rtl">
           <DialogHeader>
-            <DialogTitle>حذف المادة</DialogTitle>
+            <DialogTitle>حذف الفصل</DialogTitle>
           </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            هل أنت متأكد من حذف الفصل &quot;{targetChapter?.title}&quot;؟ سيتم
+            حذف جميع المحتوى المرتبط به.
+          </p>
           <DialogFooter className="flex items-center justify-end gap-2">
             <Button
               type="button"

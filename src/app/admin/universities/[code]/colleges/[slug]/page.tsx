@@ -145,7 +145,12 @@ export default async function CollegeBySlugPage({
         </div>
       </section>
 
-      <SubjectsManager collegeId={college.id} subjects={college.subjects} />
+      <SubjectsManager
+        collegeId={college.id}
+        universityCode={college.university.code}
+        collegeSlug={slug}
+        subjects={college.subjects}
+      />
     </div>
   );
 }
