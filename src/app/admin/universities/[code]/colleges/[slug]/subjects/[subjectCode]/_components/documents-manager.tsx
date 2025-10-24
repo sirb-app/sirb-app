@@ -80,7 +80,6 @@ export function DocumentsManager({
 
   const handleUpload = (formData: FormData, form: HTMLFormElement) => {
     startTransition(async () => {
-      // Placeholder: UI-only, no backend wiring
       toast.success("تم رفع المستند بنجاح");
       form.reset();
       setUploadOpen(false);
@@ -105,9 +104,7 @@ export function DocumentsManager({
   return (
     <section className="space-y-4" dir="rtl">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">المستندات</h2>
-        </div>
+        <h2 className="text-xl font-semibold">المستندات</h2>
         <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
           <DialogTrigger asChild>
             <Button className="whitespace-nowrap" aria-label="رفع مستند جديد">
@@ -166,7 +163,7 @@ export function DocumentsManager({
                   onValueChange={setSelectedChapter}
                   disabled={isPending}
                 >
-                  <SelectTrigger id="document-chapter">
+                  <SelectTrigger dir="rtl" id="document-chapter">
                     <SelectValue placeholder="اختر فصل أو اتركه عام" />
                   </SelectTrigger>
                   <SelectContent>
@@ -215,11 +212,17 @@ export function DocumentsManager({
       </div>
 
       {documents.length === 0 ? (
-        <div className="bg-muted/30 flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12">
-          <FileText className="text-muted-foreground mb-4 h-12 w-12" />
-          <p className="text-muted-foreground text-sm">
-            لم يتم رفع مستندات بعد
-          </p>
+        <div className="bg-muted/50 rounded-lg border-2 border-dashed p-8 text-center">
+          <FileText className="text-muted-foreground mx-auto mb-3 h-12 w-12" />
+          <h3 className="mb-1 font-semibold">لا توجد مستندات</h3>
+          <Button
+            onClick={() => setUploadOpen(true)}
+            variant="outline"
+            size="sm"
+          >
+            <Upload className="ml-2 h-4 w-4" />
+            رفع أول مستند
+          </Button>
         </div>
       ) : (
         <ul className="space-y-3">

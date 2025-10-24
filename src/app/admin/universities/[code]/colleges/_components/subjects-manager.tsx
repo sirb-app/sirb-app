@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Prisma } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
-import { MoreVertical } from "lucide-react";
+import { BookMarked, MoreVertical, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -112,12 +112,11 @@ export function SubjectsManager({
   return (
     <section className="space-y-4" dir="rtl">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">المواد</h2>
-        </div>
+        <h2 className="text-xl font-semibold">المواد</h2>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button className="whitespace-nowrap" aria-label="إضافة مادة جديدة">
+              <Plus className="ml-2 h-4 w-4" />
               إضافة مادة
             </Button>
           </DialogTrigger>
@@ -196,7 +195,20 @@ export function SubjectsManager({
       </div>
 
       {subjects.length === 0 ? (
-        <p className="text-muted-foreground text-sm">لم تتم إضافة مواد بعد.</p>
+        <div className="bg-muted/50 rounded-lg border-2 border-dashed p-8 text-center">
+          <BookMarked className="text-muted-foreground mx-auto mb-3 h-12 w-12" />
+          <h3 className="mb-1 font-semibold">لا توجد مواد</h3>
+          <p className="text-muted-foreground mb-4 text-sm">
+            ابدأ بإضافة أول مادة لهذه الكلية
+          </p>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            variant="outline"
+            size="sm"
+          >
+            إضافة أول مادة
+          </Button>
+        </div>
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2">
           {subjects.map(subject => {
@@ -359,6 +371,10 @@ export function SubjectsManager({
           <DialogHeader>
             <DialogTitle>حذف المادة</DialogTitle>
           </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            هل أنت متأكد من حذف مادة &quot;{targetSubject?.name}&quot;؟ سيتم حذف
+            جميع الفصول والمحتوى المرتبط بها.
+          </p>
           <DialogFooter className="flex items-center justify-end gap-2">
             <Button
               type="button"

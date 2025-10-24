@@ -8,10 +8,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
+import { BookOpen, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChaptersManager } from "./_components/chapters-manager";
 import { DocumentsManager } from "./_components/documents-manager";
+import { ModeratorsManager } from "./_components/moderators-manager";
 import { SubjectHeaderActions } from "./_components/subject-header-actions";
 
 export default async function SubjectByCodePage({
@@ -75,6 +77,19 @@ export default async function SubjectByCodePage({
         include: {
           _count: {
             select: { content: true },
+          },
+        },
+      },
+      moderators: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
           },
         },
       },
@@ -170,32 +185,61 @@ export default async function SubjectByCodePage({
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-card rounded-lg border p-4 shadow-sm">
-          <h2 className="text-muted-foreground text-sm font-medium">
-            عدد الملتحقين
-          </h2>
-          <p className="mt-2 text-lg font-semibold">
-            {numberFormatter.format(subject._count.enrollments)}
-          </p>
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="bg-card group rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-lg">
+              <Users className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                عدد الملتحقين
+              </h2>
+              <p className="mt-1 text-2xl font-bold">
+                {numberFormatter.format(subject._count.enrollments)}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="bg-card rounded-lg border p-4 shadow-sm">
-          <h2 className="text-muted-foreground text-sm font-medium">
-            عدد الفصول
-          </h2>
-          <p className="mt-2 text-lg font-semibold">
-            {numberFormatter.format(subject._count.chapters)}
-          </p>
+        <div className="bg-card group rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-lg">
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                عدد الفصول
+              </h2>
+              <p className="mt-1 text-2xl font-bold">
+                {numberFormatter.format(subject._count.chapters)}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="bg-card rounded-lg border p-4 shadow-sm">
-          <h2 className="text-muted-foreground text-sm font-medium">
-            المشرفون
-          </h2>
-          <p className="mt-2 text-lg font-semibold">
-            {numberFormatter.format(subject._count.moderators)}
-          </p>
-        </div>
+        <Link
+          href="#moderators"
+          className="bg-card group hover:border-primary rounded-lg border p-5 shadow-sm transition-all hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex h-11 w-11 items-center justify-center rounded-lg transition-colors">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                المشرفون
+              </h2>
+              <p className="mt-1 text-2xl font-bold">
+                {numberFormatter.format(subject._count.moderators)}
+              </p>
+            </div>
+          </div>
+        </Link>
       </section>
+
+      <ModeratorsManager
+        subjectId={subject.id}
+        moderators={subject.moderators}
+      />
 
       <ChaptersManager subjectId={subject.id} chapters={subject.chapters} />
 

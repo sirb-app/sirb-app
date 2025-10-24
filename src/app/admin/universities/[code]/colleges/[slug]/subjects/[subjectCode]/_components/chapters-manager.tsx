@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Prisma } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
-import { MoreVertical, Plus } from "lucide-react";
+import { BookOpen, MoreVertical, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -94,9 +94,7 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
   return (
     <section className="space-y-4" dir="rtl">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">الفصول</h2>
-        </div>
+        <h2 className="text-xl font-semibold">الفصول</h2>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button className="whitespace-nowrap" aria-label="إضافة فصل جديد">
@@ -178,7 +176,21 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
       </div>
 
       {chapters.length === 0 ? (
-        <p className="text-muted-foreground text-sm">لم تتم إضافة فصول بعد.</p>
+        <div className="bg-muted/50 rounded-lg border-2 border-dashed p-8 text-center">
+          <BookOpen className="text-muted-foreground mx-auto mb-3 h-12 w-12" />
+          <h3 className="mb-1 font-semibold">لا توجد فصول</h3>
+          <p className="text-muted-foreground mb-4 text-sm">
+            قم بتنظيم المحتوى عن طريق إضافة فصول للمادة
+          </p>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            variant="outline"
+            size="sm"
+          >
+            <Plus className="ml-2 h-4 w-4" />
+            إضافة أول فصل
+          </Button>
+        </div>
       ) : (
         <ul className="space-y-3">
           {chapters.map(chapter => (
@@ -336,8 +348,8 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
             <DialogTitle>حذف الفصل</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground text-sm">
-            هل أنت متأكد من حذف الفصل &quot;{targetChapter?.title}&quot;؟ سيتم
-            حذف جميع المحتوى المرتبط به.
+            هل أنت متأكد من حذف فصل &quot;{targetChapter?.title}&quot;؟ سيتم حذف
+            جميع المحتوى المرتبط به.
           </p>
           <DialogFooter className="flex items-center justify-end gap-2">
             <Button

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
+import { BookMarked, Calendar, Clock } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CollegeHeaderActions } from "../_components/college-header-actions";
@@ -118,30 +119,51 @@ export default async function CollegeBySlugPage({
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-card rounded-lg border p-4 shadow-sm">
-          <h2 className="text-muted-foreground text-sm font-medium">
-            عدد المواد
-          </h2>
-          <p className="mt-2 text-lg font-semibold">
-            {numberFormatter.format(subjectCount)}
-          </p>
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="bg-card group rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-lg">
+              <BookMarked className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                عدد المواد
+              </h2>
+              <p className="mt-1 text-2xl font-bold">
+                {numberFormatter.format(subjectCount)}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="bg-card rounded-lg border p-4 shadow-sm">
-          <h2 className="text-muted-foreground text-sm font-medium">
-            تاريخ الإنشاء
-          </h2>
-          <p className="text-foreground mt-2 text-sm font-medium">
-            {createdAtLabel}
-          </p>
+        <div className="bg-card group rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-lg">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                تاريخ الإنشاء
+              </h2>
+              <p className="text-foreground mt-1 text-sm font-medium">
+                {createdAtLabel}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="bg-card rounded-lg border p-4 shadow-sm">
-          <h2 className="text-muted-foreground text-sm font-medium">
-            آخر تحديث
-          </h2>
-          <p className="text-foreground mt-2 text-sm font-medium">
-            {updatedAtLabel}
-          </p>
+        <div className="bg-card group rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-lg">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                آخر تحديث
+              </h2>
+              <p className="text-foreground mt-1 text-sm font-medium">
+                {updatedAtLabel}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
