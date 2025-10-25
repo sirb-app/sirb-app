@@ -1,7 +1,10 @@
 "use server";
 
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { slugify } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
 type ChapterWithCounts = {
   id: number;
@@ -14,47 +17,58 @@ type ChapterWithCounts = {
   _count: { content: number };
 };
 
-async function revalidateChapterPaths(subjectId: number) {
-  if (!Number.isInteger(subjectId)) return;
-  const subject = await prisma.subject.findUnique({
-    where: { id: subjectId },
-    select: {
-      id: true,
-      code: true,
-      college: {
-        select: {
-          name: true,
-          university: { select: { code: true } },
-        },
-      },
-    },
-  });
-  if (!subject) return;
+async function requireAdmin() {
+  const headersList = await headers();
+  const session = await auth.api.getSession({ headers: headersList });
 
-  const college = subject.college;
-  const university = college?.university;
-
-  // College or university could be missing when relations are optional
-  if (!college || !university) {
-    revalidatePath("/admin/universities");
-    return;
+  if (!session?.user || session.user.role !== "ADMIN") {
+    throw new Error("Unauthorized");
   }
 
-  const universityCode = university.code;
-  const encodedUnivCode = encodeURIComponent(universityCode);
-  const collegeSlug = college.name.toLowerCase().replace(/\s+/g, "-");
-  const encodedCollegeSlug = encodeURIComponent(collegeSlug);
-  const subjectCode = subject.code;
-  const encodedSubjectCode = encodeURIComponent(subjectCode);
+  return session;
+}
 
-  revalidatePath("/admin/universities");
-  revalidatePath(`/admin/universities/${encodedUnivCode}`);
-  revalidatePath(
-    `/admin/universities/${encodedUnivCode}/colleges/${encodedCollegeSlug}`
-  );
-  revalidatePath(
-    `/admin/universities/${encodedUnivCode}/colleges/${encodedCollegeSlug}/subjects/${encodedSubjectCode}`
-  );
+async function revalidateChapterPaths(subjectId: number) {
+  if (!Number.isInteger(subjectId)) return;
+
+  try {
+    const subject = await prisma.subject.findUnique({
+      where: { id: subjectId },
+      select: {
+        id: true,
+        code: true,
+        college: {
+          select: {
+            name: true,
+            university: { select: { code: true } },
+          },
+        },
+      },
+    });
+
+    if (!subject?.college?.university) {
+      revalidatePath("/admin/universities");
+      return;
+    }
+
+    const universityCode = subject.college.university.code;
+    const encodedUnivCode = encodeURIComponent(universityCode);
+    const collegeSlug = slugify(subject.college.name);
+    const encodedCollegeSlug = encodeURIComponent(collegeSlug);
+    const subjectCode = subject.code;
+    const encodedSubjectCode = encodeURIComponent(subjectCode);
+
+    revalidatePath("/admin/universities");
+    revalidatePath(`/admin/universities/${encodedUnivCode}`);
+    revalidatePath(
+      `/admin/universities/${encodedUnivCode}/colleges/${encodedCollegeSlug}`
+    );
+    revalidatePath(
+      `/admin/universities/${encodedUnivCode}/colleges/${encodedCollegeSlug}/subjects/${encodedSubjectCode}`
+    );
+  } catch {
+    // Silent fail
+  }
 }
 
 function getUniqueConstraintArabicMessage(target: unknown): string {
@@ -64,7 +78,6 @@ function getUniqueConstraintArabicMessage(target: unknown): string {
       ? target.toLowerCase()
       : "";
 
-  // Schema-driven: handle known unique constraints for Chapter
   if (normalized.includes("subjectid") && normalized.includes("sequence")) {
     return "ترتيب الفصل مستخدم لهذه المادة بالفعل";
   }
@@ -83,6 +96,12 @@ function getUniqueConstraintArabicMessage(target: unknown): string {
 export async function createChapterAction(
   formData: FormData
 ): Promise<{ error: string } | { error: null; data: ChapterWithCounts }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "فشل العملية" };
+  }
+
   const rawTitle = formData.get("title");
   const rawDescription = formData.get("description");
   const rawSequence = formData.get("sequence");
@@ -144,6 +163,12 @@ export async function updateChapterAction(
   id: number,
   formData: FormData
 ): Promise<{ error: string } | { error: null; data: ChapterWithCounts }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "فشل العملية" };
+  }
+
   if (!Number.isInteger(id)) return { error: "فصل غير صالح" };
 
   const existing = await prisma.chapter.findUnique({
@@ -219,10 +244,30 @@ export async function deleteChapterAction(
   id: number,
   subjectId: number
 ): Promise<{ error: string } | { error: null }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "فشل العملية" };
+  }
+
   if (!Number.isInteger(id) || !Number.isInteger(subjectId)) {
     return { error: "فصل غير صالح" };
   }
+
   try {
+    const chapter = await prisma.chapter.findUnique({
+      where: { id },
+      select: { subjectId: true },
+    });
+
+    if (!chapter) {
+      return { error: "الفصل غير موجود" };
+    }
+
+    if (chapter.subjectId !== subjectId) {
+      return { error: "الفصل لا ينتمي للمادة المحددة" };
+    }
+
     await prisma.chapter.delete({ where: { id } });
     await revalidateChapterPaths(subjectId);
     return { error: null };

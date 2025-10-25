@@ -40,25 +40,37 @@ export function UserSearch({
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.trim().length >= 2) {
         setIsSearching(true);
         searchAction(searchQuery)
           .then(results => {
-            setSearchResults(
-              results.filter(user => !excludeUserIds.has(user.id))
-            );
+            if (!cancelled) {
+              setSearchResults(
+                results.filter(user => !excludeUserIds.has(user.id))
+              );
+            }
           })
           .catch(() => {
-            setSearchResults([]);
+            if (!cancelled) {
+              setSearchResults([]);
+            }
           })
-          .finally(() => setIsSearching(false));
+          .finally(() => {
+            if (!cancelled) {
+              setIsSearching(false);
+            }
+          });
       } else {
         setSearchResults([]);
       }
     }, 300);
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      cancelled = true;
+      clearTimeout(delayDebounceFn);
+    };
   }, [searchQuery, excludeUserIds, searchAction]);
 
   const getUserInitials = (name: string) => {
@@ -111,6 +123,7 @@ export function UserSearch({
               onClick={() => onUserSelect(null)}
               disabled={disabled}
               className="h-8 w-8"
+              aria-label="إزالة المستخدم المحدد"
             >
               <X className="h-4 w-4" />
             </Button>

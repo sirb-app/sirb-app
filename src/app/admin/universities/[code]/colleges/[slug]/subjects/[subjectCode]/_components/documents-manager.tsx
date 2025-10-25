@@ -158,7 +158,6 @@ export function DocumentsManager({
               <div className="space-y-2">
                 <Label htmlFor="document-chapter">الفصل (اختياري)</Label>
                 <Select
-                  name="chapterId"
                   value={selectedChapter}
                   onValueChange={setSelectedChapter}
                   disabled={isPending}
@@ -175,6 +174,13 @@ export function DocumentsManager({
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedChapter !== "general" && (
+                  <input
+                    type="hidden"
+                    name="chapterId"
+                    value={selectedChapter}
+                  />
+                )}
                 <p className="text-muted-foreground text-xs">
                   اختر فصل محدد إذا كان المستند خاص به
                 </p>
