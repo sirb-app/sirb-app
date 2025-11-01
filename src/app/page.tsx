@@ -18,7 +18,7 @@ export default async function Page() {
   const firstUniversity = universities[0];
 
   return (
-    <div className="flex h-dvh items-center justify-center">
+    <div className="my-48 flex h-dvh justify-center">
       <div className="mx-auto w-full px-3 md:px-8 lg:px-[150px]">
         <div className="mx-auto grid max-w-[1200px] grid-cols-4 gap-x-3 gap-y-6 md:grid-cols-8 md:gap-x-4 md:gap-y-8 lg:grid-cols-12 lg:gap-x-5">
           {/* Title */}

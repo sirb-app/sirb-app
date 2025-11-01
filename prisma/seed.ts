@@ -399,7 +399,149 @@ async function main() {
 
   console.log("✅ Created subjects for الأميرة (20 subjects)");
 
+  // Create a dummy user for canvas contributors
+  const dummyUser = await prisma.user.create({
+    data: {
+      id: "00000000-0000-0000-0000-000000000000",
+      name: "مساهم النظام",
+      email: "system@contributor.com",
+      emailVerified: true,
+      role: "USER",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+
+  console.log("✅ Created dummy contributor user");
+
+  // Get only the first subject to create chapters
+  const firstSubject = await prisma.subject.findFirst({
+    include: { college: true },
+  });
+
+  if (!firstSubject) {
+    console.log("❌ No subjects found to create chapters for");
+    return;
+  }
+
+  console.log(`📚 Creating chapters and canvases for: ${firstSubject.name}...`);
+
+  // Create chapters for the first subject only
+  const subject = firstSubject;
+  const chapterCount = Math.floor(Math.random() * 4) + 3; // 3-6 chapters per subject
+
+  for (let i = 1; i <= chapterCount; i++) {
+    const chapter = await prisma.chapter.create({
+      data: {
+        title: `الفصل ${i}: ${getChapterTitle(subject.name, i)}`,
+        description: getChapterDescription(subject.name, i),
+        sequence: i,
+        subjectId: subject.id,
+      },
+    });
+
+    // Create 1-3 canvases per chapter (can be empty for now)
+    const canvasCount = Math.floor(Math.random() * 3) + 1; // 1-3 canvases
+
+    for (let j = 1; j <= canvasCount; j++) {
+      await prisma.canvas.create({
+        data: {
+          title: `المحتوى ${j}: ${getCanvasTitle(subject.name, i, j)}`,
+          description: getCanvasDescription(subject.name, i, j),
+          sequence: j,
+          status: "APPROVED", // All canvases are approved for now
+          chapterId: chapter.id,
+          contributorId: dummyUser.id, // Use the dummy user's ID
+        },
+      });
+    }
+  }
+
+  console.log(`✅ Created chapters and canvases for: ${subject.name}`);
+
   console.log("🎉 Seeding finished successfully!");
+}
+
+// Helper functions to generate chapter and canvas titles/descriptions
+function getChapterTitle(subjectName: string, chapterNum: number): string {
+  const chapterTitles: Record<string, string[]> = {
+    "مقدمة في البرمجة": [
+      "مقدمة في البرمجة",
+      "المتغيرات وأنواع البيانات",
+      "الحلقات والشروط",
+      "الدوال والمصفوفات",
+      "مشروع تطبيقي",
+    ],
+    "هياكل البيانات والخوارزميات": [
+      "مقدمة في هياكل البيانات",
+      "المصفوفات والقوائم",
+      "الأشجار والرسوم البيانية",
+      "خوارزميات البحث والترتيب",
+      "تحليل التعقيد",
+    ],
+    "قواعد البيانات": [
+      "مقدمة في قواعد البيانات",
+      "تصميم قاعدة البيانات",
+      "لغة SQL الأساسية",
+      "الاستعلامات المتقدمة",
+      "مشروع قاعدة بيانات",
+    ],
+    "تطوير تطبيقات الويب": [
+      "مقدمة في تطوير الويب",
+      "HTML و CSS",
+      "JavaScript الأساسي",
+      "React و المكونات",
+      "مشروع تطبيق ويب",
+    ],
+    "الذكاء الاصطناعي": [
+      "مقدمة في الذكاء الاصطناعي",
+      "التعلم الآلي",
+      "الشبكات العصبية",
+      "معالجة اللغة الطبيعية",
+      "مشروع تطبيقي",
+    ],
+  };
+
+  const titles = chapterTitles[subjectName] || [
+    "المفاهيم الأساسية",
+    "التطبيقات العملية",
+    "المواضيع المتقدمة",
+    "المشاريع والتطبيقات",
+    "المراجعة والتقييم",
+  ];
+
+  return titles[chapterNum - 1] || `الموضوع ${chapterNum}`;
+}
+
+function getChapterDescription(
+  subjectName: string,
+  chapterNum: number
+): string {
+  return `في هذا الفصل سنتعلم ${getChapterTitle(subjectName, chapterNum).toLowerCase()} بشكل مفصل مع أمثلة عملية وتطبيقات.`;
+}
+
+function getCanvasTitle(
+  subjectName: string,
+  chapterNum: number,
+  canvasNum: number
+): string {
+  const canvasTitles = [
+    "المقدمة والنظرة العامة",
+    "المفاهيم الأساسية",
+    "الأمثلة العملية",
+    "التمارين والتطبيقات",
+    "المراجعة والخلاصة",
+  ];
+
+  return canvasTitles[canvasNum - 1] || `المحتوى ${canvasNum}`;
+}
+
+function getCanvasDescription(
+  subjectName: string,
+  chapterNum: number,
+  canvasNum: number
+): string {
+  return `محتوى تفاعلي يتضمن شرح مفصل وأمثلة عملية لـ ${getCanvasTitle(subjectName, chapterNum, canvasNum).toLowerCase()}.`;
 }
 
 main()
