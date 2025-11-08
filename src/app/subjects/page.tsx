@@ -1,12 +1,8 @@
 import SearchFilters from "@/components/search-filters";
-import SearchFiltersSkeleton from "@/components/search-filters-skeleton";
 import SubjectList from "@/components/subject-list";
-import SubjectListSkeleton from "@/components/subject-list-skeleton";
 import SubjectsPagination from "@/components/subjects-pagination";
-import SubjectsPaginationSkeleton from "@/components/subjects-pagination-skeleton";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
-import { Suspense } from "react";
 
 type SearchParams = Promise<{
   search?: string;
@@ -103,28 +99,22 @@ export default async function Page({ searchParams }: PageProps) {
   return (
     <div className="container mx-auto max-w-6xl px-3 py-8 md:px-8 lg:px-16">
       {/* Search and Filters */}
-      <section className="mb-8">
-        <Suspense fallback={<SearchFiltersSkeleton />}>
-          <SearchFilters universities={universities} colleges={colleges} />
-        </Suspense>
+      <section className="mb-8" aria-label="بحث وتصفية المقررات">
+        <SearchFilters universities={universities} colleges={colleges} />
       </section>
 
       {/* Subject List */}
-      <section className="mb-12">
-        <Suspense fallback={<SubjectListSkeleton />}>
-          <SubjectList subjects={subjects} />
-        </Suspense>
+      <section className="mb-12" aria-label="قائمة المقررات الدراسية">
+        <SubjectList subjects={subjects} />
       </section>
 
       {/* Pagination */}
       {totalPages > 1 && (
         <nav className="mt-8" aria-label="تنقل بين الصفحات">
-          <Suspense fallback={<SubjectsPaginationSkeleton />}>
-            <SubjectsPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-            />
-          </Suspense>
+          <SubjectsPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+          />
         </nav>
       )}
     </div>

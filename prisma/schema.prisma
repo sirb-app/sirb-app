@@ -152,8 +152,9 @@ model University {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  name String
-  code String @unique
+  name     String
+  code     String  @unique
+  imageUrl String? // University logo
 
   colleges College[]
 
@@ -225,6 +226,7 @@ model Canvas {
 
   title           String
   description     String?
+  imageUrl        String? // Canvas thumbnail image
   sequence        Int
   status          ContentStatus @default(PENDING)
   rejectionReason String?
@@ -415,10 +417,7 @@ model UserAnswer {
 // PROGRESS TRACKING
 
 model Enrollment {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id         Int      @id @default(autoincrement())
   enrolledAt DateTime @default(now())
   userId     String // UUID reference to User
   subjectId  Int

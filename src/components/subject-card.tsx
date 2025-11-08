@@ -21,7 +21,7 @@ type SubjectCardProps = {
 
 export default function SubjectCard({ subject }: SubjectCardProps) {
   return (
-    <Card className="group flex h-full flex-col overflow-hidden p-0 transition-shadow hover:shadow-lg">
+    <Card className="group hover:border-primary/50 flex h-full flex-col overflow-hidden p-0 transition-all hover:shadow-lg">
       {/* Image with Code Badge */}
       <div className="bg-muted relative aspect-video w-full overflow-hidden">
         {subject.imageUrl ? (
@@ -29,12 +29,13 @@ export default function SubjectCard({ subject }: SubjectCardProps) {
             src={subject.imageUrl}
             alt={subject.name}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
             className="object-cover transition-transform group-hover:scale-105"
           />
         ) : (
-          // Fallback with icon
-          <div className="flex h-full w-full items-center justify-center">
-            <BookOpen className="text-muted-foreground h-12 w-12" />
+          // Fallback with subtle pattern
+          <div className="from-muted to-muted/50 flex h-full w-full items-center justify-center bg-gradient-to-br">
+            <BookOpen className="text-muted-foreground/40 h-16 w-16" />
           </div>
         )}
         {/* Code Badge - Absolute positioned on top left */}

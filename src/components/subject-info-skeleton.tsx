@@ -5,8 +5,8 @@ export default function SubjectInfoSkeleton() {
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6 md:p-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
-          {/* Image Skeleton */}
+        <div className="flex flex-col gap-6 md:flex-row-reverse md:items-start md:gap-8">
+          {/* Image Skeleton - Shows first on mobile, Left on desktop */}
           <div className="relative aspect-video w-full overflow-hidden rounded-lg md:w-80 md:flex-shrink-0">
             <Skeleton className="h-full w-full" />
             {/* Code Badge Skeleton */}

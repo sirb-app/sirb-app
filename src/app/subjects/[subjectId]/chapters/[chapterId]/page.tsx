@@ -1,6 +1,8 @@
 import CanvasList from "@/components/canvas-list";
 import ChapterInfo from "@/components/chapter-info";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 type PageProps = {
@@ -16,16 +18,11 @@ async function getChapterData(subjectId: string, chapterId: string) {
       id: parseInt(chapterId),
       subjectId: parseInt(subjectId),
     },
-    include: {
-      subject: {
-        include: {
-          college: {
-            include: {
-              university: true,
-            },
-          },
-        },
-      },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      sequence: true,
       canvases: {
         where: { status: "APPROVED" },
         orderBy: { sequence: "asc" },
@@ -33,6 +30,7 @@ async function getChapterData(subjectId: string, chapterId: string) {
           id: true,
           title: true,
           description: true,
+          imageUrl: true,
           sequence: true,
           createdAt: true,
           contributor: {
@@ -55,25 +53,33 @@ async function getChapterData(subjectId: string, chapterId: string) {
 
 export default async function Page({ params }: PageProps) {
   const { subjectId, chapterId } = await params;
-  const chapter = await getChapterData(subjectId, chapterId);
+
+  // Fetch chapter data and session in parallel
+  const [chapter, session] = await Promise.all([
+    getChapterData(subjectId, chapterId),
+    auth.api.getSession({
+      headers: await headers(),
+    }),
+  ]);
+
+  const isAuthenticated = !!session;
 
   return (
-    <div className="container mx-auto max-w-6xl px-3 py-8 md:px-8 lg:px-16">
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-        {/* Left Pane - Chapter Info (1/3 on desktop, full width on mobile) */}
-        <div className="lg:w-1/3">
-          <ChapterInfo chapter={chapter} subjectId={parseInt(subjectId)} />
-        </div>
+    <div className="container mx-auto max-w-7xl px-3 py-8 md:px-8 lg:px-16">
+      {/* Chapter Info on Top */}
+      <section className="mb-8" aria-label="معلومات الفصل">
+        <ChapterInfo chapter={chapter} subjectId={parseInt(subjectId)} />
+      </section>
 
-        {/* Right Pane - Canvas List (2/3 on desktop, full width on mobile) */}
-        <div className="lg:w-2/3">
-          <CanvasList
-            canvases={chapter.canvases}
-            chapterId={chapter.id}
-            subjectId={parseInt(subjectId)}
-          />
-        </div>
-      </div>
+      {/* Canvas Grid Below */}
+      <section aria-label="قائمة المحتويات">
+        <CanvasList
+          canvases={chapter.canvases}
+          chapterId={chapter.id}
+          subjectId={parseInt(subjectId)}
+          isAuthenticated={isAuthenticated}
+        />
+      </section>
     </div>
   );
 }
