@@ -10,6 +10,8 @@ async function main() {
     data: {
       name: "الإمام محمد بن سعود الإسلامية",
       code: "IMAMU",
+      imageUrl:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/LogoI_of_Imam_Mohammad_Ibn_Saud_Islamic_University.png/960px-LogoI_of_Imam_Mohammad_Ibn_Saud_Islamic_University.png",
     },
   });
 
@@ -17,6 +19,8 @@ async function main() {
     data: {
       name: "الأميرة نورة بنت عبدالرحمن",
       code: "PNU",
+      imageUrl:
+        "https://upload.wikimedia.org/wikipedia/commons/8/80/PNU_logo.png",
     },
   });
 
@@ -448,6 +452,7 @@ async function main() {
         data: {
           title: `المحتوى ${j}: ${getCanvasTitle(subject.name, i, j)}`,
           description: getCanvasDescription(subject.name, i, j),
+          imageUrl: getCanvasImage(j), // Random canvas thumbnail
           sequence: j,
           status: "APPROVED", // All canvases are approved for now
           chapterId: chapter.id,
@@ -542,6 +547,18 @@ function getCanvasDescription(
   canvasNum: number
 ): string {
   return `محتوى تفاعلي يتضمن شرح مفصل وأمثلة عملية لـ ${getCanvasTitle(subjectName, chapterNum, canvasNum).toLowerCase()}.`;
+}
+
+function getCanvasImage(canvasNum: number): string {
+  // Rotate through different educational images for variety
+  const images = [
+    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop", // Students learning
+    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&auto=format&fit=crop", // Classroom
+    "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop", // Teamwork
+    "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&auto=format&fit=crop", // Online learning
+    "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&auto=format&fit=crop", // Books
+  ];
+  return images[(canvasNum - 1) % images.length];
 }
 
 main()
