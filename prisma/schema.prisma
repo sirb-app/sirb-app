@@ -254,9 +254,9 @@ model Content {
   reports      Report[]
 
   @@unique([chapterId, sequence]) // prevent duplicate ordering
-  @@index([chapterId, status]) // "approved content for chapter X"
-  @@index([contributorId]) // "user's content"
-  @@index([status]) // "pending moderation queue"
+  @@index([status, createdAt]) // pending moderation queue
+  @@index([chapterId, status, sequence]) // approved content for chapter X
+  @@index([contributorId, status]) // user's content by status
   @@map("content")
 }
 

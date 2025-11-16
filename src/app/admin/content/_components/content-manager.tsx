@@ -18,6 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -35,14 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import type { Prisma } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -50,6 +43,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   FileText,
   Search,
   Trash2,
@@ -59,7 +53,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 type ContentWithRelations = Prisma.ContentGetPayload<{
@@ -76,6 +70,7 @@ type ContentWithRelations = Prisma.ContentGetPayload<{
       select: {
         id: true;
         title: true;
+        sequence: true;
         subject: {
           select: {
             id: true;
@@ -109,7 +104,7 @@ interface ContentManagerProps {
   content: ContentWithRelations[];
   total: number;
   currentPage: number;
-  subjects: Array<{ id: number; name: string; code: string }>;
+  universities: Array<{ id: number; name: string }>;
 }
 
 const statusLabels = {
@@ -118,23 +113,37 @@ const statusLabels = {
   REJECTED: "مرفوض",
 };
 
-const contentTypeLabels = {
-  VIDEO: "فيديو",
-  FILE: "ملف",
-  QUIZ: "اختبار",
-};
-
 const contentTypeIcons = {
   VIDEO: Video,
   FILE: FileText,
   QUIZ: FileText,
 };
 
+const contentTypeLabels: Record<keyof typeof contentTypeIcons, string> = {
+  VIDEO: "فيديو",
+  FILE: "ملف",
+  QUIZ: "اختبار",
+};
+
+const statusFilters = [
+  { value: "PENDING", label: "قيد المراجعة" },
+  { value: "APPROVED", label: "مقبول" },
+  { value: "REJECTED", label: "مرفوض" },
+  { value: "ALL", label: "جميع الحالات" },
+];
+
+const typeFilters = [
+  { value: "ALL", label: "كل الأنواع" },
+  { value: "VIDEO", label: "فيديو" },
+  { value: "FILE", label: "ملف" },
+  { value: "QUIZ", label: "اختبار" },
+];
+
 export function ContentManager({
   content,
   total,
   currentPage,
-  subjects,
+  universities,
 }: ContentManagerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -145,6 +154,7 @@ export function ContentManager({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [targetContent, setTargetContent] =
     useState<ContentWithRelations | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
 
   const [moderatorNotes, setModeratorNotes] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
@@ -153,19 +163,49 @@ export function ContentManager({
     searchParams.get("search") ?? ""
   );
 
-  const statusFilter = searchParams.get("status") ?? "all";
-  const typeFilter = searchParams.get("type") ?? "all";
-  const subjectFilter = searchParams.get("subject") ?? "all";
+  const statusFilter = (searchParams.get("status") ?? "PENDING").toUpperCase();
+  const typeFilter = (searchParams.get("type") ?? "ALL").toUpperCase();
+  const universityFilter = searchParams.get("university") ?? "ALL";
   const itemsPerPage = 20;
   const totalPages = Math.ceil(total / itemsPerPage);
 
   const updateFilters = (updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([key, value]) => {
-      if (value === "all" || !value) {
+      if (key === "status") {
+        const normalized = value.toUpperCase();
+        if (normalized === "PENDING" || !normalized) {
+          params.delete(key);
+        } else {
+          params.set(key, normalized);
+        }
+        return;
+      }
+
+      if (key === "type") {
+        const normalized = value.toUpperCase();
+        if (normalized === "ALL" || !normalized) {
+          params.delete(key);
+        } else {
+          params.set(key, normalized);
+        }
+        return;
+      }
+
+      if (key === "university") {
+        if (!value || value === "ALL") {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+        return;
+      }
+
+      const trimmed = value.trim();
+      if (!trimmed) {
         params.delete(key);
       } else {
-        params.set(key, value);
+        params.set(key, trimmed);
       }
     });
     params.delete("page");
@@ -174,7 +214,7 @@ export function ContentManager({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    updateFilters({ search: searchInput });
+    updateFilters({ search: searchInput.trim() });
   };
 
   const clearSearch = () => {
@@ -267,25 +307,69 @@ export function ContentManager({
     }).format(new Date(date));
   };
 
+  const subjectGroups = useMemo(() => {
+    return Object.values(
+      content.reduce(
+        (acc, item) => {
+          const subject = item.chapter.subject;
+          const subjectId = subject.id;
+
+          if (!acc[subjectId]) {
+            acc[subjectId] = {
+              id: subjectId,
+              subjectName: subject.name,
+              subjectCode: subject.code,
+              collegeName: subject.college.name,
+              universityName: subject.college.university.name,
+              items: [],
+            };
+          }
+
+          acc[subjectId].items.push(item);
+          return acc;
+        },
+        {} as Record<
+          number,
+          {
+            id: number;
+            subjectName: string;
+            subjectCode: string;
+            collegeName: string;
+            universityName: string;
+            items: ContentWithRelations[];
+          }
+        >
+      )
+    ).sort((a, b) => {
+      if (a.universityName === b.universityName) {
+        if (a.collegeName === b.collegeName) {
+          return a.subjectName.localeCompare(b.subjectName, "ar");
+        }
+        return a.collegeName.localeCompare(b.collegeName, "ar");
+      }
+      return a.universityName.localeCompare(b.universityName, "ar");
+    });
+  }, [content]);
+
   return (
-    <div className="space-y-6" dir="rtl">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">إدارة المحتوى</h1>
-          <p className="text-muted-foreground mt-1">
-            مراجعة والموافقة على المحتوى المقدم من المساهمين
+    <div className="space-y-4" dir="rtl">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold">طلبات المحتوى</h1>
+          <p className="text-muted-foreground">
+            مراجعة والموافقة على طلبات المحتوى الجديدة
           </p>
         </div>
       </div>
 
-      <div className="bg-card space-y-4 rounded-lg border p-4 shadow-sm">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <div className="relative flex-1">
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <form onSubmit={handleSearch} className="relative flex-1">
             <Search className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
             <Input
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              placeholder="ابحث بالعنوان أو الوصف..."
+              placeholder="ابحث بالعنوان أو الوصف أو اسم المساهم..."
               className="pr-10"
             />
             {searchInput && (
@@ -295,251 +379,367 @@ export function ContentManager({
                 size="icon"
                 className="absolute top-1/2 left-2 h-6 w-6 -translate-y-1/2"
                 onClick={clearSearch}
+                aria-label="مسح البحث"
               >
                 <X className="h-4 w-4" />
               </Button>
             )}
-          </div>
-          <Button type="submit">بحث</Button>
-        </form>
+          </form>
 
-        <div className="flex flex-wrap gap-3">
-          <Select
-            value={statusFilter}
-            onValueChange={value => updateFilters({ status: value })}
-          >
-            <SelectTrigger className="w-[180px]" dir="rtl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع الحالات</SelectItem>
-              <SelectItem value="PENDING">قيد المراجعة</SelectItem>
-              <SelectItem value="APPROVED">موافق عليه</SelectItem>
-              <SelectItem value="REJECTED">مرفوض</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={typeFilter}
-            onValueChange={value => updateFilters({ type: value })}
-          >
-            <SelectTrigger className="w-[180px]" dir="rtl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع الأنواع</SelectItem>
-              <SelectItem value="VIDEO">فيديو</SelectItem>
-              <SelectItem value="FILE">ملف</SelectItem>
-              <SelectItem value="QUIZ">اختبار</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={subjectFilter}
-            onValueChange={value => updateFilters({ subject: value })}
-          >
-            <SelectTrigger className="w-[220px]" dir="rtl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع المواد</SelectItem>
-              {subjects.map(subject => (
-                <SelectItem key={subject.id} value={String(subject.id)}>
-                  {subject.code} - {subject.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {(statusFilter !== "all" ||
-            typeFilter !== "all" ||
-            subjectFilter !== "all" ||
-            searchInput) && (
+          {(searchInput ||
+            typeFilter !== "ALL" ||
+            statusFilter !== "PENDING" ||
+            universityFilter !== "ALL") && (
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 setSearchInput("");
                 const params = new URLSearchParams();
+                params.set("status", "PENDING");
                 router.push(`/admin/content?${params.toString()}`);
               }}
             >
+              <X className="ml-1 h-4 w-4" />
               إعادة تعيين
             </Button>
           )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {statusFilters.map(option => (
+            <Button
+              key={option.value}
+              type="button"
+              variant={statusFilter === option.value ? "default" : "outline"}
+              size="sm"
+              className="rounded-full px-4"
+              onClick={() => updateFilters({ status: option.value })}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-2">
+            {typeFilters.map(option => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={typeFilter === option.value ? "secondary" : "ghost"}
+                size="sm"
+                className="rounded-full border"
+                onClick={() => updateFilters({ type: option.value })}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label
+              className="text-muted-foreground text-xs"
+              htmlFor="university-filter"
+            >
+              الجامعة
+            </Label>
+            <Select
+              value={universityFilter}
+              onValueChange={value => updateFilters({ university: value })}
+            >
+              <SelectTrigger id="university-filter" className="w-56">
+                <SelectValue placeholder="جميع الجامعات" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">جميع الجامعات</SelectItem>
+                {universities.map(university => (
+                  <SelectItem
+                    key={university.id}
+                    value={university.id.toString()}
+                  >
+                    {university.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
       {content.length === 0 ? (
         <div className="bg-muted/50 rounded-lg border-2 border-dashed p-12 text-center">
           <FileText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-          <h3 className="mb-2 text-lg font-semibold">لا يوجد محتوى</h3>
+          <h3 className="mb-2 text-lg font-semibold">لا توجد طلبات</h3>
           <p className="text-muted-foreground">
-            لا توجد محتويات تطابق الفلاتر المحددة
+            لا توجد طلبات محتوى تطابق الفلاتر المحددة
           </p>
         </div>
       ) : (
         <>
-          <div className="bg-card rounded-lg border shadow-sm">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right">المحتوى</TableHead>
-                  <TableHead className="text-right">المساهم</TableHead>
-                  <TableHead className="text-right">المادة والفصل</TableHead>
-                  <TableHead className="text-right">النوع</TableHead>
-                  <TableHead className="text-right">الحالة</TableHead>
-                  <TableHead className="text-right">الإحصائيات</TableHead>
-                  <TableHead className="text-right">تاريخ الإنشاء</TableHead>
-                  <TableHead className="text-right">الإجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {content.map(item => {
-                  const Icon = contentTypeIcons[item.contentType];
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div className="flex items-start gap-2">
-                          <Icon className="text-muted-foreground mt-1 h-5 w-5 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-medium">{item.title}</p>
-                            {item.description && (
-                              <p className="text-muted-foreground line-clamp-2 text-xs">
-                                {item.description}
+          <div className="space-y-3">
+            {subjectGroups.map(group => {
+              const latestSubmission = group.items.reduce(
+                (latest, current) =>
+                  current.createdAt > latest ? current.createdAt : latest,
+                group.items[0].createdAt
+              );
+              return (
+                <section
+                  key={group.id}
+                  className="bg-card/40 rounded-xl border p-3 shadow-sm"
+                >
+                  <div className="flex flex-col gap-2 border-b pb-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="text-[11px]">
+                          {group.subjectCode}
+                        </Badge>
+                        <h2 className="text-lg font-semibold">
+                          {group.subjectName}
+                        </h2>
+                        <Badge variant="secondary" className="text-[11px]">
+                          {group.items.length} طلب
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground text-sm">
+                        {group.universityName} • {group.collegeName}
+                      </p>
+                    </div>
+                    <div className="text-muted-foreground text-xs">
+                      آخر تقديم: {formatDate(latestSubmission)}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 pt-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {group.items.map(item => {
+                      const Icon = contentTypeIcons[item.contentType];
+                      const typeLabel =
+                        contentTypeLabels[
+                          item.contentType as keyof typeof contentTypeLabels
+                        ];
+                      const isExpanded = expandedCardId === item.id;
+                      const showEngagement = item.status !== "PENDING";
+                      const chapterSequenceLabel = `الفصل ${item.chapter.sequence}`;
+                      const cleanChapterTitle = item.chapter.title?.trim();
+                      const showChapterTitle =
+                        !!cleanChapterTitle &&
+                        !cleanChapterTitle
+                          .replace(/\s+/g, " ")
+                          .toLowerCase()
+                          .startsWith(chapterSequenceLabel.toLowerCase());
+
+                      return (
+                        <Card
+                          key={item.id}
+                          className="bg-background flex h-full flex-col border"
+                        >
+                          <div className="space-y-3 p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-muted-foreground bg-muted inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]">
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {typeLabel}
+                                  </span>
+                                  <Badge
+                                    variant={
+                                      item.status === "APPROVED"
+                                        ? "default"
+                                        : item.status === "PENDING"
+                                          ? "secondary"
+                                          : "destructive"
+                                    }
+                                    className="text-[10px]"
+                                  >
+                                    {statusLabels[item.status]}
+                                  </Badge>
+                                </div>
+                                <CardTitle className="line-clamp-2 text-base">
+                                  {item.title}
+                                </CardTitle>
+                              </div>
+                              {item.url && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  asChild
+                                >
+                                  <Link
+                                    href={item.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label="عرض المحتوى"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Link>
+                                </Button>
+                              )}
+                            </div>
+
+                            {item.description ? (
+                              <div className="bg-muted/40 rounded-md px-3 py-2">
+                                <p
+                                  className={cn(
+                                    "text-xs leading-relaxed",
+                                    isExpanded ? "" : "line-clamp-2"
+                                  )}
+                                >
+                                  {item.description}
+                                </p>
+                                {item.description.length > 140 && (
+                                  <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="px-0 text-[11px]"
+                                    onClick={() =>
+                                      setExpandedCardId(
+                                        isExpanded ? null : item.id
+                                      )
+                                    }
+                                  >
+                                    {isExpanded ? "إخفاء" : "عرض المزيد"}
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-muted-foreground text-xs">
+                                لا يوجد وصف مضاف
                               </p>
                             )}
-                            {item.url && (
-                              <Link
-                                href={item.url}
-                                target="_blank"
-                                className="text-primary mt-1 block text-xs hover:underline"
-                              >
-                                عرض المحتوى ↗
-                              </Link>
+
+                            <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-[11px]">
+                              <Badge variant="outline" className="text-[10px]">
+                                {chapterSequenceLabel}
+                              </Badge>
+                              {showChapterTitle && (
+                                <span className="truncate">
+                                  {cleanChapterTitle}
+                                </span>
+                              )}
+                              <span>•</span>
+                              <span>{formatDate(item.createdAt)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage
+                                  src={item.contributor.image ?? undefined}
+                                />
+                                <AvatarFallback>
+                                  {getUserInitials(item.contributor.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">
+                                  {item.contributor.name}
+                                </p>
+                                <p className="text-muted-foreground truncate text-xs">
+                                  {item.contributor.email}
+                                </p>
+                              </div>
+                            </div>
+
+                            {showEngagement && (
+                              <div className="text-muted-foreground flex flex-wrap gap-1.5 text-[10px]">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {item._count.votes} تفاعل
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {item._count.comments} تعليق
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {item._count.userProgress} متابعة
+                                </Badge>
+                              </div>
                             )}
+
+                            <div className="mt-auto flex flex-col gap-2 sm:flex-row">
+                              {item.status === "PENDING" ? (
+                                <>
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => {
+                                      setTargetContent(item);
+                                      setApproveOpen(true);
+                                    }}
+                                    disabled={isPending}
+                                    className="gap-1"
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    موافقة
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setTargetContent(item);
+                                      setRejectOpen(true);
+                                    }}
+                                    disabled={isPending}
+                                    className="gap-1"
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                    رفض
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setTargetContent(item);
+                                      setDeleteOpen(true);
+                                    }}
+                                    disabled={isPending}
+                                    className="text-destructive gap-1"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    حذف
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setTargetContent(item);
+                                    setDeleteOpen(true);
+                                  }}
+                                  disabled={isPending}
+                                  className="gap-1"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  حذف
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage
-                              src={item.contributor.image ?? undefined}
-                            />
-                            <AvatarFallback className="text-xs">
-                              {getUserInitials(item.contributor.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {item.contributor.name}
-                            </p>
-                            <p className="text-muted-foreground truncate text-xs">
-                              {item.contributor.email}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <p className="font-medium">
-                            {item.chapter.subject.code}
-                          </p>
-                          <p className="text-muted-foreground truncate text-xs">
-                            {item.chapter.title}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {contentTypeLabels[item.contentType]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            item.status === "APPROVED"
-                              ? "default"
-                              : item.status === "PENDING"
-                                ? "secondary"
-                                : "destructive"
-                          }
-                        >
-                          {statusLabels[item.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-muted-foreground space-y-0.5 text-xs">
-                          <div>{item._count.votes} تصويت</div>
-                          <div>{item._count.comments} تعليق</div>
-                          <div>{item._count.userProgress} مستخدم</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-muted-foreground text-xs">
-                          {formatDate(item.createdAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {item.status === "PENDING" && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setTargetContent(item);
-                                  setApproveOpen(true);
-                                }}
-                                disabled={isPending}
-                                className="gap-1"
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                                موافقة
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setTargetContent(item);
-                                  setRejectOpen(true);
-                                }}
-                                disabled={isPending}
-                                className="gap-1"
-                              >
-                                <XCircle className="h-4 w-4" />
-                                رفض
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setTargetContent(item);
-                              setDeleteOpen(true);
-                            }}
-                            disabled={isPending}
-                            className="gap-1"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            حذف
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
           </div>
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-muted-foreground text-sm">
                 عرض {(currentPage - 1) * itemsPerPage + 1} إلى{" "}
-                {Math.min(currentPage * itemsPerPage, total)} من أصل {total}{" "}
-                محتوى
+                {Math.min(currentPage * itemsPerPage, total)} من أصل {total} طلب
               </p>
               <div className="flex gap-2">
                 <Button

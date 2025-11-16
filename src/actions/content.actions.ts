@@ -20,6 +20,7 @@ type ContentWithRelations = Prisma.ContentGetPayload<{
       select: {
         id: true;
         title: true;
+        sequence: true;
         subject: {
           select: {
             id: true;
@@ -81,6 +82,7 @@ export async function listContentAction(params?: {
   status?: ContentStatus;
   contentType?: string;
   subjectId?: number;
+  universityId?: number;
   search?: string;
   page?: number;
   limit?: number;
@@ -104,7 +106,18 @@ export async function listContentAction(params?: {
     if (session.user.role !== "ADMIN") {
       const moderatedSubjects = await prisma.subjectModerator.findMany({
         where: { userId: session.user.id },
-        select: { subjectId: true },
+        select: {
+          subject: {
+            select: {
+              id: true,
+              college: {
+                select: {
+                  universityId: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       if (moderatedSubjects.length === 0) {
@@ -113,18 +126,27 @@ export async function listContentAction(params?: {
 
       where.chapter = {
         subject: {
-          id: { in: moderatedSubjects.map(m => m.subjectId) },
+          id: {
+            in: moderatedSubjects.map(m => m.subject.id),
+          },
         },
       };
     }
 
-    if (params?.status) {
-      where.status = params.status;
+    const normalizedStatus = params?.status?.toUpperCase() as
+      | ContentStatus
+      | undefined;
+    if (
+      normalizedStatus &&
+      ["PENDING", "APPROVED", "REJECTED"].includes(normalizedStatus)
+    ) {
+      where.status = normalizedStatus;
     }
 
-    if (params?.contentType) {
+    const normalizedType = params?.contentType?.toUpperCase();
+    if (normalizedType && normalizedType !== "ALL") {
       where.contentType =
-        params.contentType as Prisma.ContentWhereInput["contentType"];
+        normalizedType as Prisma.ContentWhereInput["contentType"];
     }
 
     if (params?.subjectId) {
@@ -134,10 +156,39 @@ export async function listContentAction(params?: {
       };
     }
 
-    if (params?.search) {
+    if (params?.universityId) {
+      where.chapter = {
+        ...(where.chapter as object),
+        subject: {
+          ...(where.chapter?.subject as object),
+          college: {
+            ...(where.chapter?.subject?.college as object),
+            universityId: params.universityId,
+          },
+        },
+      };
+    }
+
+    const trimmedSearch = params?.search?.trim();
+    if (trimmedSearch) {
       where.OR = [
-        { title: { contains: params.search, mode: "insensitive" } },
-        { description: { contains: params.search, mode: "insensitive" } },
+        { title: { contains: trimmedSearch, mode: "insensitive" } },
+        { description: { contains: trimmedSearch, mode: "insensitive" } },
+        {
+          contributor: {
+            name: { contains: trimmedSearch, mode: "insensitive" },
+          },
+        },
+        {
+          contributor: {
+            email: { contains: trimmedSearch, mode: "insensitive" },
+          },
+        },
+        {
+          chapter: {
+            title: { contains: trimmedSearch, mode: "insensitive" },
+          },
+        },
       ];
     }
 
@@ -157,6 +208,7 @@ export async function listContentAction(params?: {
             select: {
               id: true,
               title: true,
+              sequence: true,
               subject: {
                 select: {
                   id: true,
@@ -164,9 +216,12 @@ export async function listContentAction(params?: {
                   code: true,
                   college: {
                     select: {
+                      id: true,
+                      universityId: true,
                       name: true,
                       university: {
                         select: {
+                          id: true,
                           name: true,
                         },
                       },
@@ -229,34 +284,47 @@ export async function approveContentAction(
 
     await requireAdminOrModerator(content.chapter.subjectId);
 
-    if (content.status === "APPROVED") {
-      return { error: "المحتوى موافق عليه بالفعل" };
-    }
+    const result = await prisma.$transaction(async tx => {
+      const currentContent = await tx.content.findUnique({
+        where: { id: contentId },
+        select: { status: true, contributorId: true },
+      });
 
-    await prisma.$transaction([
-      prisma.content.update({
+      if (!currentContent || currentContent.status === "APPROVED") {
+        return { alreadyApproved: true };
+      }
+
+      await tx.content.update({
         where: { id: contentId },
         data: {
           status: "APPROVED",
           moderatorNotes: moderatorNotes ?? null,
           rejectionReason: null,
         },
-      }),
-      prisma.userPoints.create({
+      });
+
+      await tx.userPoints.create({
         data: {
           userId: content.contributorId,
           points: 10,
           reason: "content_approved",
           subjectId: content.chapter.subjectId,
         },
-      }),
-      prisma.user.update({
+      });
+
+      await tx.user.update({
         where: { id: content.contributorId },
         data: {
           totalPoints: { increment: 10 },
         },
-      }),
-    ]);
+      });
+
+      return { alreadyApproved: false };
+    });
+
+    if (result.alreadyApproved) {
+      return { error: "المحتوى موافق عليه بالفعل" };
+    }
 
     revalidatePath("/admin/content");
     return { error: null };
@@ -406,5 +474,64 @@ export async function listSubjectsForFilterAction(): Promise<
       return { error: error.message };
     }
     return { error: "فشل تحميل المواد" };
+  }
+}
+
+export async function listUniversitiesForFilterAction(): Promise<
+  Array<{ id: number; name: string }> | { error: string }
+> {
+  try {
+    const headersList = await headers();
+    const session = await auth.api.getSession({ headers: headersList });
+
+    if (!session?.user) {
+      return { error: "Unauthorized" };
+    }
+
+    if (session.user.role === "ADMIN") {
+      const universities = await prisma.university.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+        take: 100,
+      });
+      return universities;
+    }
+
+    const moderatedUniversities = await prisma.subjectModerator.findMany({
+      where: { userId: session.user.id },
+      select: {
+        subject: {
+          select: {
+            college: {
+              select: {
+                university: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const unique = new Map<number, string>();
+    moderatedUniversities.forEach(entry => {
+      const uni = entry.subject.college.university;
+      if (uni) {
+        unique.set(uni.id, uni.name);
+      }
+    });
+
+    return Array.from(unique.entries())
+      .sort((a, b) => a[1].localeCompare(b[1], "ar"))
+      .map(([id, name]) => ({ id, name }));
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+    return { error: "فشل تحميل الجامعات" };
   }
 }
