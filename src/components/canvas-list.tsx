@@ -1,5 +1,6 @@
 "use client";
 
+import { toggleCanvasCompletion } from "@/actions/canvas-progress.action";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Empty,
@@ -11,10 +12,11 @@ import {
 } from "@/components/ui/empty";
 import type { Prisma } from "@/generated/prisma";
 import { cn, stripTitlePrefix } from "@/lib/utils";
-import { BookOpen, Lock } from "lucide-react";
+import { BookOpen, Check, Lock } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 type CanvasWithContributor = Prisma.CanvasGetPayload<{
@@ -29,6 +31,11 @@ type CanvasWithContributor = Prisma.CanvasGetPayload<{
       select: {
         id: true;
         name: true;
+      };
+    };
+    userProgress: {
+      select: {
+        completedAt: true;
       };
     };
   };
@@ -123,73 +130,148 @@ function CanvasCard({
   isAuthenticated,
   onCanvasClick,
 }: CanvasCardProps) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  // Determine if canvas is completed
+  const isCompleted =
+    isAuthenticated && canvas.userProgress?.[0]?.completedAt !== null;
+
+  // Optimistic UI state
+  const [optimisticCompleted, setOptimisticCompleted] = useState(isCompleted);
+
+  const handleToggleComplete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated) return;
+
+    const newCompletedState = !optimisticCompleted;
+
+    // Optimistic update
+    setOptimisticCompleted(newCompletedState);
+
+    startTransition(async () => {
+      try {
+        await toggleCanvasCompletion(canvas.id, newCompletedState);
+        router.refresh();
+      } catch (error) {
+        // Revert on error
+        setOptimisticCompleted(!newCompletedState);
+        toast.error("فشل تحديث الحالة");
+        console.error("Toggle completion error:", error);
+      }
+    });
+  };
+
   return (
-    <Link
-      href={`/subjects/${subjectId}/chapters/${chapterId}/canvases/${canvas.id}`}
-      onClick={e => !isAuthenticated && onCanvasClick(e, canvas.id)}
-      className={cn("group", !isAuthenticated && "pointer-events-none")}
-    >
-      <Card
-        className={cn(
-          "hover:border-primary/50 h-full gap-0 p-0 transition-all hover:shadow-md",
-          !isAuthenticated && "opacity-75"
-        )}
+    <div className="group relative">
+      <Link
+        href={`/subjects/${subjectId}/chapters/${chapterId}/canvases/${canvas.id}`}
+        onClick={e => !isAuthenticated && onCanvasClick(e, canvas.id)}
+        className={cn("block", !isAuthenticated && "pointer-events-none")}
       >
-        <CardContent className="flex h-full flex-col p-0">
-          {/* Thumbnail Area */}
-          <div className="relative aspect-video w-full overflow-hidden rounded-t-xl">
-            {canvas.imageUrl ? (
-              <Image
-                src={canvas.imageUrl}
-                alt={canvas.title}
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                className="object-cover transition-transform group-hover:scale-105"
-              />
-            ) : (
-              <div className="from-muted to-muted/50 flex h-full w-full items-center justify-center bg-gradient-to-br">
-                {isAuthenticated ? (
-                  <BookOpen className="text-muted-foreground/20 h-16 w-16" />
-                ) : (
-                  <Lock className="text-muted-foreground/20 h-16 w-16" />
-                )}
-              </div>
-            )}
-
-            {/* Locked Overlay */}
-            {!isAuthenticated && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-                <div className="bg-background/90 flex items-center gap-2 rounded-full px-4 py-2 backdrop-blur-sm">
-                  <Lock className="h-4 w-4" />
-                  <span className="text-sm font-medium">مقفل</span>
+        <Card
+          className={cn(
+            "hover:border-primary/50 h-full gap-0 p-0 transition-all hover:shadow-md",
+            !isAuthenticated && "opacity-75"
+          )}
+        >
+          <CardContent className="flex h-full flex-col p-0">
+            {/* Thumbnail Area */}
+            <div className="relative aspect-video w-full overflow-hidden rounded-t-xl">
+              {canvas.imageUrl ? (
+                <Image
+                  src={canvas.imageUrl}
+                  alt={canvas.title}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  className={cn(
+                    "object-cover transition-all group-hover:scale-105",
+                    optimisticCompleted && "opacity-50 saturate-0"
+                  )}
+                />
+              ) : (
+                <div
+                  className={cn(
+                    "from-muted to-muted/50 flex h-full w-full items-center justify-center bg-gradient-to-br transition-all",
+                    optimisticCompleted && "opacity-50 saturate-0"
+                  )}
+                >
+                  {isAuthenticated ? (
+                    <BookOpen className="text-muted-foreground/20 h-16 w-16" />
+                  ) : (
+                    <Lock className="text-muted-foreground/20 h-16 w-16" />
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Canvas Info */}
-          <div className="flex flex-1 flex-col p-3">
-            <h3
-              className={cn(
-                "line-clamp-2 leading-tight font-semibold transition-colors",
-                isAuthenticated && "group-hover:text-primary"
               )}
-            >
-              {stripTitlePrefix(canvas.title)}
-            </h3>
 
-            {canvas.description && (
-              <p className="text-muted-foreground mt-2 line-clamp-3 flex-1 text-sm leading-relaxed">
-                {canvas.description}
-              </p>
-            )}
+              {/* Checkbox - Top Right */}
+              {isAuthenticated && (
+                <button
+                  onClick={handleToggleComplete}
+                  disabled={isPending}
+                  className={cn(
+                    "bg-background/80 absolute top-3 right-3 z-10 flex h-6 w-6 items-center justify-center rounded border-2 backdrop-blur-sm transition-all hover:scale-110",
+                    optimisticCompleted
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border hover:border-primary",
+                    isPending && "opacity-50"
+                  )}
+                  aria-label={
+                    optimisticCompleted ? "تحديد كغير مكتمل" : "تحديد كمكتمل"
+                  }
+                >
+                  {optimisticCompleted && <Check className="h-4 w-4" />}
+                </button>
+              )}
 
-            <div className="text-muted-foreground mt-3 text-xs">
-              <span>بواسطة {canvas.contributor.name}</span>
+              {/* Locked Overlay */}
+              {!isAuthenticated && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                  <div className="bg-background/90 flex items-center gap-2 rounded-full px-4 py-2 backdrop-blur-sm">
+                    <Lock className="h-4 w-4" />
+                    <span className="text-sm font-medium">مقفل</span>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+
+            {/* Canvas Info */}
+            <div className="flex flex-1 flex-col p-3">
+              <h3
+                className={cn(
+                  "line-clamp-2 leading-tight font-semibold transition-colors",
+                  isAuthenticated && "group-hover:text-primary",
+                  optimisticCompleted && "text-muted-foreground"
+                )}
+              >
+                {stripTitlePrefix(canvas.title)}
+              </h3>
+
+              {canvas.description && (
+                <p
+                  className={cn(
+                    "text-muted-foreground mt-2 line-clamp-3 flex-1 text-sm leading-relaxed",
+                    optimisticCompleted && "opacity-70"
+                  )}
+                >
+                  {canvas.description}
+                </p>
+              )}
+
+              <div
+                className={cn(
+                  "text-muted-foreground mt-3 text-xs",
+                  optimisticCompleted && "opacity-70"
+                )}
+              >
+                <span>بواسطة {canvas.contributor.name}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    </div>
   );
 }
