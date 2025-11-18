@@ -444,11 +444,11 @@ async function main() {
       },
     });
 
-    // Create 1-3 canvases per chapter (can be empty for now)
-    const canvasCount = Math.floor(Math.random() * 3) + 1; // 1-3 canvases
+    // Create 2-3 canvases per chapter with mixed content
+    const canvasCount = Math.floor(Math.random() * 2) + 2; // 2-3 canvases
 
     for (let j = 1; j <= canvasCount; j++) {
-      await prisma.canvas.create({
+      const canvas = await prisma.canvas.create({
         data: {
           title: `المحتوى ${j}: ${getCanvasTitle(subject.name, i, j)}`,
           description: getCanvasDescription(subject.name, i, j),
@@ -459,6 +459,88 @@ async function main() {
           contributorId: dummyUser.id, // Use the dummy user's ID
         },
       });
+
+      // Create mixed content for each canvas (text, video, file)
+      let contentSequence = 1;
+
+      // Add 1-2 text blocks
+      const textCount = Math.floor(Math.random() * 2) + 1;
+      for (let k = 0; k < textCount; k++) {
+        const textContent = await prisma.textContent.create({
+          data: {
+            content: getTextContent(subject.name, i, k + 1),
+          },
+        });
+
+        await prisma.contentBlock.create({
+          data: {
+            canvasId: canvas.id,
+            sequence: contentSequence++,
+            contentType: "TEXT",
+            contentId: textContent.id,
+          },
+        });
+      }
+
+      // Add 1 video
+      const video = await prisma.video.create({
+        data: {
+          title: `شرح: ${getCanvasTitle(subject.name, i, j)}`,
+          description: `فيديو توضيحي لـ ${getCanvasTitle(subject.name, i, j).toLowerCase()}`,
+          url: "https://youtu.be/Q94_BoOr2xs?si=3_i7x0uqXIeZ4f-2",
+          youtubeVideoId: "Q94_BoOr2xs",
+          duration: 600, // 10 minutes placeholder
+        },
+      });
+
+      await prisma.contentBlock.create({
+        data: {
+          canvasId: canvas.id,
+          sequence: contentSequence++,
+          contentType: "VIDEO",
+          contentId: video.id,
+        },
+      });
+
+      // Add 0-1 file (50% chance)
+      if (Math.random() > 0.5) {
+        const file = await prisma.file.create({
+          data: {
+            title: `ملف: ${getCanvasTitle(subject.name, i, j)}`,
+            description: "ملف PDF يحتوي على ملخص الدرس",
+            url: "https://example.com/sample.pdf", // Placeholder
+            fileSize: BigInt(1024 * 500), // 500KB placeholder
+            mimeType: "application/pdf",
+          },
+        });
+
+        await prisma.contentBlock.create({
+          data: {
+            canvasId: canvas.id,
+            sequence: contentSequence++,
+            contentType: "FILE",
+            contentId: file.id,
+          },
+        });
+      }
+
+      // Add another text block at the end (50% chance)
+      if (Math.random() > 0.5) {
+        const textContent = await prisma.textContent.create({
+          data: {
+            content: getTextContent(subject.name, i, 3),
+          },
+        });
+
+        await prisma.contentBlock.create({
+          data: {
+            canvasId: canvas.id,
+            sequence: contentSequence++,
+            contentType: "TEXT",
+            contentId: textContent.id,
+          },
+        });
+      }
     }
   }
 
@@ -559,6 +641,22 @@ function getCanvasImage(canvasNum: number): string {
     "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&auto=format&fit=crop", // Books
   ];
   return images[(canvasNum - 1) % images.length];
+}
+
+function getTextContent(
+  subjectName: string,
+  chapterNum: number,
+  textNum: number
+): string {
+  const contents = [
+    "في هذا القسم سنتعلم المفاهيم الأساسية بشكل مفصل. من المهم فهم هذه المبادئ جيداً قبل الانتقال للأمثلة العملية. سنغطي النقاط الرئيسية ونشرح كل منها بالتفصيل مع أمثلة توضيحية.",
+    "تطبيقات عملية: سنستخدم ما تعلمناه في أمثلة واقعية لتعزيز الفهم وتطوير المهارات العملية. هذه الأمثلة مستوحاة من حالات حقيقية في سوق العمل وستساعدك على فهم كيفية تطبيق المفاهيم النظرية في الواقع.",
+    "ملاحظات هامة: تذكر دائماً أن الممارسة المستمرة هي مفتاح الإتقان. حاول تطبيق ما تعلمته في مشاريعك الخاصة، ولا تتردد في طرح الأسئلة في قسم التعليقات. التعلم عملية مستمرة تحتاج إلى الصبر والمثابرة.",
+  ];
+  return (
+    contents[textNum - 1] ||
+    "محتوى تعليمي إضافي يساعد على فهم الموضوع بشكل أفضل ويوفر سياقاً إضافياً للمحتوى المقدم."
+  );
 }
 
 main()

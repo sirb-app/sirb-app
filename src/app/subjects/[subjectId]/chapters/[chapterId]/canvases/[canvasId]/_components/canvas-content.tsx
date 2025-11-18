@@ -1,82 +1,85 @@
-import CanvasFileViewer from "@/components/canvas-file-viewer";
-import CanvasQuizViewer from "@/components/canvas-quiz-viewer";
-import CanvasVideoPlayer from "@/components/canvas-video-player";
 import type { Prisma } from "@/generated/prisma";
-import { stripTitlePrefix } from "@/lib/utils";
+import CanvasHeader from "./canvas-header";
+import FileContentBlock from "./file-content-block";
+import TextContentBlock from "./text-content-block";
+import VideoContentBlock from "./video-content-block";
 
 type CanvasWithContent = Prisma.CanvasGetPayload<{
   include: {
-    videos: {
-      include: {
-        progress: {
-          select: { lastPosition: true };
-        };
+    chapter: {
+      select: {
+        id: true;
+        title: true;
+        sequence: true;
+        subjectId: true;
       };
     };
-    files: true;
-    quizzes: true;
+    contentBlocks: {
+      select: {
+        id: true;
+        sequence: true;
+        contentType: true;
+        contentId: true;
+      };
+    };
   };
-}>;
+}> & {
+  textMap: Map<number, Prisma.TextContentGetPayload<{}>>;
+  videoMap: Map<
+    number,
+    Prisma.VideoGetPayload<{
+      include: {
+        progress: { select: { lastPosition: true } };
+      };
+    }>
+  >;
+  fileMap: Map<number, Prisma.FileGetPayload<{}>>;
+};
 
 type CanvasContentProps = {
   readonly canvas: CanvasWithContent;
   readonly userId: string;
 };
 
-export default function CanvasContent({ canvas, userId }: CanvasContentProps) {
-  // Combine all content and sort by sequence
-  const allContent = [
-    ...canvas.videos.map(v => ({ ...v, type: "video" as const })),
-    ...canvas.files.map(f => ({ ...f, type: "file" as const })),
-    ...canvas.quizzes.map(q => ({ ...q, type: "quiz" as const })),
-  ].sort((a, b) => a.sequence - b.sequence);
-
+export default function CanvasContent({ canvas }: CanvasContentProps) {
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-6 py-8 md:p-8 md:py-12">
-      {/* Canvas Header */}
-      <div className="space-y-3">
-        <h1 className="text-3xl leading-tight font-bold md:text-4xl">
-          {stripTitlePrefix(canvas.title)}
-        </h1>
-        {canvas.description && (
-          <p className="text-muted-foreground text-base leading-relaxed md:text-lg">
-            {canvas.description}
-          </p>
-        )}
-      </div>
+    <div className="space-y-8">
+      {/* Header with back button */}
+      <CanvasHeader
+        title={canvas.title}
+        description={canvas.description}
+        subjectId={canvas.chapter.subjectId}
+        chapterId={canvas.chapterId}
+      />
 
       {/* Content Items */}
-      {allContent.length > 0 ? (
-        <div className="space-y-8">
-          {allContent.map((item, index) => {
-            if (item.type === "video") {
-              return (
-                <CanvasVideoPlayer
-                  key={`video-${item.id}`}
-                  video={item}
-                  userId={userId}
-                />
-              );
-            }
+      <div className="space-y-6">
+        {canvas.contentBlocks.map(block => {
+          if (block.contentType === "TEXT") {
+            const textContent = canvas.textMap.get(block.contentId);
+            if (!textContent) return null;
+            return (
+              <TextContentBlock key={block.id} content={textContent.content} />
+            );
+          }
 
-            if (item.type === "file") {
-              return <CanvasFileViewer key={`file-${item.id}`} file={item} />;
-            }
+          if (block.contentType === "VIDEO") {
+            const video = canvas.videoMap.get(block.contentId);
+            if (!video) return null;
+            return <VideoContentBlock key={block.id} video={video} />;
+          }
 
-            if (item.type === "quiz") {
-              return <CanvasQuizViewer key={`quiz-${item.id}`} quiz={item} />;
-            }
+          if (block.contentType === "FILE") {
+            const file = canvas.fileMap.get(block.contentId);
+            if (!file) return null;
+            return <FileContentBlock key={block.id} file={file} />;
+          }
 
-            return null;
-          })}
-        </div>
-      ) : (
-        <div className="py-12 text-center">
-          <p className="text-muted-foreground text-sm">
-            لا يوجد محتوى متاح حالياً
-          </p>
-        </div>
-      )}
+          return null;
+        })}
+      </div>
+
+      {/* Placeholder for Phase 2-4: Video progress, Canvas progress, Votes, Comments */}
     </div>
   );
 }

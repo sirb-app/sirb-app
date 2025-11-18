@@ -219,6 +219,36 @@ model Chapter {
 
 // CONTENT SYSTEM - Canvas-based approach
 
+// Junction table for content ordering across different types
+model ContentBlock {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  canvasId    Int
+  sequence    Int // Global sequence across all content types
+  contentType String // "TEXT" | "VIDEO" | "FILE"
+  contentId   Int // Points to the specific content record
+
+  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  @@unique([canvasId, sequence]) // Enforces global uniqueness!
+  @@index([canvasId])
+  @@index([contentType, contentId]) // For reverse lookups
+  @@map("content_blocks")
+}
+
+// Text content blocks
+model TextContent {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  content String @db.Text // Plain text content
+
+  @@map("text_contents")
+}
+
 model Canvas {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
@@ -235,15 +265,14 @@ model Canvas {
   contributorId   String // UUID reference to User
 
   // Relations
-  chapter      Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  contributor  User             @relation(fields: [contributorId], references: [id], onDelete: Cascade)
-  videos       Video[]
-  files        File[]
-  quizzes      Quiz[]
-  votes        CanvasVote[]
-  userProgress CanvasProgress[]
-  comments     Comment[]
-  reports      Report[]
+  chapter       Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributor   User             @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  contentBlocks ContentBlock[]
+  quizzes       Quiz[]
+  votes         CanvasVote[]
+  userProgress  CanvasProgress[]
+  comments      Comment[]
+  reports       Report[]
 
   @@unique([chapterId, sequence])
   @@index([chapterId, status])
@@ -262,14 +291,9 @@ model Video {
   url            String // YouTube URL
   youtubeVideoId String // Extracted video ID
   duration       Int // seconds
-  sequence       Int // Order within canvas
-  canvasId       Int
 
-  canvas   Canvas          @relation(fields: [canvasId], references: [id], onDelete: Cascade)
   progress VideoProgress[]
 
-  @@unique([canvasId, sequence])
-  @@index([canvasId])
   @@map("videos")
 }
 
@@ -283,13 +307,7 @@ model File {
   url         String // File storage URL
   fileSize    BigInt // bytes
   mimeType    String // application/pdf, image/png, etc
-  sequence    Int // Order within canvas
-  canvasId    Int
 
-  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
-
-  @@unique([canvasId, sequence])
-  @@index([canvasId])
   @@map("files")
 }
 

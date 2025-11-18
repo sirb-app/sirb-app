@@ -12,7 +12,11 @@ type PageProps = {
   }>;
 };
 
-async function getChapterData(subjectId: string, chapterId: string) {
+async function getChapterData(
+  subjectId: string,
+  chapterId: string,
+  userId?: string
+) {
   const chapter = await prisma.chapter.findUnique({
     where: {
       id: parseInt(chapterId),
@@ -39,6 +43,14 @@ async function getChapterData(subjectId: string, chapterId: string) {
               name: true,
             },
           },
+          userProgress: userId
+            ? {
+                where: { userId },
+                select: {
+                  completedAt: true,
+                },
+              }
+            : false,
         },
       },
     },
@@ -54,15 +66,15 @@ async function getChapterData(subjectId: string, chapterId: string) {
 export default async function Page({ params }: PageProps) {
   const { subjectId, chapterId } = await params;
 
-  // Fetch chapter data and session in parallel
-  const [chapter, session] = await Promise.all([
-    getChapterData(subjectId, chapterId),
-    auth.api.getSession({
-      headers: await headers(),
-    }),
-  ]);
+  // Fetch session first to get userId
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
   const isAuthenticated = !!session;
+
+  // Fetch chapter data with user progress
+  const chapter = await getChapterData(subjectId, chapterId, session?.user?.id);
 
   return (
     <div className="container mx-auto max-w-7xl px-3 py-8 md:px-8 lg:px-16">
