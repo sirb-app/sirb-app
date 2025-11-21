@@ -56,14 +56,6 @@ export default function ChapterPlaylists({
 
   return (
     <div>
-      {/* Section Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">فصول المقرر</h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {chapters.length} فصل متاح
-        </p>
-      </div>
-
       {/* Chapters Grid - YouTube Style */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {chapters.map(chapter => (

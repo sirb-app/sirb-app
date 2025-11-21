@@ -1,7 +1,7 @@
-import ChapterPlaylists from "@/components/chapter-playlists";
-import SubjectInfoCard from "@/components/subject-info-card";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import ChapterPlaylists from "./_components/chapter-playlists";
+import SubjectInfoCard from "./_components/subject-info-card";
 
 type PageProps = {
   params: Promise<{ subjectId: string }>;
@@ -35,7 +35,48 @@ async function getSubjectData(subjectId: string) {
     notFound();
   }
 
-  return subject;
+  // Get top contributor for this subject
+  const topContributor = await prisma.canvas.groupBy({
+    by: ["contributorId"],
+    where: {
+      chapter: {
+        subjectId: parseInt(subjectId),
+      },
+      status: "APPROVED",
+    },
+    _count: {
+      id: true,
+    },
+    orderBy: {
+      _count: {
+        id: "desc",
+      },
+    },
+    take: 1,
+  });
+
+  let topContributorInfo = null;
+  if (topContributor.length > 0) {
+    const contributorData = await prisma.user.findUnique({
+      where: { id: topContributor[0].contributorId },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+      },
+    });
+
+    if (contributorData) {
+      topContributorInfo = {
+        ...contributorData,
+        _count: {
+          canvases: topContributor[0]._count.id,
+        },
+      };
+    }
+  }
+
+  return { ...subject, topContributor: topContributorInfo };
 }
 
 export default async function Page({ params }: PageProps) {

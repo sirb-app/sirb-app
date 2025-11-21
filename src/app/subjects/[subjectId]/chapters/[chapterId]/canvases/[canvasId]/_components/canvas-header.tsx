@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { stripTitlePrefix } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -26,14 +26,17 @@ export default function CanvasHeader({
   return (
     <div className="space-y-4">
       {/* Back button */}
-      <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+      <button
+        onClick={handleBack}
+        className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center gap-1 rounded px-2 py-1 text-sm transition-colors"
+      >
         <ArrowRight className="h-4 w-4" />
         العودة للفصل
-      </Button>
+      </button>
 
       {/* Title and description */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">{title}</h1>
+        <h1 className="text-3xl font-bold">{stripTitlePrefix(title)}</h1>
         {description && <p className="text-muted-foreground">{description}</p>}
       </div>
     </div>

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/empty";
 import type { Prisma } from "@/generated/prisma";
 import { cn, stripTitlePrefix } from "@/lib/utils";
-import { BookOpen, Check, Lock } from "lucide-react";
+import { BookOpen, Check, Lock, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -93,11 +93,6 @@ export default function CanvasList({
 
   return (
     <div>
-      {/* Section Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">المحتويات التعليمية</h2>
-      </div>
-
       {/* Canvas Grid - YouTube Style */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {canvases.map(canvas => (
@@ -262,11 +257,12 @@ function CanvasCard({
 
               <div
                 className={cn(
-                  "text-muted-foreground mt-3 text-xs",
+                  "text-muted-foreground mt-3 flex items-center gap-1.5 text-xs",
                   optimisticCompleted && "opacity-70"
                 )}
               >
-                <span>بواسطة {canvas.contributor.name}</span>
+                <User className="h-3 w-3" />
+                <span>{canvas.contributor.name}</span>
               </div>
             </div>
           </CardContent>

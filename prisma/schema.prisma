@@ -158,6 +158,7 @@ model University {
 
   colleges College[]
 
+  @@index([name])
   @@map("universities")
 }
 
@@ -173,6 +174,7 @@ model College {
   subjects   Subject[]
 
   @@index([universityId])
+  @@index([name])
   @@map("colleges")
 }
 
@@ -195,6 +197,7 @@ model Subject {
 
   @@unique([code, collegeId])
   @@index([collegeId])
+  @@index([name])
   @@map("subjects")
 }
 
@@ -264,6 +267,12 @@ model Canvas {
   chapterId       Int
   contributorId   String // UUID reference to User
 
+  // Denormalized vote counts for performance
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+  viewCount      Int @default(0)
+
   // Relations
   chapter       Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   contributor   User             @relation(fields: [contributorId], references: [id], onDelete: Cascade)
@@ -278,6 +287,7 @@ model Canvas {
   @@index([chapterId, status])
   @@index([contributorId])
   @@index([status])
+  @@index([netScore]) // for sorting by popularity
   @@map("canvases")
 }
 
@@ -456,6 +466,7 @@ model CanvasProgress {
 
   completedAt  DateTime? // null = not completed
   lastAccessed DateTime  @default(now())
+  lastViewed   DateTime  @default(now()) // for view tracking
   userId       String // UUID reference to User
   canvasId     Int
 
@@ -522,6 +533,11 @@ model Comment {
   canvasId        Int
   parentCommentId Int? // for replies
 
+  // Denormalized vote counts for performance
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   canvas        Canvas        @relation(fields: [canvasId], references: [id], onDelete: Cascade)
   parentComment Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
@@ -532,6 +548,7 @@ model Comment {
   @@index([canvasId, isDeleted, createdAt]) // for canvas comments (excluding deleted)
   @@index([parentCommentId]) // for loading replies
   @@index([canvasId, isPinned, isAnnouncement]) // for featured comments
+  @@index([canvasId, parentCommentId, isDeleted, netScore]) // for paginated top-level comments sorted by score
   @@map("comments")
 }
 

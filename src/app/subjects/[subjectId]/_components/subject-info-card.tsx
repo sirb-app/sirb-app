@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Prisma } from "@/generated/prisma";
-import { BookOpen, GraduationCap, School } from "lucide-react";
+import { BookOpen, GraduationCap, School, Trophy } from "lucide-react";
 import Image from "next/image";
 
 type SubjectWithRelations = Prisma.SubjectGetPayload<{
@@ -15,7 +15,16 @@ type SubjectWithRelations = Prisma.SubjectGetPayload<{
 }>;
 
 type SubjectInfoCardProps = {
-  readonly subject: SubjectWithRelations;
+  readonly subject: SubjectWithRelations & {
+    topContributor: {
+      id: string;
+      name: string;
+      image: string | null;
+      _count: {
+        canvases: number;
+      };
+    } | null;
+  };
 };
 
 export default function SubjectInfoCard({ subject }: SubjectInfoCardProps) {
@@ -73,6 +82,16 @@ export default function SubjectInfoCard({ subject }: SubjectInfoCardProps) {
                 </span>
               </div>
             </div>
+
+            {/* Top Contributor */}
+            {subject.topContributor && (
+              <div className="flex items-center gap-2">
+                <Trophy className="text-muted-foreground h-4 w-4 shrink-0" />
+                <span className="text-sm">
+                  أكثر مساهم: {subject.topContributor.name}
+                </span>
+              </div>
+            )}
 
             {/* Enroll Button */}
             <div className="mt-auto">

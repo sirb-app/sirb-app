@@ -77,7 +77,12 @@ export default function SubjectCard({ subject }: SubjectCardProps) {
 
       {/* Footer with Button */}
       <CardFooter className="px-4 pt-0 pb-4">
-        <Button asChild variant="outline" className="w-full" size="sm">
+        <Button
+          asChild
+          variant="outline"
+          className="hover:bg-accent hover:text-accent-foreground w-full"
+          size="sm"
+        >
           <Link href={`/subjects/${subject.id}`}>التفاصيل</Link>
         </Button>
       </CardFooter>

@@ -23,10 +23,10 @@ export default function FileContentBlock({ file }: FileContentBlockProps) {
       href={file.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group bg-card hover:bg-accent/50 block rounded-lg border p-6 transition-colors"
+      className="group bg-card hover:border-primary/50 block rounded-lg border p-6 transition-all hover:shadow-sm"
     >
       <div className="flex items-center gap-4">
-        <div className="bg-primary/10 group-hover:bg-primary/20 rounded-lg p-3 transition-colors">
+        <div className="bg-primary/10 rounded-lg p-3 transition-colors">
           <FileText className="text-primary h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">

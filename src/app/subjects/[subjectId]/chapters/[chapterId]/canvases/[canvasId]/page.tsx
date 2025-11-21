@@ -1,9 +1,13 @@
 import { markCanvasComplete } from "@/actions/canvas-progress.action";
+import { trackCanvasView } from "@/actions/canvas-view.action";
+import { getComments } from "@/actions/get-comments.action";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import CanvasComments from "./_components/canvas-comments";
 import CanvasContent from "./_components/canvas-content";
+import CanvasContributorSection from "./_components/canvas-contributor-section";
 
 type PageProps = {
   params: Promise<{
@@ -34,6 +38,13 @@ async function getCanvasData(
           subjectId: true,
         },
       },
+      contributor: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      },
       contentBlocks: {
         orderBy: { sequence: "asc" },
         select: {
@@ -43,6 +54,10 @@ async function getCanvasData(
           contentId: true,
         },
       },
+      votes: {
+        where: { userId },
+        select: { voteType: true },
+      },
     },
   });
 
@@ -50,7 +65,6 @@ async function getCanvasData(
     notFound();
   }
 
-  // Fetch all content based on contentBlocks
   const textIds: number[] = [];
   const videoIds: number[] = [];
   const fileIds: number[] = [];
@@ -89,13 +103,13 @@ async function getCanvasData(
     textMap,
     videoMap,
     fileMap,
+    userVote: canvas.votes[0]?.voteType || null,
   };
 }
 
 export default async function Page({ params }: PageProps) {
   const { subjectId, chapterId, canvasId } = await params;
 
-  // Page-level authentication check
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -106,20 +120,49 @@ export default async function Page({ params }: PageProps) {
     );
   }
 
-  // Auto-mark canvas as complete on entry
   await markCanvasComplete(parseInt(canvasId));
+  await trackCanvasView(parseInt(canvasId));
 
-  const canvas = await getCanvasData(
-    subjectId,
-    chapterId,
-    canvasId,
-    session.user.id
-  );
+  const [canvas, initialCommentsData] = await Promise.all([
+    getCanvasData(subjectId, chapterId, canvasId, session.user.id),
+    getComments(parseInt(canvasId), undefined, "best"),
+  ]);
 
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto max-w-5xl px-4 py-8">
         <CanvasContent canvas={canvas} userId={session.user.id} />
+
+        <div className="mt-8" />
+
+        <CanvasContributorSection
+          canvas={{
+            id: canvas.id,
+            contributorId: canvas.contributorId,
+            createdAt: canvas.createdAt,
+            upvotesCount: (canvas as any).upvotesCount,
+            downvotesCount: (canvas as any).downvotesCount,
+            netScore: (canvas as any).netScore,
+            viewCount: (canvas as any).viewCount,
+            contributor: canvas.contributor,
+          }}
+          userVote={canvas.userVote}
+          isAuthenticated={true}
+        />
+
+        <CanvasComments
+          canvasId={canvas.id}
+          contributorId={canvas.contributorId}
+          initialComments={initialCommentsData.comments}
+          initialNextCursor={initialCommentsData.nextCursor}
+          initialHasMore={initialCommentsData.hasMore}
+          currentUser={{
+            id: session.user.id,
+            name: session.user.name,
+            image: session.user.image ?? null,
+          }}
+          isAuthenticated={true}
+        />
       </div>
     </div>
   );

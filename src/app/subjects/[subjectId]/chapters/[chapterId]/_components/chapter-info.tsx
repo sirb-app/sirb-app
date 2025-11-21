@@ -37,12 +37,12 @@ export default function ChapterInfo({ chapter, subjectId }: ChapterInfoProps) {
 
   return (
     <Card>
-      <CardContent className="p-6 md:p-8">
-        {/* Breadcrumb */}
+      <CardContent className="p-6 pt-4 md:p-8 md:pt-4">
+        {/* Back Button */}
         <div className="mb-4">
           <Link
             href={`/subjects/${subjectId}`}
-            className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-sm transition-colors"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center gap-1 rounded px-2 py-1 text-sm transition-colors"
           >
             <ChevronRight className="h-4 w-4" />
             العودة إلى المقرر
@@ -51,9 +51,14 @@ export default function ChapterInfo({ chapter, subjectId }: ChapterInfoProps) {
 
         {/* Chapter Title and Description */}
         <div className="mb-6">
-          <h1 className="text-3xl leading-tight font-bold md:text-4xl">
-            {stripTitlePrefix(chapter.title)}
-          </h1>
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl leading-tight font-bold md:text-4xl">
+              {stripTitlePrefix(chapter.title)}
+            </h1>
+            <span className="bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
+              الفصل {chapter.sequence}
+            </span>
+          </div>
           {chapter.description && (
             <p className="text-muted-foreground mt-3 text-lg leading-relaxed">
               {chapter.description}
@@ -66,19 +71,17 @@ export default function ChapterInfo({ chapter, subjectId }: ChapterInfoProps) {
           <div className="flex items-center gap-2">
             <BookOpen className="text-muted-foreground h-5 w-5" />
             <div>
-              <p className="text-sm font-medium">{canvasCount} محتوى</p>
+              <p className="text-sm font-medium">عدد الدروس: {canvasCount}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <Users className="text-muted-foreground h-5 w-5" />
             <div>
-              <p className="text-sm font-medium">{contributors} مساهم</p>
+              <p className="text-sm font-medium">
+                عدد المساهمين: {contributors}
+              </p>
             </div>
-          </div>
-
-          <div className="bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
-            الفصل {chapter.sequence}
           </div>
         </div>
       </CardContent>

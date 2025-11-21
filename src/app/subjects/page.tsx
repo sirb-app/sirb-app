@@ -55,11 +55,7 @@ async function getSubjects(params: Awaited<SearchParams>) {
           },
         },
       },
-      orderBy: [
-        { college: { university: { name: "asc" } } },
-        { college: { name: "asc" } },
-        { name: "asc" },
-      ],
+      orderBy: [{ name: "asc" }],
       skip,
       take: SUBJECTS_PER_PAGE,
     }),

@@ -1,9 +1,9 @@
-import CanvasList from "@/components/canvas-list";
-import ChapterInfo from "@/components/chapter-info";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import CanvasList from "./_components/canvas-list";
+import ChapterInfo from "./_components/chapter-info";
 
 type PageProps = {
   params: Promise<{
