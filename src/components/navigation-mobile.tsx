@@ -72,7 +72,7 @@ export const NavigationMobile = ({
                   href={route.path}
                   onClick={() => setIsSheetOpen(false)}
                   className={cn(
-                    "text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                    "text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
                     {
                       "border-primary bg-primary/10 text-primary border-r-2":
                         route.path === activePathname,
@@ -107,7 +107,7 @@ export const NavigationMobile = ({
                   <Link
                     href="/dashboard"
                     onClick={() => setIsSheetOpen(false)}
-                    className="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
                   >
                     <BookOpen className="h-4 w-4" />
                     <span>مقرراتي</span>
@@ -115,7 +115,7 @@ export const NavigationMobile = ({
                   <Link
                     href="/profile"
                     onClick={() => setIsSheetOpen(false)}
-                    className="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
                   >
                     <Users className="h-4 w-4" />
                     <span>الملف الشخصي</span>
@@ -139,7 +139,7 @@ export const NavigationMobile = ({
                   <div onClick={() => setIsSheetOpen(false)}>
                     <Link
                       href="/auth/login"
-                      className="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
                     >
                       <LogIn className="h-4 w-4" />
                       <span>تسجيل الدخول</span>
@@ -148,7 +148,7 @@ export const NavigationMobile = ({
                   <div onClick={() => setIsSheetOpen(false)}>
                     <Link
                       href="/auth/register"
-                      className="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
                     >
                       <UserPlus className="h-4 w-4" />
                       <span>إنشاء حساب</span>

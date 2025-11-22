@@ -75,7 +75,7 @@ type UserWithCounts = Prisma.UserGetPayload<{
   include: {
     _count: {
       select: {
-        contributions: true;
+        contributedCanvases: true;
         enrollments: true;
         moderatedSubjects: true;
       };
@@ -87,11 +87,11 @@ type UserDetails = Prisma.UserGetPayload<{
   include: {
     _count: {
       select: {
-        contributions: true;
+        contributedCanvases: true;
         enrollments: true;
         moderatedSubjects: true;
         comments: true;
-        contentVotes: true;
+        canvasVotes: true;
         reportsSubmitted: true;
       };
     };
@@ -118,11 +118,15 @@ type UserDetails = Prisma.UserGetPayload<{
         };
       };
     };
-    contributions: {
+    contributedCanvases: {
       select: {
         id: true;
         title: true;
-        contentType: true;
+        contentBlocks: {
+          select: {
+            contentType: true;
+          };
+        };
         status: true;
         createdAt: true;
         chapter: {
@@ -468,7 +472,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                     </TableCell>
                     <TableCell>
                       <div className="text-muted-foreground space-y-0.5 text-xs">
-                        <div>{user._count.contributions} مساهمات</div>
+                        <div>{user._count.contributedCanvases} مساهمات</div>
                         <div>{user._count.enrollments} تسجيلات</div>
                         {user._count.moderatedSubjects > 0 && (
                           <div>مشرف على {user._count.moderatedSubjects}</div>
@@ -805,7 +809,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                     المساهمات
                   </div>
                   <div className="text-2xl font-bold">
-                    {userDetails._count.contributions}
+                    {userDetails._count.contributedCanvases}
                   </div>
                 </div>
                 <div className="bg-muted rounded-lg p-4 text-center">
@@ -878,7 +882,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                 </div>
               )}
 
-              {userDetails.contributions.length > 0 && (
+              {userDetails.contributedCanvases.length > 0 && (
                 <div>
                   <div className="mb-3 flex items-center gap-2">
                     <FileText className="h-5 w-5" />
@@ -888,7 +892,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {userDetails.contributions.map(contribution => (
+                    {userDetails.contributedCanvases.map(contribution => (
                       <div
                         key={contribution.id}
                         className="bg-muted rounded-lg p-3"

@@ -2,12 +2,21 @@
 
 import { useSession } from "@/lib/auth-client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { NavigationDesktop, NavigationDesktopAuth } from "./navigation-desktop";
 import { NavigationMobile } from "./navigation-mobile";
 
 export const Navigation = () => {
   const { data: session, isPending } = useSession();
   const user = session?.user;
+  const pathname = usePathname();
+
+  // Hide navigation on canvas pages
+  const isCanvasPage = pathname?.includes("/canvases/");
+
+  if (isCanvasPage) {
+    return null;
+  }
 
   return (
     <>

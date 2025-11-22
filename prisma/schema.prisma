@@ -13,12 +13,6 @@ enum UserRole {
   ADMIN
 }
 
-enum ContentType {
-  VIDEO
-  FILE
-  QUIZ
-}
-
 enum ContentStatus {
   PENDING
   APPROVED
@@ -75,15 +69,16 @@ model User {
   accounts Account[]
 
   // Content system relations
-  contributions Content[]
-  contentVotes  ContentVote[]
+  contributedCanvases Canvas[]
+  canvasVotes         CanvasVote[]
 
   // Quiz system relations
   quizAttempts UserQuizAttempt[]
 
   // Progress tracking relations
   enrollments        Enrollment[]
-  userProgress       UserProgress[]
+  canvasProgress     CanvasProgress[]
+  videoProgress      VideoProgress[]
   chapterCompletions ChapterCompletion[]
 
   // Engagement relations
@@ -157,11 +152,13 @@ model University {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  name String
-  code String @unique
+  name     String
+  code     String  @unique
+  imageUrl String? // University logo
 
   colleges College[]
 
+  @@index([name])
   @@map("universities")
 }
 
@@ -177,6 +174,7 @@ model College {
   subjects   Subject[]
 
   @@index([universityId])
+  @@index([name])
   @@map("colleges")
 }
 
@@ -188,6 +186,7 @@ model Subject {
   name        String
   code        String
   description String?
+  imageUrl    String? // Subject cover image
   collegeId   Int
 
   college     College            @relation(fields: [collegeId], references: [id], onDelete: Cascade)
@@ -198,6 +197,7 @@ model Subject {
 
   @@unique([code, collegeId])
   @@index([collegeId])
+  @@index([name])
   @@map("subjects")
 }
 
@@ -212,7 +212,7 @@ model Chapter {
   subjectId   Int
 
   subject            Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  content            Content[]
+  canvases           Canvas[]
   chapterCompletions ChapterCompletion[]
 
   @@unique([subjectId, sequence])
@@ -220,76 +220,146 @@ model Chapter {
   @@map("chapters")
 }
 
-// CONTENT SYSTEM
+// CONTENT SYSTEM - Canvas-based approach
 
-model Content {
+// Junction table for content ordering across different types
+model ContentBlock {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  canvasId    Int
+  sequence    Int // Global sequence across all content types
+  contentType String // "TEXT" | "VIDEO" | "FILE"
+  contentId   Int // Points to the specific content record
+
+  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  @@unique([canvasId, sequence]) // Enforces global uniqueness!
+  @@index([canvasId])
+  @@index([contentType, contentId]) // For reverse lookups
+  @@map("content_blocks")
+}
+
+// Text content blocks
+model TextContent {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  content String @db.Text // Plain text content
+
+  @@map("text_contents")
+}
+
+model Canvas {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   title           String
   description     String?
-  contentType     ContentType
-  url             String? // YouTube URL or file storage URL, null for quizzes
-  sequence        Int // ordering within chapter
+  imageUrl        String? // Canvas thumbnail image
+  sequence        Int
   status          ContentStatus @default(PENDING)
   rejectionReason String?
   moderatorNotes  String?
   chapterId       Int
   contributorId   String // UUID reference to User
 
-  // Metadata (conditional based on content type)
-  duration       Int? // seconds for videos
-  fileSize       BigInt? // bytes for files
-  mimeType       String? // for files (image/pdf/etc)
-  youtubeVideoId String? // extracted from URL for embedding
+  // Denormalized vote counts for performance
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+  viewCount      Int @default(0)
 
   // Relations
-  chapter      Chapter        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  contributor  User           @relation(fields: [contributorId], references: [id], onDelete: Cascade)
-  votes        ContentVote[]
-  quiz         Quiz? // One-to-one relation for quiz content
-  userProgress UserProgress[]
-  comments     Comment[]
-  reports      Report[]
+  chapter       Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributor   User             @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  contentBlocks ContentBlock[]
+  quizzes       Quiz[]
+  votes         CanvasVote[]
+  userProgress  CanvasProgress[]
+  comments      Comment[]
+  reports       Report[]
 
-  @@unique([chapterId, sequence]) // prevent duplicate ordering
-  @@index([status, createdAt]) // pending moderation queue
-  @@index([chapterId, status, sequence]) // approved content for chapter X
-  @@index([contributorId, status]) // user's content by status
-  @@map("content")
+  @@unique([chapterId, sequence])
+  @@index([chapterId, status])
+  @@index([contributorId])
+  @@index([status])
+  @@index([netScore]) // for sorting by popularity
+  @@map("canvases")
 }
 
-model ContentVote {
+model Video {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  voteType  VoteType
-  userId    String // UUID reference to User
-  contentId Int
+  title          String
+  description    String?
+  url            String // YouTube URL
+  youtubeVideoId String // Extracted video ID
+  duration       Int // seconds
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  progress VideoProgress[]
 
-  @@unique([userId, contentId]) // one vote per user per content
-  @@index([contentId, voteType]) // for counting votes by type
-  @@map("content_votes")
+  @@map("videos")
+}
+
+model File {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  description String?
+  url         String // File storage URL
+  fileSize    BigInt // bytes
+  mimeType    String // application/pdf, image/png, etc
+
+  @@map("files")
+}
+
+model CanvasVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType VoteType
+  userId   String // UUID reference to User
+  canvasId Int
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, canvasId]) // one vote per user per canvas
+  @@index([canvasId, voteType]) // for counting votes by type
+  @@map("canvas_votes")
 }
 
 // QUIZ SYSTEM
 
 model Quiz {
-  contentId       Int     @id // One-to-one with Content
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title           String
+  description     String?
   instructions    String?
   timeLimit       Int? // minutes, null = no limit
   attemptsAllowed Int     @default(-1) // -1 = unlimited
-  passScore       Float? // 0.0 to 1.0, null = no pass requirement
+  passScore       Float? // 0.0 to 1.0
+  sequence        Int // Order within canvas
+  canvasId        Int
 
-  content   Content           @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  canvas    Canvas            @relation(fields: [canvasId], references: [id], onDelete: Cascade)
   questions QuizQuestion[]
   attempts  UserQuizAttempt[]
 
+  @@unique([canvasId, sequence])
+  @@index([canvasId])
   @@map("quizzes")
 }
 
@@ -304,7 +374,7 @@ model QuizQuestion {
   sequence     Int // question order within quiz
   quizId       Int
 
-  quiz    Quiz         @relation(fields: [quizId], references: [contentId], onDelete: Cascade)
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
   options QuizOption[]
   answers UserAnswer[]
 
@@ -344,7 +414,7 @@ model UserQuizAttempt {
   quizId      Int
 
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quiz    Quiz         @relation(fields: [quizId], references: [contentId], onDelete: Cascade)
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
   answers UserAnswer[]
 
   @@index([userId, quizId]) // for user's attempts on specific quiz
@@ -375,10 +445,7 @@ model UserAnswer {
 // PROGRESS TRACKING
 
 model Enrollment {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id         Int      @id @default(autoincrement())
   enrolledAt DateTime @default(now())
   userId     String // UUID reference to User
   subjectId  Int
@@ -392,25 +459,43 @@ model Enrollment {
   @@map("enrollments")
 }
 
-model UserProgress {
+model CanvasProgress {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  completedAt          DateTime? // null = not completed
-  lastAccessed         DateTime  @default(now())
-  lastPosition         Int       @default(0) // seconds into video for YouTube progress
-  completionPercentage Int       @default(0) // 0-100, for partial progress
-  userId               String // UUID reference to User
-  contentId            Int
+  completedAt  DateTime? // null = not completed
+  lastAccessed DateTime  @default(now())
+  lastViewed   DateTime  @default(now()) // for view tracking
+  userId       String // UUID reference to User
+  canvasId     Int
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, contentId]) // one progress record per user per content
+  @@unique([userId, canvasId]) // one progress record per user per canvas
   @@index([userId, completedAt]) // for user progress queries
-  @@index([contentId]) // for content completion statistics
-  @@map("user_progress")
+  @@index([canvasId]) // for canvas completion statistics
+  @@map("canvas_progress")
+}
+
+model VideoProgress {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lastPosition Int      @default(0) // seconds into video
+  lastAccessed DateTime @default(now())
+  userId       String // UUID reference to User
+  videoId      Int
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId]) // one progress record per user per video
+  @@index([userId]) // for user video progress queries
+  @@index([videoId]) // for video statistics
+  @@map("video_progress")
 }
 
 model ChapterCompletion {
@@ -445,19 +530,25 @@ model Comment {
   isDeleted       Boolean   @default(false) // soft delete
   editedAt        DateTime?
   userId          String // UUID reference to User
-  contentId       Int
+  canvasId        Int
   parentCommentId Int? // for replies
 
+  // Denormalized vote counts for performance
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content       Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  canvas        Canvas        @relation(fields: [canvasId], references: [id], onDelete: Cascade)
   parentComment Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
   replies       Comment[]     @relation("CommentReplies")
   votes         CommentVote[]
   reports       Report[]
 
-  @@index([contentId, isDeleted, createdAt]) // for content comments (excluding deleted)
+  @@index([canvasId, isDeleted, createdAt]) // for canvas comments (excluding deleted)
   @@index([parentCommentId]) // for loading replies
-  @@index([contentId, isPinned, isAnnouncement]) // for featured comments
+  @@index([canvasId, isPinned, isAnnouncement]) // for featured comments
+  @@index([canvasId, parentCommentId, isDeleted, netScore]) // for paginated top-level comments sorted by score
   @@map("comments")
 }
 
@@ -508,20 +599,20 @@ model Report {
   resolutionNotes   String?
   resolvedAt        DateTime?
   reporterUserId    String // UUID reference to User
-  reportedContentId Int? // One of these three must be non-null
+  reportedCanvasId  Int? // One of these three must be non-null
   reportedCommentId Int?
   reportedUserId    String?
   resolvedBy        String? // UUID reference to User (admin/moderator)
 
   reporter        User     @relation("ReportedBy", fields: [reporterUserId], references: [id], onDelete: Cascade)
-  reportedContent Content? @relation(fields: [reportedContentId], references: [id], onDelete: SetNull)
+  reportedCanvas  Canvas?  @relation(fields: [reportedCanvasId], references: [id], onDelete: SetNull)
   reportedComment Comment? @relation(fields: [reportedCommentId], references: [id], onDelete: SetNull)
   reportedUser    User?    @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
   resolver        User?    @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt]) // for moderation queue
   @@index([reporterUserId]) // for user's reports
-  @@index([reportedContentId]) // for content reports
+  @@index([reportedCanvasId]) // for canvas reports
   @@index([reportedCommentId]) // for comment reports
   @@index([reportedUserId]) // for user reports
   @@index([resolvedBy]) // for moderator activity

@@ -43,7 +43,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   FileText,
   Search,
   Trash2,
@@ -51,12 +50,11 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-type ContentWithRelations = Prisma.ContentGetPayload<{
+type ContentWithRelations = Prisma.CanvasGetPayload<{
   include: {
     contributor: {
       select: {
@@ -88,6 +86,11 @@ type ContentWithRelations = Prisma.ContentGetPayload<{
             };
           };
         };
+      };
+    };
+    contentBlocks: {
+      select: {
+        contentType: true;
       };
     };
     _count: {
@@ -513,11 +516,16 @@ export function ContentManager({
 
                   <div className="grid gap-2 pt-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     {group.items.map(item => {
-                      const Icon = contentTypeIcons[item.contentType];
+                      const primaryType =
+                        item.contentBlocks[0]?.contentType || "FILE";
+                      const Icon =
+                        contentTypeIcons[
+                          primaryType as keyof typeof contentTypeIcons
+                        ] || FileText;
                       const typeLabel =
                         contentTypeLabels[
-                          item.contentType as keyof typeof contentTypeLabels
-                        ];
+                          primaryType as keyof typeof contentTypeLabels
+                        ] || "ملف";
                       const isExpanded = expandedCardId === item.id;
                       const showEngagement = item.status !== "PENDING";
                       const chapterSequenceLabel = `الفصل ${item.chapter.sequence}`;
@@ -559,24 +567,6 @@ export function ContentManager({
                                   {item.title}
                                 </CardTitle>
                               </div>
-                              {item.url && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  asChild
-                                >
-                                  <Link
-                                    href={item.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label="عرض المحتوى"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                  </Link>
-                                </Button>
-                              )}
                             </div>
 
                             {item.description ? (

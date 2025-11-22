@@ -25,7 +25,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 type ChapterWithCounts = Prisma.ChapterGetPayload<{
-  include: { _count: { select: { content: true } } };
+  include: { _count: { select: { canvases: true } } };
 }>;
 
 interface ChaptersManagerProps {
@@ -214,7 +214,7 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
                   <p className="text-muted-foreground text-xs">
                     المحتوى:{" "}
                     {new Intl.NumberFormat("ar-SA-u-nu-latn").format(
-                      chapter._count?.content ?? 0
+                      chapter._count?.canvases ?? 0
                     )}
                   </p>
                 </div>

@@ -76,7 +76,7 @@ export default async function SubjectByCodePage({
         orderBy: { sequence: "asc" },
         include: {
           _count: {
-            select: { content: true },
+            select: { canvases: true },
           },
         },
       },

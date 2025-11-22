@@ -10,7 +10,7 @@ type UserWithCounts = Prisma.UserGetPayload<{
   include: {
     _count: {
       select: {
-        contributions: true;
+        contributedCanvases: true;
         enrollments: true;
         moderatedSubjects: true;
       };
@@ -69,7 +69,7 @@ export async function listUsersAction(params?: {
         include: {
           _count: {
             select: {
-              contributions: true,
+              contributedCanvases: true,
               enrollments: true,
               moderatedSubjects: true,
             },
@@ -233,11 +233,11 @@ export async function getUserDetailsAction(
       include: {
         _count: {
           select: {
-            contributions: true,
+            contributedCanvases: true,
             enrollments: true,
             moderatedSubjects: true,
             comments: true,
-            contentVotes: true,
+            canvasVotes: true,
             reportsSubmitted: true,
           },
         },
@@ -266,11 +266,15 @@ export async function getUserDetailsAction(
           orderBy: { enrolledAt: "desc" },
           take: 10,
         },
-        contributions: {
+        contributedCanvases: {
           select: {
             id: true,
             title: true,
-            contentType: true,
+            contentBlocks: {
+              select: {
+                contentType: true,
+              },
+            },
             status: true,
             createdAt: true,
             chapter: {
@@ -333,11 +337,11 @@ type UserWithDetails = Prisma.UserGetPayload<{
   include: {
     _count: {
       select: {
-        contributions: true;
+        contributedCanvases: true;
         enrollments: true;
         moderatedSubjects: true;
         comments: true;
-        contentVotes: true;
+        canvasVotes: true;
         reportsSubmitted: true;
       };
     };
@@ -364,11 +368,15 @@ type UserWithDetails = Prisma.UserGetPayload<{
         };
       };
     };
-    contributions: {
+    contributedCanvases: {
       select: {
         id: true;
         title: true;
-        contentType: true;
+        contentBlocks: {
+          select: {
+            contentType: true;
+          };
+        };
         status: true;
         createdAt: true;
         chapter: {

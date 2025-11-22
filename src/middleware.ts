@@ -5,7 +5,7 @@ const protectedRoutes = [
   "/profile",
   "/admin/dashboard",
   "/dashboard",
-  "/subjects/[^/]+/chapters",
+  "/subjects/[^/]+/chapters/[^/]+/canvases",
 ];
 
 export async function middleware(req: NextRequest) {

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
-type ContentWithRelations = Prisma.ContentGetPayload<{
+type ContentWithRelations = Prisma.CanvasGetPayload<{
   include: {
     contributor: {
       select: {
@@ -38,6 +38,11 @@ type ContentWithRelations = Prisma.ContentGetPayload<{
             };
           };
         };
+      };
+    };
+    contentBlocks: {
+      select: {
+        contentType: true;
       };
     };
     _count: {
@@ -101,7 +106,7 @@ export async function listContentAction(params?: {
     const limit = Math.min(100, Math.max(1, params?.limit ?? 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ContentWhereInput = {};
+    const where: Prisma.CanvasWhereInput = {};
 
     if (session.user.role !== "ADMIN") {
       const moderatedSubjects = await prisma.subjectModerator.findMany({
@@ -145,8 +150,11 @@ export async function listContentAction(params?: {
 
     const normalizedType = params?.contentType?.toUpperCase();
     if (normalizedType && normalizedType !== "ALL") {
-      where.contentType =
-        normalizedType as Prisma.ContentWhereInput["contentType"];
+      where.contentBlocks = {
+        some: {
+          contentType: normalizedType,
+        },
+      };
     }
 
     if (params?.subjectId) {
@@ -193,7 +201,7 @@ export async function listContentAction(params?: {
     }
 
     const [content, total] = await Promise.all([
-      prisma.content.findMany({
+      prisma.canvas.findMany({
         where,
         include: {
           contributor: {
@@ -231,6 +239,11 @@ export async function listContentAction(params?: {
               },
             },
           },
+          contentBlocks: {
+            select: {
+              contentType: true,
+            },
+          },
           _count: {
             select: {
               votes: true,
@@ -243,7 +256,7 @@ export async function listContentAction(params?: {
         skip,
         take: limit,
       }),
-      prisma.content.count({ where }),
+      prisma.canvas.count({ where }),
     ]);
 
     return { content, total };
@@ -264,7 +277,7 @@ export async function approveContentAction(
       return { error: "معرف المحتوى غير صالح" };
     }
 
-    const content = await prisma.content.findUnique({
+    const content = await prisma.canvas.findUnique({
       where: { id: contentId },
       select: {
         id: true,
@@ -285,7 +298,7 @@ export async function approveContentAction(
     await requireAdminOrModerator(content.chapter.subjectId);
 
     const result = await prisma.$transaction(async tx => {
-      const currentContent = await tx.content.findUnique({
+      const currentContent = await tx.canvas.findUnique({
         where: { id: contentId },
         select: { status: true, contributorId: true },
       });
@@ -294,7 +307,7 @@ export async function approveContentAction(
         return { alreadyApproved: true };
       }
 
-      await tx.content.update({
+      await tx.canvas.update({
         where: { id: contentId },
         data: {
           status: "APPROVED",
@@ -350,7 +363,7 @@ export async function rejectContentAction(
       return { error: "سبب الرفض مطلوب" };
     }
 
-    const content = await prisma.content.findUnique({
+    const content = await prisma.canvas.findUnique({
       where: { id: contentId },
       select: {
         status: true,
@@ -368,7 +381,7 @@ export async function rejectContentAction(
 
     await requireAdminOrModerator(content.chapter.subjectId);
 
-    await prisma.content.update({
+    await prisma.canvas.update({
       where: { id: contentId },
       data: {
         status: "REJECTED",
@@ -395,7 +408,7 @@ export async function deleteContentAction(
       return { error: "معرف المحتوى غير صالح" };
     }
 
-    const content = await prisma.content.findUnique({
+    const content = await prisma.canvas.findUnique({
       where: { id: contentId },
       select: {
         chapter: {
@@ -412,7 +425,7 @@ export async function deleteContentAction(
 
     await requireAdminOrModerator(content.chapter.subjectId);
 
-    await prisma.content.delete({
+    await prisma.canvas.delete({
       where: { id: contentId },
     });
 

@@ -14,7 +14,7 @@ type ChapterWithCounts = {
   description: string | null;
   sequence: number;
   subjectId: number;
-  _count: { content: number };
+  _count: { canvases: number };
 };
 
 async function requireAdmin() {
@@ -141,7 +141,7 @@ export async function createChapterAction(
         subjectId,
       },
       include: {
-        _count: { select: { content: true } },
+        _count: { select: { canvases: true } },
       },
     });
     await revalidateChapterPaths(subjectId);
@@ -219,7 +219,7 @@ export async function updateChapterAction(
         subjectId,
       },
       include: {
-        _count: { select: { content: true } },
+        _count: { select: { canvases: true } },
       },
     });
     await revalidateChapterPaths(subjectId);
