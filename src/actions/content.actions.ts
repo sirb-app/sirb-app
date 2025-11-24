@@ -242,6 +242,10 @@ export async function listContentAction(params?: {
           contentBlocks: {
             select: {
               contentType: true,
+              sequence: true,
+            },
+            orderBy: {
+              sequence: "asc",
             },
           },
           _count: {

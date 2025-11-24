@@ -98,16 +98,6 @@ export function ModeratorsManager({
     });
   };
 
-  const getUserInitials = (name: string) => {
-    return name
-      .split(" ")
-      .filter(n => n.trim().length > 0)
-      .map(n => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
     <section className="space-y-4" dir="rtl" id="moderators">
       <div className="flex items-center justify-between gap-3">
@@ -177,8 +167,8 @@ export function ModeratorsManager({
               <div className="flex items-start gap-3">
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={moderator.user.image ?? undefined} />
-                  <AvatarFallback>
-                    {getUserInitials(moderator.user.name)}
+                  <AvatarFallback className="text-xs uppercase">
+                    {moderator.user.name.slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">

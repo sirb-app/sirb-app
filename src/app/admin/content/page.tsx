@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: PageProps) {
 
   const contentResult = await listContentAction({
     status: contentStatus,
-    contentType: params.type,
+    contentType: params.type?.toUpperCase(),
     universityId: params.university
       ? parseInt(params.university, 10)
       : undefined,

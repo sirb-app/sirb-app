@@ -167,7 +167,7 @@ export function ContentManager({
   );
 
   const statusFilter = (searchParams.get("status") ?? "PENDING").toUpperCase();
-  const typeFilter = (searchParams.get("type") ?? "ALL").toUpperCase();
+  const typeFilter = searchParams.get("type")?.toUpperCase() ?? "ALL";
   const universityFilter = searchParams.get("university") ?? "ALL";
   const itemsPerPage = 20;
   const totalPages = Math.ceil(total / itemsPerPage);
@@ -291,16 +291,6 @@ export function ContentManager({
         toast.error(res.error);
       }
     });
-  };
-
-  const getUserInitials = (name: string) => {
-    return name
-      .split(" ")
-      .filter(n => n.trim().length > 0)
-      .map(n => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
   };
 
   const formatDate = (date: Date) => {
@@ -619,8 +609,8 @@ export function ContentManager({
                                 <AvatarImage
                                   src={item.contributor.image ?? undefined}
                                 />
-                                <AvatarFallback>
-                                  {getUserInitials(item.contributor.name)}
+                                <AvatarFallback className="text-xs uppercase">
+                                  {item.contributor.name.slice(0, 2)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">

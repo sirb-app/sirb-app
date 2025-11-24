@@ -302,16 +302,6 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
     });
   };
 
-  const getUserInitials = (name: string) => {
-    return name
-      .split(" ")
-      .filter(n => n.trim().length > 0)
-      .map(n => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
       dateStyle: "medium",
@@ -424,8 +414,8 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={user.image ?? undefined} />
-                          <AvatarFallback>
-                            {getUserInitials(user.name)}
+                          <AvatarFallback className="text-xs uppercase">
+                            {user.name.slice(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
@@ -761,7 +751,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                 <Avatar className="h-16 w-16">
                   <AvatarImage src={userDetails.image ?? undefined} />
                   <AvatarFallback className="text-lg">
-                    {getUserInitials(userDetails.name)}
+                    {userDetails.name.slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">

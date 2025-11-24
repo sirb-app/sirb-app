@@ -73,16 +73,6 @@ export function UserSearch({
     };
   }, [searchQuery, excludeUserIds, searchAction]);
 
-  const getUserInitials = (name: string) => {
-    return name
-      .split(" ")
-      .filter(n => n.trim().length > 0)
-      .map(n => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -106,8 +96,8 @@ export function UserSearch({
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={selectedUser.image ?? undefined} />
-                <AvatarFallback>
-                  {getUserInitials(selectedUser.name)}
+                <AvatarFallback className="text-xs uppercase">
+                  {selectedUser.name.slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
@@ -161,8 +151,8 @@ export function UserSearch({
                 >
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user.image ?? undefined} />
-                    <AvatarFallback>
-                      {getUserInitials(user.name)}
+                    <AvatarFallback className="text-xs uppercase">
+                      {user.name.slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
