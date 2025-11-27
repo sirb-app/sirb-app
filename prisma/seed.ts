@@ -428,6 +428,17 @@ async function main() {
     return;
   }
 
+  // Assign moderator to first subject
+  // Using the dummy user as the placeholder moderator
+  await prisma.subjectModerator.create({
+    data: {
+      userId: dummyUser.id,
+      subjectId: firstSubject.id,
+    },
+  });
+
+  console.log(`✅ Assigned moderator to: ${firstSubject.name}`);
+
   console.log(`📚 Creating chapters and canvases for: ${firstSubject.name}...`);
 
   // Create chapters for the first subject only

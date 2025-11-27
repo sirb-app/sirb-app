@@ -17,6 +17,7 @@ enum ContentStatus {
   PENDING
   APPROVED
   REJECTED
+  DRAFT
 }
 
 enum VoteType {
@@ -264,6 +265,7 @@ model Canvas {
   status          ContentStatus @default(PENDING)
   rejectionReason String?
   moderatorNotes  String?
+  isDeleted       Boolean       @default(false)
   chapterId       Int
   contributorId   String // UUID reference to User
 
@@ -301,6 +303,7 @@ model Video {
   url            String // YouTube URL
   youtubeVideoId String // Extracted video ID
   duration       Int // seconds
+  isOriginal     Boolean @default(false)
 
   progress VideoProgress[]
 
@@ -317,6 +320,7 @@ model File {
   url         String // File storage URL
   fileSize    BigInt // bytes
   mimeType    String // application/pdf, image/png, etc
+  isOriginal  Boolean @default(false)
 
   @@map("files")
 }

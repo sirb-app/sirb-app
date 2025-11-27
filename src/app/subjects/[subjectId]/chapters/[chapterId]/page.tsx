@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import AddCanvasButton from "./_components/add-canvas-button";
 import CanvasList from "./_components/canvas-list";
 import ChapterInfo from "./_components/chapter-info";
 
@@ -83,14 +84,33 @@ export default async function Page({ params }: PageProps) {
         <ChapterInfo chapter={chapter} subjectId={parseInt(subjectId)} />
       </section>
 
+      {/* Header & Add Button */}
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-bold">الشروحات</h2>
+        {isAuthenticated && chapter.canvases.length > 0 && (
+          <AddCanvasButton chapterId={chapter.id} hasCanvases={true} />
+        )}
+      </div>
+
       {/* Canvas Grid Below */}
       <section aria-label="قائمة المحتويات">
-        <CanvasList
-          canvases={chapter.canvases}
-          chapterId={chapter.id}
-          subjectId={parseInt(subjectId)}
-          isAuthenticated={isAuthenticated}
-        />
+        {chapter.canvases.length > 0 ? (
+          <CanvasList
+            canvases={chapter.canvases}
+            chapterId={chapter.id}
+            subjectId={parseInt(subjectId)}
+            isAuthenticated={isAuthenticated}
+          />
+        ) : isAuthenticated ? (
+          <AddCanvasButton chapterId={chapter.id} hasCanvases={false} />
+        ) : (
+          <CanvasList
+            canvases={[]}
+            chapterId={chapter.id}
+            subjectId={parseInt(subjectId)}
+            isAuthenticated={isAuthenticated}
+          />
+        )}
       </section>
     </div>
   );

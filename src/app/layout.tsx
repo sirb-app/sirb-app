@@ -34,7 +34,7 @@ export default function RootLayout({
         >
           <Navigation />
           <main className="pt-6">{children}</main>
-          <Toaster position="top-center" richColors />
+          <Toaster position="bottom-right" richColors />
         </ThemeProvider>
       </body>
     </html>
