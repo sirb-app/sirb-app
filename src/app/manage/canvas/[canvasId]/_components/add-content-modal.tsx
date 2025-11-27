@@ -252,7 +252,7 @@ export default function AddContentModal({
                 dir="ltr"
               />
             </div>
-            <div className="bg-muted/40 flex items-center gap-2 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 px-3 py-2">
               <Checkbox
                 id="v-external"
                 checked={videoIsExternal}
@@ -307,7 +307,7 @@ export default function AddContentModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="bg-muted/40 flex items-center gap-2 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 px-3 py-2">
               <Checkbox
                 id="f-external"
                 checked={fileIsExternal}
