@@ -17,6 +17,7 @@ enum ContentStatus {
   PENDING
   APPROVED
   REJECTED
+  DRAFT
 }
 
 enum VoteType {
@@ -231,13 +232,16 @@ model ContentBlock {
   canvasId    Int
   sequence    Int // Global sequence across all content types
   contentType String // "TEXT" | "VIDEO" | "FILE"
-  contentId   Int // Points to the specific content record
 
   canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
 
+  // One-to-one relations (content owns the block)
+  textContent TextContent?
+  video       Video?
+  file        File?
+
   @@unique([canvasId, sequence]) // Enforces global uniqueness!
   @@index([canvasId])
-  @@index([contentType, contentId]) // For reverse lookups
   @@map("content_blocks")
 }
 
@@ -248,6 +252,10 @@ model TextContent {
   updatedAt DateTime @updatedAt
 
   content String @db.Text // Plain text content
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int          @unique
+  contentBlock   ContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
 
   @@map("text_contents")
 }
@@ -261,9 +269,10 @@ model Canvas {
   description     String?
   imageUrl        String? // Canvas thumbnail image
   sequence        Int
-  status          ContentStatus @default(PENDING)
+  status          ContentStatus @default(DRAFT) // New canvases start as DRAFT
   rejectionReason String?
   moderatorNotes  String?
+  isDeleted       Boolean       @default(false)
   chapterId       Int
   contributorId   String // UUID reference to User
 
@@ -301,8 +310,13 @@ model Video {
   url            String // YouTube URL
   youtubeVideoId String // Extracted video ID
   duration       Int // seconds
+  isOriginal     Boolean @default(false)
 
   progress VideoProgress[]
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int          @unique
+  contentBlock   ContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
 
   @@map("videos")
 }
@@ -314,9 +328,14 @@ model File {
 
   title       String
   description String?
-  url         String // File storage URL
+  url         String // R2 storage key
   fileSize    BigInt // bytes
   mimeType    String // application/pdf, image/png, etc
+  isOriginal  Boolean @default(false)
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int          @unique
+  contentBlock   ContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
 
   @@map("files")
 }
