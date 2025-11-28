@@ -19,22 +19,17 @@ type CanvasWithContent = Prisma.CanvasGetPayload<{
         id: true;
         sequence: true;
         contentType: true;
-        contentId: true;
+        textContent: true;
+        video: {
+          include: {
+            progress: { select: { lastPosition: true } };
+          };
+        };
+        file: true;
       };
     };
   };
-}> & {
-  textMap: Map<number, Prisma.TextContentGetPayload<{}>>;
-  videoMap: Map<
-    number,
-    Prisma.VideoGetPayload<{
-      include: {
-        progress: { select: { lastPosition: true } };
-      };
-    }>
-  >;
-  fileMap: Map<number, Prisma.FileGetPayload<{}>>;
-};
+}>;
 
 type CanvasContentProps = {
   readonly canvas: CanvasWithContent;
@@ -55,24 +50,18 @@ export default function CanvasContent({ canvas }: CanvasContentProps) {
       {/* Content Items */}
       <div className="space-y-6">
         {canvas.contentBlocks.map(block => {
-          if (block.contentType === "TEXT") {
-            const textContent = canvas.textMap.get(block.contentId);
-            if (!textContent) return null;
+          if (block.contentType === "TEXT" && block.textContent) {
             return (
-              <TextContentBlock key={block.id} content={textContent.content} />
+              <TextContentBlock key={block.id} content={block.textContent.content} />
             );
           }
 
-          if (block.contentType === "VIDEO") {
-            const video = canvas.videoMap.get(block.contentId);
-            if (!video) return null;
-            return <VideoContentBlock key={block.id} video={video} />;
+          if (block.contentType === "VIDEO" && block.video) {
+            return <VideoContentBlock key={block.id} video={block.video} />;
           }
 
-          if (block.contentType === "FILE") {
-            const file = canvas.fileMap.get(block.contentId);
-            if (!file) return null;
-            return <FileContentBlock key={block.id} file={file} />;
+          if (block.contentType === "FILE" && block.file) {
+            return <FileContentBlock key={block.id} file={block.file} />;
           }
 
           return null;

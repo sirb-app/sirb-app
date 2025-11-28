@@ -23,7 +23,7 @@ export async function sendEmailAction({
   };
 }) {
   const mailOptions = {
-    from: "Sirb <onboarding@resend.dev>",
+    from: "Sirb <no-reply@sirb-app.com>",
     to: [to],
     subject: `Sirb - ${subject}`,
     html: `
