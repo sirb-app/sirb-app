@@ -28,11 +28,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+// Format file size helper
+function formatFileSize(bytes: bigint): string {
+  const size = Number(bytes);
+  if (size < 1024) return `${size} بايت`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} كيلوبايت`;
+  return `${(size / (1024 * 1024)).toFixed(2)} ميجابايت`;
+}
+
 type ContentBlock = {
   id: number;
   sequence: number;
   contentType: "TEXT" | "VIDEO" | "FILE";
-  contentId: number;
   data?: any;
 };
 
@@ -63,7 +70,17 @@ export default function ContentBlockCard({
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
-      await deleteContentBlock(block.id, canvasId);
+      const result = await deleteContentBlock(block.id, canvasId);
+
+      // Cleanup file from R2 if it was a FILE block
+      if (result.r2Key) {
+        fetch("/api/r2/delete", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: result.r2Key }),
+        }).catch(() => {}); // Silent cleanup
+      }
+
       toast.success("تم حذف المحتوى");
       router.refresh();
     } catch (error) {
@@ -73,14 +90,28 @@ export default function ContentBlockCard({
     }
   };
 
+  // Get file extension from MIME type
+  const getFileExtension = (mimeType: string): string => {
+    const extensionMap: Record<string, string> = {
+      "application/pdf": ".pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+      "text/plain": ".txt",
+      "image/png": ".png",
+      "image/jpeg": ".jpg",
+      "image/gif": ".gif",
+    };
+    return extensionMap[mimeType] || "";
+  };
+
   const getIcon = () => {
     switch (block.contentType) {
       case "TEXT":
-        return <FileText className="h-6 w-6 text-blue-600" />;
+        return <FileText className="text-primary h-6 w-6" />;
       case "VIDEO":
-        return <Video className="h-6 w-6 text-red-600" />;
+        return <Video className="text-primary h-6 w-6" />;
       case "FILE":
-        return <File className="h-6 w-6 text-yellow-600" />;
+        return <File className="text-primary h-6 w-6" />;
     }
   };
 
@@ -100,6 +131,20 @@ export default function ContentBlockCard({
     if (block.contentType === "TEXT") {
       return block.data.content;
     }
+    if (block.contentType === "FILE") {
+      const extension = block.data.mimeType ? getFileExtension(block.data.mimeType) : "";
+      const size = block.data.fileSize ? formatFileSize(block.data.fileSize) : "";
+      return (
+        <div>
+          <div className="text-foreground text-base font-medium">{block.data.title}</div>
+          <div className="text-muted-foreground mt-1 text-xs">
+            <span>{size}</span>
+            {extension && size && <span className="mx-1">•</span>}
+            <span>{extension}</span>
+          </div>
+        </div>
+      );
+    }
     return block.data.title;
   };
 
@@ -110,14 +155,14 @@ export default function ContentBlockCard({
         isDeleting && "opacity-50"
       )}
     >
-      <CardContent className="flex items-center gap-6 p-4">
+      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6">
         {/* Move Buttons */}
         {!isReadOnly && (
-          <div className="text-muted-foreground flex flex-col gap-1">
+          <div className="text-muted-foreground flex flex-row gap-2 sm:flex-col sm:gap-1">
             <Button
               variant="ghost"
               size="icon"
-              className="hover:bg-accent hover:text-accent-foreground h-6 w-6"
+              className="hover:bg-accent hover:text-accent-foreground h-8 w-8 sm:h-6 sm:w-6"
               disabled={isFirst}
               onClick={onMoveUp}
             >
@@ -126,7 +171,7 @@ export default function ContentBlockCard({
             <Button
               variant="ghost"
               size="icon"
-              className="hover:bg-accent hover:text-accent-foreground h-6 w-6"
+              className="hover:bg-accent hover:text-accent-foreground h-8 w-8 sm:h-6 sm:w-6"
               disabled={isLast}
               onClick={onMoveDown}
             >
@@ -136,31 +181,35 @@ export default function ContentBlockCard({
         )}
 
         {/* Icon & Type */}
-        <div className="flex min-w-[80px] flex-col items-center justify-center gap-1 text-center">
-          <div className="bg-muted/50 group-hover:bg-muted rounded-lg p-3 transition-colors">
+        <div className="flex min-w-[70px] flex-col items-center justify-center gap-1 text-center sm:min-w-[80px]">
+          <div className="bg-muted/50 group-hover:bg-muted rounded-lg p-2 transition-colors sm:p-3">
             {getIcon()}
           </div>
-          <span className="text-foreground text-sm font-bold">
+          <span className="text-foreground text-xs font-bold sm:text-sm">
             {getLabel()}
           </span>
         </div>
 
         {/* Content Info */}
-        <div className="mr-2 min-w-0 flex-1 border-r pr-6">
-          <div
-            className={cn(
-              "text-muted-foreground line-clamp-2 text-sm",
-              block.contentType !== "TEXT" &&
-                "text-foreground text-base font-medium"
-            )}
-          >
-            {getContentPreview()}
-          </div>
+        <div className="min-w-0 flex-1 border-b pb-4 sm:mr-2 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-6">
+          {block.contentType === "FILE" ? (
+            getContentPreview()
+          ) : (
+            <div
+              className={cn(
+                "text-muted-foreground line-clamp-2 text-sm",
+                block.contentType !== "TEXT" &&
+                  "text-foreground text-base font-medium"
+              )}
+            >
+              {getContentPreview()}
+            </div>
+          )}
         </div>
 
         {/* Actions (Vertical) */}
         {!isReadOnly && (
-          <div className="mr-2 flex flex-col gap-2 border-r pr-4">
+          <div className="flex flex-row justify-end gap-4 sm:mr-2 sm:flex-col sm:gap-2 sm:border-r sm:pr-4">
             <Button
               variant="ghost"
               size="sm"
@@ -180,14 +229,14 @@ export default function ContentBlockCard({
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="sm:max-w-[425px]">
                 <AlertDialogHeader>
                   <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                   <AlertDialogDescription>
                     سيتم حذف هذا المحتوى نهائياً.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
+                <AlertDialogFooter className="gap-2 sm:gap-0">
                   <AlertDialogCancel>إلغاء</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}

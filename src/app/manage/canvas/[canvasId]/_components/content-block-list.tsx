@@ -13,7 +13,6 @@ type ContentBlock = {
   id: number;
   sequence: number;
   contentType: "TEXT" | "VIDEO" | "FILE";
-  contentId: number;
   data?: any;
 };
 

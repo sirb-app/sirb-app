@@ -19,6 +19,11 @@ async function getCanvasDetails(canvasId: number, userId: string) {
     include: {
       contentBlocks: {
         orderBy: { sequence: "asc" },
+        include: {
+          textContent: true,
+          video: true,
+          file: true,
+        },
       },
       chapter: {
         select: {
@@ -28,7 +33,7 @@ async function getCanvasDetails(canvasId: number, userId: string) {
     },
   });
 
-  if (!canvas) return null;
+  if (!canvas || canvas.isDeleted) return null;
 
   if (canvas.contributorId !== userId) {
     const user = await prisma.user.findUnique({
@@ -40,31 +45,15 @@ async function getCanvasDetails(canvasId: number, userId: string) {
     }
   }
 
-  // Fetch content details
-  const textIds = canvas.contentBlocks
-    .filter(b => b.contentType === "TEXT")
-    .map(b => b.contentId);
-  const videoIds = canvas.contentBlocks
-    .filter(b => b.contentType === "VIDEO")
-    .map(b => b.contentId);
-  const fileIds = canvas.contentBlocks
-    .filter(b => b.contentType === "FILE")
-    .map(b => b.contentId);
-
-  const [textContents, videos, files] = await Promise.all([
-    prisma.textContent.findMany({ where: { id: { in: textIds } } }),
-    prisma.video.findMany({ where: { id: { in: videoIds } } }),
-    prisma.file.findMany({ where: { id: { in: fileIds } } }),
-  ]);
-
+  // Map blocks to include data field for compatibility with existing components
   const blocksWithData = canvas.contentBlocks.map(block => {
     let data = null;
-    if (block.contentType === "TEXT") {
-      data = textContents.find(t => t.id === block.contentId);
-    } else if (block.contentType === "VIDEO") {
-      data = videos.find(v => v.id === block.contentId);
-    } else if (block.contentType === "FILE") {
-      data = files.find(f => f.id === block.contentId);
+    if (block.contentType === "TEXT" && block.textContent) {
+      data = block.textContent;
+    } else if (block.contentType === "VIDEO" && block.video) {
+      data = block.video;
+    } else if (block.contentType === "FILE" && block.file) {
+      data = block.file;
     }
     return { ...block, data };
   });

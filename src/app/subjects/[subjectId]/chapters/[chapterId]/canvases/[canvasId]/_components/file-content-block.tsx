@@ -1,8 +1,9 @@
-import { Download, FileText } from "lucide-react";
-import Link from "next/link";
+import { FileDownloadButton } from "@/components/canvas-file-download";
+import { File } from "lucide-react";
 
 type FileContentBlockProps = {
   readonly file: {
+    id: number;
     title: string;
     description: string | null;
     url: string;
@@ -11,39 +12,64 @@ type FileContentBlockProps = {
   };
 };
 
-export default function FileContentBlock({ file }: FileContentBlockProps) {
-  const formatFileSize = (bytes: bigint) => {
-    const kb = Number(bytes) / 1024;
-    if (kb < 1024) return `${kb.toFixed(1)} KB`;
-    return `${(kb / 1024).toFixed(1)} MB`;
-  };
+// Format file size helper
+function formatFileSize(bytes: bigint): string {
+  const size = Number(bytes);
+  if (size < 1024) return `${size} بايت`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} كيلوبايت`;
+  return `${(size / (1024 * 1024)).toFixed(2)} ميجابايت`;
+}
 
+// Get file type label helper
+function getFileTypeLabel(mimeType: string): string {
+  const typeMap: Record<string, string> = {
+    "application/pdf": "PDF",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "مستند Word",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "عرض تقديمي",
+    "text/plain": "ملف نصي",
+    "image/png": "صورة PNG",
+    "image/jpeg": "صورة JPEG",
+    "image/gif": "صورة GIF",
+  };
+  return typeMap[mimeType] || "ملف";
+}
+
+export default function FileContentBlock({ file }: FileContentBlockProps) {
   return (
-    <Link
-      href={file.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group bg-card hover:border-primary/50 block rounded-lg border p-6 transition-all hover:shadow-sm"
-    >
-      <div className="flex items-center gap-4">
-        <div className="bg-primary/10 rounded-lg p-3 transition-colors">
-          <FileText className="text-primary h-6 w-6" />
+    <div className="bg-card block rounded-lg border p-4 sm:p-6">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+        {/* File Icon */}
+        <div className="bg-primary/10 flex-shrink-0 rounded-lg p-3">
+          <File className="text-primary h-6 w-6" />
         </div>
+
+        {/* File Info */}
         <div className="min-w-0 flex-1">
-          <h3 className="text-foreground group-hover:text-primary font-semibold transition-colors">
+          <h3 className="text-foreground break-words text-base font-semibold sm:text-lg">
             {file.title}
           </h3>
           {file.description && (
-            <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">
+            <p className="text-muted-foreground mt-1 break-words text-sm">
               {file.description}
             </p>
           )}
-          <p className="text-muted-foreground mt-1 text-xs">
-            {file.mimeType} • {formatFileSize(file.fileSize)}
+          <p className="text-muted-foreground mt-2 text-xs">
+            {formatFileSize(file.fileSize)} • {getFileTypeLabel(file.mimeType)}
           </p>
         </div>
-        <Download className="text-muted-foreground group-hover:text-primary h-5 w-5 transition-colors" />
+
+        {/* Download Button */}
+        <div className="flex-shrink-0">
+          <FileDownloadButton
+            fileId={file.id}
+            fileName={file.title}
+            variant="ghost"
+            size="icon"
+            iconOnly
+            className="hover:bg-muted/50 h-10 w-10"
+          />
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }

@@ -1,5 +1,3 @@
-import { markCanvasComplete } from "@/actions/canvas-progress.action";
-import { trackCanvasView } from "@/actions/canvas-view.action";
 import { getComments } from "@/actions/get-comments.action";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
@@ -11,6 +9,7 @@ import { notFound, redirect } from "next/navigation";
 import CanvasComments from "./_components/canvas-comments";
 import CanvasContent from "./_components/canvas-content";
 import CanvasContributorSection from "./_components/canvas-contributor-section";
+import CanvasViewTracker from "./_components/canvas-view-tracker";
 
 type PageProps = {
   params: Promise<{
@@ -30,6 +29,7 @@ async function getCanvasData(
     where: {
       id: parseInt(canvasId),
       chapterId: parseInt(chapterId),
+      isDeleted: false, // Exclude soft-deleted canvases
     },
     include: {
       chapter: {
@@ -53,7 +53,16 @@ async function getCanvasData(
           id: true,
           sequence: true,
           contentType: true,
-          contentId: true,
+          textContent: true,
+          video: {
+            include: {
+              progress: {
+                where: { userId },
+                select: { lastPosition: true },
+              },
+            },
+          },
+          file: true,
         },
       },
       votes: {
@@ -95,44 +104,9 @@ async function getCanvasData(
     }
   }
 
-  const textIds: number[] = [];
-  const videoIds: number[] = [];
-  const fileIds: number[] = [];
-
-  canvas.contentBlocks.forEach(block => {
-    if (block.contentType === "TEXT") textIds.push(block.contentId);
-    else if (block.contentType === "VIDEO") videoIds.push(block.contentId);
-    else if (block.contentType === "FILE") fileIds.push(block.contentId);
-  });
-
-  const [textContents, videos, files] = await Promise.all([
-    prisma.textContent.findMany({
-      where: { id: { in: textIds } },
-    }),
-    prisma.video.findMany({
-      where: { id: { in: videoIds } },
-      include: {
-        progress: {
-          where: { userId },
-          select: { lastPosition: true },
-        },
-      },
-    }),
-    prisma.file.findMany({
-      where: { id: { in: fileIds } },
-    }),
-  ]);
-
-  // Create lookup maps for efficient access
-  const textMap = new Map(textContents.map(t => [t.id, t]));
-  const videoMap = new Map(videos.map(v => [v.id, v]));
-  const fileMap = new Map(files.map(f => [f.id, f]));
-
+  // No need to manually fetch content anymore - it's included in contentBlocks
   return {
     ...canvas,
-    textMap,
-    videoMap,
-    fileMap,
     userVote: canvas.votes[0]?.voteType || null,
   };
 }
@@ -150,20 +124,6 @@ export default async function Page({ params }: PageProps) {
     );
   }
 
-  // Only track views for Approved content
-  const isApproved =
-    (
-      await prisma.canvas.findUnique({
-        where: { id: parseInt(canvasId) },
-        select: { status: true },
-      })
-    )?.status === "APPROVED";
-
-  if (isApproved) {
-    await markCanvasComplete(parseInt(canvasId));
-    await trackCanvasView(parseInt(canvasId));
-  }
-
   const [canvas, initialCommentsData] = await Promise.all([
     getCanvasData(subjectId, chapterId, canvasId, session.user.id),
     getComments(parseInt(canvasId), undefined, "best"),
@@ -173,6 +133,12 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <div className="bg-background min-h-screen pb-20">
+      {/* Client-side view tracking - only tracks when user actually views the page */}
+      <CanvasViewTracker
+        canvasId={canvas.id}
+        isApproved={canvas.status === "APPROVED"}
+      />
+
       {isPreviewMode && (
         <div className="border-b border-yellow-500/20 bg-yellow-500/10 px-4 py-3">
           <div className="container mx-auto flex max-w-5xl items-center justify-between">

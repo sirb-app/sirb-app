@@ -50,19 +50,22 @@ const UpdateVideoBlockSchema = z.object({
 const AddFileBlockSchema = z.object({
   canvasId: z.number(),
   title: z.string().min(1, "Title is required"),
-  url: z.string().url("Invalid File URL"),
+  r2Key: z.string().min(1, "R2 key is required"),
   fileSize: z.number(),
   mimeType: z.string(),
   isOriginal: z.boolean().default(false),
+  description: z.string().optional(),
 });
 
 const UpdateFileBlockSchema = z.object({
   blockId: z.number(),
   canvasId: z.number(),
-  title: z.string().min(1, "Title is required"),
-  url: z.string().url("Invalid File URL"),
-  mimeType: z.string(),
-  isOriginal: z.boolean().default(false),
+  title: z.string().min(1, "Title is required").optional(),
+  description: z.string().optional(),
+  r2Key: z.string().min(1).optional(), // For file replacement
+  fileSize: z.number().optional(),
+  mimeType: z.string().optional(),
+  isOriginal: z.boolean().optional(),
 });
 
 const ReorderBlocksSchema = z.object({
@@ -89,11 +92,12 @@ async function checkCanvasOwnership(canvasId: number, userId: string) {
     select: {
       contributorId: true,
       status: true,
+      isDeleted: true,
       chapter: { select: { subjectId: true } },
     },
   });
 
-  if (!canvas) throw new Error("Canvas not found");
+  if (!canvas || canvas.isDeleted) throw new Error("Canvas not found");
 
   if (canvas.contributorId === userId) return canvas;
 
@@ -115,9 +119,12 @@ export async function createCanvas(data: z.infer<typeof CreateCanvasSchema>) {
 
   const validated = CreateCanvasSchema.parse(data);
 
-  // Get next sequence
+  // Get next sequence (exclude soft-deleted canvases)
   const lastCanvas = await prisma.canvas.findFirst({
-    where: { chapterId: validated.chapterId },
+    where: {
+      chapterId: validated.chapterId,
+      isDeleted: false,
+    },
     orderBy: { sequence: "desc" },
     select: { sequence: true },
   });
@@ -130,7 +137,7 @@ export async function createCanvas(data: z.infer<typeof CreateCanvasSchema>) {
       chapterId: validated.chapterId,
       contributorId: session.user.id,
       sequence,
-      status: ContentStatus.DRAFT,
+      // status defaults to DRAFT in schema
     },
   });
 
@@ -219,8 +226,11 @@ export async function cancelSubmission(canvasId: number) {
 
 // --- Content Block Actions ---
 
-async function getNextBlockSequence(canvasId: number) {
-  const lastBlock = await prisma.contentBlock.findFirst({
+async function getNextBlockSequence(
+  canvasId: number,
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+) {
+  const lastBlock = await tx.contentBlock.findFirst({
     where: { canvasId },
     orderBy: { sequence: "desc" },
     select: { sequence: true },
@@ -236,20 +246,26 @@ export async function addTextBlock(data: z.infer<typeof AddTextBlockSchema>) {
   await checkCanvasOwnership(validated.canvasId, session.user.id);
 
   return await prisma.$transaction(async tx => {
-    const textContent = await tx.textContent.create({
-      data: { content: validated.content },
-    });
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
 
-    const sequence = await getNextBlockSequence(validated.canvasId);
-
+    // Create ContentBlock first
     const block = await tx.contentBlock.create({
       data: {
         canvasId: validated.canvasId,
         sequence,
         contentType: "TEXT",
-        contentId: textContent.id,
       },
     });
+
+    // Create content with reference to ContentBlock
+    await tx.textContent.create({
+      data: {
+        content: validated.content,
+        contentBlockId: block.id,
+      },
+    });
+
     return block;
   });
 }
@@ -265,18 +281,20 @@ export async function updateTextBlock(
 
   const block = await prisma.contentBlock.findUnique({
     where: { id: validated.blockId },
+    include: { textContent: true },
   });
 
   if (
     !block ||
     block.canvasId !== validated.canvasId ||
-    block.contentType !== "TEXT"
+    block.contentType !== "TEXT" ||
+    !block.textContent
   ) {
     throw new Error("Block not found or invalid type");
   }
 
   await prisma.textContent.update({
-    where: { id: block.contentId },
+    where: { contentBlockId: validated.blockId },
     data: { content: validated.content },
   });
 
@@ -300,26 +318,30 @@ export async function addVideoBlock(data: z.infer<typeof AddVideoBlockSchema>) {
   if (!videoId) throw new Error("Invalid YouTube URL");
 
   return await prisma.$transaction(async tx => {
-    const video = await tx.video.create({
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
+
+    // Create ContentBlock first
+    const block = await tx.contentBlock.create({
+      data: {
+        canvasId: validated.canvasId,
+        sequence,
+        contentType: "VIDEO",
+      },
+    });
+
+    // Create content with reference to ContentBlock
+    await tx.video.create({
       data: {
         title: validated.title,
         url: validated.url,
         youtubeVideoId: videoId,
         duration: 0, // Pending duration fetch
         isOriginal: validated.isOriginal,
+        contentBlockId: block.id,
       },
     });
 
-    const sequence = await getNextBlockSequence(validated.canvasId);
-
-    const block = await tx.contentBlock.create({
-      data: {
-        canvasId: validated.canvasId,
-        sequence,
-        contentType: "VIDEO",
-        contentId: video.id,
-      },
-    });
     return block;
   });
 }
@@ -335,12 +357,14 @@ export async function updateVideoBlock(
 
   const block = await prisma.contentBlock.findUnique({
     where: { id: validated.blockId },
+    include: { video: true },
   });
 
   if (
     !block ||
     block.canvasId !== validated.canvasId ||
-    block.contentType !== "VIDEO"
+    block.contentType !== "VIDEO" ||
+    !block.video
   ) {
     throw new Error("Block not found or invalid type");
   }
@@ -349,7 +373,7 @@ export async function updateVideoBlock(
   if (!videoId) throw new Error("Invalid YouTube URL");
 
   await prisma.video.update({
-    where: { id: block.contentId },
+    where: { contentBlockId: validated.blockId },
     data: {
       title: validated.title,
       url: validated.url,
@@ -369,26 +393,31 @@ export async function addFileBlock(data: z.infer<typeof AddFileBlockSchema>) {
   await checkCanvasOwnership(validated.canvasId, session.user.id);
 
   return await prisma.$transaction(async tx => {
-    const file = await tx.file.create({
-      data: {
-        title: validated.title,
-        url: validated.url,
-        fileSize: BigInt(validated.fileSize),
-        mimeType: validated.mimeType,
-        isOriginal: validated.isOriginal,
-      },
-    });
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
 
-    const sequence = await getNextBlockSequence(validated.canvasId);
-
+    // Create ContentBlock first
     const block = await tx.contentBlock.create({
       data: {
         canvasId: validated.canvasId,
         sequence,
         contentType: "FILE",
-        contentId: file.id,
       },
     });
+
+    // Create content with reference to ContentBlock
+    await tx.file.create({
+      data: {
+        title: validated.title,
+        description: validated.description,
+        url: validated.r2Key, // Store R2 key in url field
+        fileSize: BigInt(validated.fileSize),
+        mimeType: validated.mimeType,
+        isOriginal: validated.isOriginal,
+        contentBlockId: block.id,
+      },
+    });
+
     return block;
   });
 }
@@ -404,27 +433,40 @@ export async function updateFileBlock(
 
   const block = await prisma.contentBlock.findUnique({
     where: { id: validated.blockId },
+    include: { file: true },
   });
 
   if (
     !block ||
     block.canvasId !== validated.canvasId ||
-    block.contentType !== "FILE"
+    block.contentType !== "FILE" ||
+    !block.file
   ) {
     throw new Error("Block not found or invalid type");
   }
 
+  // Get old file URL for cleanup if file is being replaced
+  const oldKey = validated.r2Key ? block.file.url : null;
+
+  // Update file with new data
+  const updateData: any = {};
+  if (validated.title) updateData.title = validated.title;
+  if (validated.description !== undefined) updateData.description = validated.description;
+  if (validated.r2Key) updateData.url = validated.r2Key; // Store new R2 key
+  if (validated.fileSize) updateData.fileSize = BigInt(validated.fileSize);
+  if (validated.mimeType) updateData.mimeType = validated.mimeType;
+  if (validated.isOriginal !== undefined) updateData.isOriginal = validated.isOriginal;
+
   await prisma.file.update({
-    where: { id: block.contentId },
-    data: {
-      title: validated.title,
-      url: validated.url,
-      mimeType: validated.mimeType,
-      isOriginal: validated.isOriginal,
-    },
+    where: { contentBlockId: validated.blockId },
+    data: updateData,
   });
 
-  return { success: true };
+  // Return old key for cleanup if file was replaced
+  return {
+    success: true,
+    oldKey,
+  };
 }
 
 export async function deleteContentBlock(blockId: number, canvasId: number) {
@@ -432,25 +474,24 @@ export async function deleteContentBlock(blockId: number, canvasId: number) {
   if (!session) throw new Error("Unauthorized");
   await checkCanvasOwnership(canvasId, session.user.id);
 
+  let r2Key: string | null = null;
+
   await prisma.$transaction(async tx => {
     const block = await tx.contentBlock.findUnique({
       where: { id: blockId },
+      include: { file: true },
     });
 
     if (!block || block.canvasId !== canvasId) {
       throw new Error("Block not found");
     }
 
-    // Delete specific content
-    if (block.contentType === "TEXT") {
-      await tx.textContent.delete({ where: { id: block.contentId } });
-    } else if (block.contentType === "VIDEO") {
-      await tx.video.delete({ where: { id: block.contentId } });
-    } else if (block.contentType === "FILE") {
-      await tx.file.delete({ where: { id: block.contentId } });
+    // Get R2 key before deleting file
+    if (block.contentType === "FILE" && block.file) {
+      r2Key = block.file.url;
     }
 
-    // Delete block
+    // Delete ContentBlock (this will CASCADE delete the content due to onDelete: Cascade)
     await tx.contentBlock.delete({ where: { id: blockId } });
 
     // Resequence remaining blocks
@@ -469,7 +510,7 @@ export async function deleteContentBlock(blockId: number, canvasId: number) {
     }
   });
 
-  return { success: true };
+  return { success: true, r2Key };
 }
 
 export async function reorderBlocks(data: z.infer<typeof ReorderBlocksSchema>) {
@@ -480,6 +521,16 @@ export async function reorderBlocks(data: z.infer<typeof ReorderBlocksSchema>) {
   await checkCanvasOwnership(validated.canvasId, session.user.id);
 
   await prisma.$transaction(async tx => {
+    // Two-phase update to avoid unique constraint violations:
+    // Phase 1: Move all blocks to temporary negative sequences
+    for (let i = 0; i < validated.updates.length; i++) {
+      await tx.contentBlock.update({
+        where: { id: validated.updates[i].blockId },
+        data: { sequence: -(i + 1) }, // Use negative sequences temporarily
+      });
+    }
+
+    // Phase 2: Set the final sequences
     for (const update of validated.updates) {
       await tx.contentBlock.update({
         where: { id: update.blockId },

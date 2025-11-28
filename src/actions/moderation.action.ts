@@ -49,6 +49,7 @@ async function getCanvasWithSubject(canvasId: number) {
     select: {
       id: true,
       status: true,
+      isDeleted: true,
       chapter: {
         select: {
           subjectId: true,
@@ -57,7 +58,7 @@ async function getCanvasWithSubject(canvasId: number) {
     },
   });
 
-  if (!canvas) throw new Error("Canvas not found");
+  if (!canvas || canvas.isDeleted) throw new Error("Canvas not found");
   return canvas;
 }
 
@@ -73,6 +74,7 @@ export async function getModerationQueue(subjectId: number) {
     where: {
       chapter: { subjectId },
       status: ContentStatus.PENDING,
+      isDeleted: false, // Exclude soft-deleted canvases
     },
     include: {
       contributor: {
@@ -93,8 +95,8 @@ export async function getModerationQueue(subjectId: number) {
   const reports = await prisma.report.findMany({
     where: {
       OR: [
-        { reportedCanvas: { chapter: { subjectId } } },
-        { reportedComment: { canvas: { chapter: { subjectId } } } },
+        { reportedCanvas: { chapter: { subjectId }, isDeleted: false } },
+        { reportedComment: { canvas: { chapter: { subjectId }, isDeleted: false } } },
       ],
       status: "PENDING",
     },

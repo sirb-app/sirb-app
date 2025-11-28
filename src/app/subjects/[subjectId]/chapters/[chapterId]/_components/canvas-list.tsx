@@ -129,8 +129,9 @@ function CanvasCard({
   const router = useRouter();
 
   // Determine if canvas is completed
+  // Using !! to convert to boolean - handles both null and undefined correctly
   const isCompleted =
-    isAuthenticated && canvas.userProgress?.[0]?.completedAt !== null;
+    isAuthenticated && !!canvas.userProgress?.[0]?.completedAt;
 
   // Optimistic UI state
   const [optimisticCompleted, setOptimisticCompleted] = useState(isCompleted);

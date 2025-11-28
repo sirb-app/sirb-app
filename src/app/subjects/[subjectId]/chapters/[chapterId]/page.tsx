@@ -29,7 +29,10 @@ async function getChapterData(
       description: true,
       sequence: true,
       canvases: {
-        where: { status: "APPROVED" },
+        where: {
+          status: "APPROVED",
+          isDeleted: false, // Exclude soft-deleted canvases
+        },
         orderBy: { sequence: "asc" },
         select: {
           id: true,
