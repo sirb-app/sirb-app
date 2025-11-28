@@ -1,5 +1,22 @@
 "use client";
 
+import {
+  createSubjectResource,
+  deleteSubjectResource,
+  generateUploadUrl,
+  getResourceStatus,
+  triggerResourceIndexing,
+} from "@/actions/resource.actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,25 +36,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { FileText, Upload } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Loader2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-interface DocumentItem {
-  id: string;
+interface SubjectResourceItem {
+  id: number;
   title: string;
   description: string | null;
-  documentType: string;
-  status: string;
-  fileName: string;
-  fileSize: bigint | number;
+  url: string;
+  fileSize: number;
   mimeType: string;
   createdAt: Date;
-  totalChunks: number;
-  totalPages: number | null;
-  processingError: string | null;
+  isIndexed: boolean;
+  ragStatus: string | null;
   chapterId: number | null;
+  chapter: { id: number; title: string; sequence: number } | null;
 }
 
 interface ChapterOption {
@@ -48,50 +72,242 @@ interface ChapterOption {
 
 interface DocumentsManagerProps {
   subjectId: number;
-  documents: DocumentItem[];
+  resources: SubjectResourceItem[];
   chapters: ChapterOption[];
 }
 
-const statusLabels: Record<string, string> = {
-  UPLOADED: "تم الرفع",
-  PROCESSING: "جاري المعالجة",
-  INDEXED: "تمت الفهرسة",
-  FAILED: "فشل",
+// RAG status labels and colors
+const ragStatusLabels: Record<string, string> = {
+  PENDING: "في الانتظار",
+  PROCESSING: "جاري الفهرسة",
+  COMPLETED: "تمت الفهرسة",
+  FAILED: "فشلت الفهرسة",
 };
 
-const statusColors: Record<string, string> = {
-  UPLOADED: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  PROCESSING:
+const ragStatusColors: Record<string, string> = {
+  PENDING:
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-  INDEXED:
+  PROCESSING:
+    "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  COMPLETED:
     "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
   FAILED: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
 };
 
+const ragStatusIcons: Record<string, React.ReactNode> = {
+  PENDING: <Clock className="h-3.5 w-3.5" />,
+  PROCESSING: <Loader2 className="h-3.5 w-3.5 animate-spin" />,
+  COMPLETED: <CheckCircle2 className="h-3.5 w-3.5" />,
+  FAILED: <AlertCircle className="h-3.5 w-3.5" />,
+};
+
 export function DocumentsManager({
   subjectId,
-  documents,
+  resources: initialResources,
   chapters,
 }: DocumentsManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedChapter, setSelectedChapter] = useState<string>("general");
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [resources, setResources] = useState(initialResources);
+  const [deleteTarget, setDeleteTarget] = useState<SubjectResourceItem | null>(
+    null
+  );
+  const [indexingIds, setIndexingIds] = useState<Set<number>>(new Set());
+  const pollingRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
-  const handleUpload = (formData: FormData, form: HTMLFormElement) => {
-    startTransition(async () => {
+  // Update resources when props change
+  useEffect(() => {
+    setResources(initialResources);
+  }, [initialResources]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      pollingRef.current.forEach(timer => clearTimeout(timer));
+      pollingRef.current.clear();
+    };
+  }, []);
+
+  // Poll for status updates on resources with active indexing
+  const pollStatus = useCallback(async (resourceId: number) => {
+    const result = await getResourceStatus(resourceId);
+    if (result.error || !result.data) return;
+
+    const { isIndexed, ragStatus } = result.data;
+
+    setResources(prev =>
+      prev.map(r => (r.id === resourceId ? { ...r, isIndexed, ragStatus } : r))
+    );
+
+    // Continue polling if still processing
+    if (ragStatus === "PENDING" || ragStatus === "PROCESSING") {
+      const timer = setTimeout(() => pollStatus(resourceId), 3000);
+      pollingRef.current.set(resourceId, timer);
+    } else {
+      pollingRef.current.delete(resourceId);
+      setIndexingIds(prev => {
+        const next = new Set(prev);
+        next.delete(resourceId);
+        return next;
+      });
+
+      if (ragStatus === "COMPLETED") {
+        toast.success("تمت فهرسة المستند بنجاح");
+      } else if (ragStatus === "FAILED") {
+        toast.error("فشلت عملية الفهرسة");
+      }
+    }
+  }, []);
+
+  // Start polling for a resource
+  const startPolling = useCallback(
+    (resourceId: number) => {
+      if (pollingRef.current.has(resourceId)) return;
+      pollStatus(resourceId);
+    },
+    [pollStatus]
+  );
+
+  const handleUpload = async (formData: FormData, form: HTMLFormElement) => {
+    const file = formData.get("file") as File;
+    const title = formData.get("title") as string;
+    const description = (formData.get("description") as string) || undefined;
+    const chapterId =
+      selectedChapter !== "general" ? parseInt(selectedChapter) : undefined;
+
+    if (!file || file.size === 0) {
+      toast.error("يرجى اختيار ملف");
+      return;
+    }
+
+    try {
+      setUploadProgress(0);
+
+      // Get presigned URL from server
+      const urlResult = await generateUploadUrl({
+        filename: file.name,
+        contentType: file.type,
+        subjectId,
+      });
+
+      if (urlResult.error || !urlResult.data) {
+        toast.error(urlResult.error ?? "فشل إنشاء رابط الرفع");
+        return;
+      }
+
+      const { uploadUrl, fileUrl } = urlResult.data;
+
+      // Upload to MinIO/R2 using presigned URL
+      const xhr = new XMLHttpRequest();
+
+      await new Promise<void>((resolve, reject) => {
+        xhr.upload.addEventListener("progress", e => {
+          if (e.lengthComputable) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+
+        xhr.open("PUT", uploadUrl);
+        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.send(file);
+      });
+
+      // Create SubjectResource record in database
+      const result = await createSubjectResource({
+        title,
+        description,
+        url: fileUrl,
+        fileSize: file.size,
+        mimeType: file.type,
+        subjectId,
+        chapterId,
+      });
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
       toast.success("تم رفع المستند بنجاح");
       form.reset();
+      setSelectedChapter("general");
       setUploadOpen(false);
       router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "فشل رفع الملف");
+    } finally {
+      setUploadProgress(null);
+    }
+  };
+
+  const handleTriggerIndexing = async (resource: SubjectResourceItem) => {
+    if (resource.mimeType !== "application/pdf") {
+      toast.error("الفهرسة مدعومة لملفات PDF فقط");
+      return;
+    }
+
+    setIndexingIds(prev => new Set(prev).add(resource.id));
+
+    startTransition(async () => {
+      const result = await triggerResourceIndexing(resource.id);
+
+      if (result.error) {
+        toast.error(result.error);
+        setIndexingIds(prev => {
+          const next = new Set(prev);
+          next.delete(resource.id);
+          return next;
+        });
+        return;
+      }
+
+      // Update local state
+      setResources(prev =>
+        prev.map(r =>
+          r.id === resource.id ? { ...r, ragStatus: "PENDING" } : r
+        )
+      );
+
+      toast.success("تم بدء عملية الفهرسة");
+
+      // Start polling for status updates
+      startPolling(resource.id);
     });
   };
 
-  const formatFileSize = (bytes: bigint | number) => {
-    const size = Number(bytes);
-    if (size < 1024) return `${size} B`;
-    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  const handleDelete = async (resource: SubjectResourceItem) => {
+    startTransition(async () => {
+      const result = await deleteSubjectResource(resource.id);
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      // Remove from local state
+      setResources(prev => prev.filter(r => r.id !== resource.id));
+      setDeleteTarget(null);
+      toast.success("تم حذف المستند");
+    });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const formatDate = (date: Date) => {
@@ -101,10 +317,42 @@ export function DocumentsManager({
     }).format(new Date(date));
   };
 
+  const getStatusDisplay = (resource: SubjectResourceItem) => {
+    if (resource.isIndexed) {
+      return {
+        label: "تمت الفهرسة",
+        color: ragStatusColors.COMPLETED,
+        icon: ragStatusIcons.COMPLETED,
+      };
+    }
+    if (resource.ragStatus && ragStatusLabels[resource.ragStatus]) {
+      return {
+        label: ragStatusLabels[resource.ragStatus],
+        color: ragStatusColors[resource.ragStatus],
+        icon: ragStatusIcons[resource.ragStatus],
+      };
+    }
+    return {
+      label: "لم تتم الفهرسة",
+      color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+      icon: null,
+    };
+  };
+
+  const canTriggerIndexing = (resource: SubjectResourceItem) => {
+    return (
+      !resource.isIndexed &&
+      resource.mimeType === "application/pdf" &&
+      resource.ragStatus !== "PENDING" &&
+      resource.ragStatus !== "PROCESSING" &&
+      !indexingIds.has(resource.id)
+    );
+  };
+
   return (
     <section className="space-y-4" dir="rtl">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">المستندات</h2>
+        <h2 className="text-xl font-semibold">مصادر المادة</h2>
         <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
           <DialogTrigger asChild>
             <Button className="whitespace-nowrap" aria-label="رفع مستند جديد">
@@ -122,18 +370,16 @@ export function DocumentsManager({
                 event.preventDefault();
                 const form = event.currentTarget;
                 const formData = new FormData(form);
-                formData.set("subjectId", String(subjectId));
                 handleUpload(formData, form);
               }}
             >
-              <input type="hidden" name="subjectId" value={subjectId} />
               <div className="space-y-2">
                 <Label htmlFor="document-title">عنوان المستند</Label>
                 <Input
                   id="document-title"
                   name="title"
                   required
-                  disabled={isPending}
+                  disabled={isPending || uploadProgress !== null}
                   autoFocus
                   placeholder="مثال: سلايدات الشابتر الأول"
                 />
@@ -145,7 +391,7 @@ export function DocumentsManager({
                 <textarea
                   id="document-description"
                   name="description"
-                  disabled={isPending}
+                  disabled={isPending || uploadProgress !== null}
                   rows={2}
                   className={cn(
                     "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground",
@@ -160,7 +406,7 @@ export function DocumentsManager({
                 <Select
                   value={selectedChapter}
                   onValueChange={setSelectedChapter}
-                  disabled={isPending}
+                  disabled={isPending || uploadProgress !== null}
                 >
                   <SelectTrigger dir="rtl" id="document-chapter">
                     <SelectValue placeholder="اختر فصل أو اتركه عام" />
@@ -174,13 +420,6 @@ export function DocumentsManager({
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedChapter !== "general" && (
-                  <input
-                    type="hidden"
-                    name="chapterId"
-                    value={selectedChapter}
-                  />
-                )}
                 <p className="text-muted-foreground text-xs">
                   اختر فصل محدد إذا كان المستند خاص به
                 </p>
@@ -192,24 +431,41 @@ export function DocumentsManager({
                   name="file"
                   type="file"
                   required
-                  disabled={isPending}
-                  accept=".pdf,.ppt,.pptx"
+                  disabled={isPending || uploadProgress !== null}
+                  accept=".pdf"
                 />
                 <p className="text-muted-foreground text-xs">
-                  الصيغ المدعومة: PDF, PowerPoint
+                  الصيغ المدعومة: PDF
                 </p>
               </div>
+              {uploadProgress !== null && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span>جارٍ الرفع...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="bg-muted h-2 overflow-hidden rounded-full">
+                    <div
+                      className="bg-primary h-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <DialogFooter className="flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setUploadOpen(false)}
-                  disabled={isPending}
+                  disabled={isPending || uploadProgress !== null}
                 >
                   إلغاء
                 </Button>
-                <Button type="submit" disabled={isPending}>
-                  {isPending ? "جارٍ الرفع..." : "رفع"}
+                <Button
+                  type="submit"
+                  disabled={isPending || uploadProgress !== null}
+                >
+                  {uploadProgress !== null ? "جارٍ الرفع..." : "رفع"}
                 </Button>
               </DialogFooter>
             </form>
@@ -217,10 +473,13 @@ export function DocumentsManager({
         </Dialog>
       </div>
 
-      {documents.length === 0 ? (
+      {resources.length === 0 ? (
         <div className="bg-muted/50 rounded-lg border-2 border-dashed p-8 text-center">
           <FileText className="text-muted-foreground mx-auto mb-3 h-12 w-12" />
-          <h3 className="mb-1 font-semibold">لا توجد مستندات</h3>
+          <h3 className="mb-1 font-semibold">لا توجد مصادر</h3>
+          <p className="text-muted-foreground mb-4 text-sm">
+            ارفع ملفات PDF ليتم فهرستها بالذكاء الاصطناعي
+          </p>
           <Button
             onClick={() => setUploadOpen(true)}
             variant="outline"
@@ -232,13 +491,11 @@ export function DocumentsManager({
         </div>
       ) : (
         <ul className="space-y-3">
-          {documents.map(doc => {
-            const chapter = doc.chapterId
-              ? chapters.find(ch => ch.id === doc.chapterId)
-              : null;
+          {resources.map(resource => {
+            const status = getStatusDisplay(resource);
             return (
               <li
-                key={doc.id}
+                key={resource.id}
                 className="bg-card rounded-lg border p-4 shadow-sm"
               >
                 <div className="flex items-start gap-3">
@@ -247,42 +504,66 @@ export function DocumentsManager({
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold">{doc.title}</h3>
-                          {chapter && (
+                          <h3 className="font-semibold">{resource.title}</h3>
+                          {resource.chapter && (
                             <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs font-medium">
-                              {chapter.sequence}. {chapter.title}
+                              {resource.chapter.sequence}.{" "}
+                              {resource.chapter.title}
                             </span>
                           )}
                         </div>
-                        {doc.description && (
+                        {resource.description && (
                           <p className="text-muted-foreground text-sm">
-                            {doc.description}
+                            {resource.description}
                           </p>
                         )}
                       </div>
-                      <span
-                        className={cn(
-                          "rounded-full px-2.5 py-1 text-xs font-medium",
-                          statusColors[doc.status]
-                        )}
-                      >
-                        {statusLabels[doc.status]}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                            status.color
+                          )}
+                        >
+                          {status.icon}
+                          {status.label}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                      <span>{doc.fileName}</span>
-                      <span>{formatFileSize(doc.fileSize)}</span>
-                      {doc.totalPages && <span>{doc.totalPages} صفحة</span>}
-                      {doc.status === "INDEXED" && doc.totalChunks > 0 && (
-                        <span>{doc.totalChunks} مقطع</span>
-                      )}
-                      <span>{formatDate(doc.createdAt)}</span>
+                      <span dir="ltr">{formatFileSize(resource.fileSize)}</span>
+                      <span dir="ltr">{resource.mimeType}</span>
+                      <span>{formatDate(resource.createdAt)}</span>
                     </div>
-                    {doc.status === "FAILED" && doc.processingError && (
-                      <p className="text-destructive text-xs">
-                        خطأ: {doc.processingError}
-                      </p>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {canTriggerIndexing(resource) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTriggerIndexing(resource)}
+                          disabled={isPending}
+                        >
+                          <Bot className="ml-1.5 h-3.5 w-3.5" />
+                          تفعيل البحث الذكي
+                        </Button>
+                      )}
+                      {indexingIds.has(resource.id) && (
+                        <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          جاري الإرسال...
+                        </span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteTarget(resource)}
+                        disabled={isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="sr-only">حذف</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </li>
@@ -290,6 +571,32 @@ export function DocumentsManager({
           })}
         </ul>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={() => setDeleteTarget(null)}
+      >
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف المستند &quot;{deleteTarget?.title}&quot; نهائياً. هذا
+              الإجراء لا يمكن التراجع عنه.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel disabled={isPending}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && handleDelete(deleteTarget)}
+              disabled={isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isPending ? "جارٍ الحذف..." : "حذف"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

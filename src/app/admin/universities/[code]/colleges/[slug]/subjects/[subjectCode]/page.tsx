@@ -93,6 +93,14 @@ export default async function SubjectByCodePage({
           },
         },
       },
+      subjectResources: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          chapter: {
+            select: { id: true, title: true, sequence: true },
+          },
+        },
+      },
       _count: {
         select: {
           enrollments: true,
@@ -245,7 +253,7 @@ export default async function SubjectByCodePage({
 
       <DocumentsManager
         subjectId={subject.id}
-        documents={[]}
+        resources={subject.subjectResources}
         chapters={subject.chapters.map(ch => ({
           id: ch.id,
           title: ch.title,
