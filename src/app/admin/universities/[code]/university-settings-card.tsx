@@ -56,13 +56,20 @@ export function UniversityHeaderActions({
             event.preventDefault();
             const formData = new FormData(event.currentTarget);
             startTransition(async () => {
-              const res = await updateUniversityAction(universityId, formData);
-              if (!("error" in res) || res.error === null) {
-                toast.success("تم تحديث بيانات الجامعة");
-                setOpen(false);
-                router.refresh();
-              } else if (res.error) {
-                toast.error(res.error);
+              try {
+                const res = await updateUniversityAction(
+                  universityId,
+                  formData
+                );
+                if (res.error === null) {
+                  toast.success("تم تحديث بيانات الجامعة");
+                  setOpen(false);
+                  router.refresh();
+                } else {
+                  toast.error(res.error || "حدث خطأ");
+                }
+              } catch {
+                toast.error("فشل الاتصال بالخادم");
               }
             });
           }}

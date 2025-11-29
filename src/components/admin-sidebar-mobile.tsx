@@ -16,7 +16,7 @@ export default function AdminSidebarMobile() {
   return (
     <div className="md:hidden">
       <Sheet>
-        <SheetTrigger asChild className="bg-accent md:hidden">
+        <SheetTrigger asChild>
           <Button
             variant="secondary"
             size="icon"
@@ -35,7 +35,7 @@ export default function AdminSidebarMobile() {
               لوحة الإدارة
             </SheetTitle>
           </SheetHeader>
-          <div
+          <nav
             className="flex h-full flex-col gap-2 text-right"
             dir="rtl"
             aria-label="الشريط الجانبي للإدارة"
@@ -44,7 +44,7 @@ export default function AdminSidebarMobile() {
               linkWrapper={node => <SheetClose asChild>{node}</SheetClose>}
               showHeader={false}
             />
-          </div>
+          </nav>
         </SheetContent>
       </Sheet>
     </div>

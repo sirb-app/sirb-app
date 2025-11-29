@@ -65,14 +65,18 @@ export function SubjectsManager({
   );
 
   const handleCreate = (formData: FormData, form: HTMLFormElement) => {
+    const code = formData.get("code");
+    if (typeof code === "string") {
+      formData.set("code", code.toUpperCase());
+    }
     startTransition(async () => {
       const res = await createSubjectAction(formData);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تمت إضافة المادة");
         form.reset();
         setCreateOpen(false);
         router.refresh();
-      } else if (res.error) {
+      } else {
         toast.error(res.error);
       }
     });
@@ -80,15 +84,19 @@ export function SubjectsManager({
 
   const handleUpdate = (formData: FormData, form: HTMLFormElement) => {
     if (!targetSubject) return;
+    const code = formData.get("code");
+    if (typeof code === "string") {
+      formData.set("code", code.toUpperCase());
+    }
     startTransition(async () => {
       const res = await updateSubjectAction(targetSubject.id, formData);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تم تحديث المادة");
         form.reset();
         setEditOpen(false);
         setTargetSubject(null);
         router.refresh();
-      } else if (res.error) {
+      } else {
         toast.error(res.error);
       }
     });
@@ -98,12 +106,12 @@ export function SubjectsManager({
     if (!targetSubject) return;
     startTransition(async () => {
       const res = await deleteSubjectAction(targetSubject.id, collegeId);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تم حذف المادة");
         setDeleteOpen(false);
         setTargetSubject(null);
         router.refresh();
-      } else if (res.error) {
+      } else {
         toast.error(res.error);
       }
     });
@@ -134,7 +142,6 @@ export function SubjectsManager({
                 handleCreate(formData, form);
               }}
             >
-              <input type="hidden" name="collegeId" value={collegeId} />
               <div className="space-y-2">
                 <Label htmlFor="new-subject-name">اسم المادة</Label>
                 <Input
@@ -301,7 +308,6 @@ export function SubjectsManager({
               handleUpdate(formData, form);
             }}
           >
-            <input type="hidden" name="collegeId" value={collegeId} />
             <div className="space-y-2">
               <Label htmlFor="edit-subject-name">اسم المادة</Label>
               <Input

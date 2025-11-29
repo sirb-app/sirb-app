@@ -204,6 +204,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
     if (searchQuery) params.set("search", searchQuery);
     if (roleFilter !== "all") params.set("role", roleFilter);
     if (bannedFilter !== "all") params.set("banned", bannedFilter);
+    params.set("page", "1");
     router.push(`/admin/users?${params.toString()}`);
   };
 
@@ -751,7 +752,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                 <Avatar className="h-16 w-16">
                   <AvatarImage src={userDetails.image ?? undefined} />
                   <AvatarFallback className="text-lg">
-                    {userDetails.name.slice(0, 2)}
+                    {(userDetails.name ?? "??").slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">

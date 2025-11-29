@@ -54,12 +54,14 @@ export default async function Page({ searchParams }: PageProps) {
     );
   }
 
+  const universities = "error" in universitiesResult ? [] : universitiesResult;
+
   return (
     <ContentManager
       content={contentResult.content}
       total={contentResult.total}
       currentPage={page}
-      universities={Array.isArray(universitiesResult) ? universitiesResult : []}
+      universities={universities}
     />
   );
 }

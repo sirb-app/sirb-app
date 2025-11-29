@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface UserSearchResult {
   id: string;
@@ -26,10 +26,12 @@ interface UserSearchProps {
   label?: string;
 }
 
+const EMPTY_SET = new Set<string>();
+
 export function UserSearch({
   onUserSelect,
   selectedUser,
-  excludeUserIds = new Set(),
+  excludeUserIds,
   searchAction,
   disabled = false,
   placeholder = "ابحث بالاسم أو البريد الإلكتروني...",
@@ -38,6 +40,11 @@ export function UserSearch({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  const stableExcludeUserIds = useMemo(
+    () => excludeUserIds ?? EMPTY_SET,
+    [excludeUserIds]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +55,7 @@ export function UserSearch({
           .then(results => {
             if (!cancelled) {
               setSearchResults(
-                results.filter(user => !excludeUserIds.has(user.id))
+                results.filter(user => !stableExcludeUserIds.has(user.id))
               );
             }
           })
@@ -71,7 +78,7 @@ export function UserSearch({
       cancelled = true;
       clearTimeout(delayDebounceFn);
     };
-  }, [searchQuery, excludeUserIds, searchAction]);
+  }, [searchQuery, stableExcludeUserIds, searchAction]);
 
   return (
     <div className="space-y-4">
@@ -97,7 +104,7 @@ export function UserSearch({
               <Avatar className="h-10 w-10">
                 <AvatarImage src={selectedUser.image ?? undefined} />
                 <AvatarFallback className="text-xs uppercase">
-                  {selectedUser.name.slice(0, 2)}
+                  {selectedUser.name?.slice(0, 2) ?? "??"}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
@@ -152,7 +159,7 @@ export function UserSearch({
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user.image ?? undefined} />
                     <AvatarFallback className="text-xs uppercase">
-                      {user.name.slice(0, 2)}
+                      {user.name?.slice(0, 2) ?? "??"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">

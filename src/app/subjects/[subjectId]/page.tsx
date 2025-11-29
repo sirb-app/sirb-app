@@ -81,6 +81,11 @@ async function getSubjectData(subjectId: string) {
 
 export default async function Page({ params }: PageProps) {
   const { subjectId } = await params;
+
+  if (!subjectId || !/^\d+$/.test(subjectId)) {
+    notFound();
+  }
+
   const subject = await getSubjectData(subjectId);
 
   return (

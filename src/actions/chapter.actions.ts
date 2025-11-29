@@ -81,14 +81,8 @@ function getUniqueConstraintArabicMessage(target: unknown): string {
   if (normalized.includes("subjectid") && normalized.includes("sequence")) {
     return "ترتيب الفصل مستخدم لهذه المادة بالفعل";
   }
-  if (normalized.includes("chapterid") || normalized.includes("id")) {
-    return "معرف الفصل مستخدم بالفعل";
-  }
-  if (normalized.includes("code") && normalized.includes("collegeid")) {
-    return "رمز المادة مستخدم بالفعل في هذه الكلية";
-  }
-  if (normalized.includes("chapterid") && normalized.includes("sequence")) {
-    return "ترتيب المحتوى مستخدم بالفعل في هذا الفصل";
+  if (normalized.includes("title") && normalized.includes("subjectid")) {
+    return "عنوان الفصل مستخدم بالفعل في هذه المادة";
   }
   return "قيمة فريدة مستخدمة بالفعل";
 }
@@ -171,10 +165,15 @@ export async function updateChapterAction(
 
   if (!Number.isInteger(id)) return { error: "فصل غير صالح" };
 
-  const existing = await prisma.chapter.findUnique({
-    where: { id },
-    select: { subjectId: true },
-  });
+  let existing;
+  try {
+    existing = await prisma.chapter.findUnique({
+      where: { id },
+      select: { subjectId: true },
+    });
+  } catch {
+    return { error: "فشل تحميل بيانات الفصل" };
+  }
   if (!existing) {
     return { error: "فصل غير صالح" };
   }

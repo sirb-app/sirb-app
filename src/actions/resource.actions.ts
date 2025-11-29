@@ -163,11 +163,11 @@ export async function triggerResourceIndexing(resourceId: number) {
       return { error: "الفهرسة مدعومة لملفات PDF فقط" } as const;
     }
 
-    const baseUrl = process.env.FASTAPI_BASE_URL?.trim();
+    const baseUrl = process.env.FASTAPI_BASE_URL;
     const apiKey = process.env.INTERNAL_API_KEY;
 
     if (!baseUrl || !apiKey) {
-      return { error: "خادم الذكاء الاصطناعي غير مهيأ" } as const;
+      return { error: "خادم الفهرسة غير مهيأ" } as const;
     }
 
     const ingestUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest`;
@@ -282,12 +282,12 @@ export async function deleteSubjectResource(
     }
 
     if (resource.isIndexed) {
-      const baseUrl = process.env.FASTAPI_BASE_URL?.trim();
+      const baseUrl = process.env.FASTAPI_BASE_URL;
       const apiKey = process.env.INTERNAL_API_KEY;
 
       if (!baseUrl || !apiKey) {
         return {
-          error: "خادم الذكاء الاصطناعي غير مهيأ - لا يمكن حذف المورد المفهرس",
+          error: "خادم الفهرسة غير مهيأ - لا يمكن حذف المورد المفهرس",
         } as const;
       }
 
@@ -356,24 +356,50 @@ export async function deleteSubjectResource(
 
 export async function getResourceStatus(resourceId: number) {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
 
     const validated = resourceIdSchema.parse(resourceId);
 
-    const resource = await prisma.subjectResource.findUnique({
-      where: { id: validated },
-      select: {
-        id: true,
-        isIndexed: true,
-        ragStatus: true,
-      },
-    });
+    const baseUrl = process.env.FASTAPI_BASE_URL;
+    const apiKey = process.env.INTERNAL_API_KEY;
 
-    if (!resource) {
-      return { error: "المورد غير موجود" } as const;
+    if (!baseUrl || !apiKey) {
+      return { error: "خادم الفهرسة غير مهيأ" } as const;
     }
 
-    return { error: null, data: resource } as const;
+    const statusUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest/${validated}/status`;
+
+    const response = await fetch(statusUrl, {
+      method: "GET",
+      headers: {
+        "X-API-Key": apiKey,
+        "X-User-ID": session.user.id,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { error: "المورد غير موجود" } as const;
+      }
+      return { error: "فشل جلب حالة الفهرسة" } as const;
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return { error: "استجابة غير صالحة من خادم الفهرسة" } as const;
+    }
+
+    return {
+      error: null,
+      data: {
+        id: validated,
+        isIndexed: data.is_indexed,
+        ragStatus: data.status === "NOT_STARTED" ? null : data.status,
+      },
+    } as const;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { error: "معرف مورد غير صالح" } as const;

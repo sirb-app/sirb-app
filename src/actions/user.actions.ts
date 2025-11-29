@@ -94,7 +94,7 @@ export async function listUsersAction(params?: {
 export async function banUserAction(
   userId: string,
   reason: string,
-  expiresAt?: Date
+  expiresAt?: Date | string
 ): Promise<{ error: string } | { error: null }> {
   try {
     const session = await requireAdmin();
@@ -107,11 +107,13 @@ export async function banUserAction(
       return { error: "سبب الحظر مطلوب" };
     }
 
-    if (
-      expiresAt &&
-      (!(expiresAt instanceof Date) || expiresAt <= new Date())
-    ) {
-      return { error: "تاريخ انتهاء الحظر غير صالح" };
+    let parsedExpiresAt: Date | null = null;
+    if (expiresAt) {
+      parsedExpiresAt =
+        expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
+      if (isNaN(parsedExpiresAt.getTime()) || parsedExpiresAt <= new Date()) {
+        return { error: "تاريخ انتهاء الحظر غير صالح" };
+      }
     }
 
     if (session.user.id === userId) {
@@ -136,7 +138,7 @@ export async function banUserAction(
       data: {
         banned: true,
         banReason: reason,
-        banExpires: expiresAt ?? null,
+        banExpires: parsedExpiresAt,
       },
     });
 
@@ -158,6 +160,15 @@ export async function unbanUserAction(
 
     if (!userId || typeof userId !== "string") {
       return { error: "معرف المستخدم غير صالح" };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return { error: "المستخدم غير موجود" };
     }
 
     await prisma.user.update({
@@ -188,6 +199,10 @@ export async function updateUserRoleAction(
 
     if (!userId || typeof userId !== "string") {
       return { error: "معرف المستخدم غير صالح" };
+    }
+
+    if (!role || !["USER", "ADMIN"].includes(role)) {
+      return { error: "الصلاحية غير صالحة" };
     }
 
     if (session.user.id === userId) {

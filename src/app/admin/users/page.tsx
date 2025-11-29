@@ -8,14 +8,17 @@ export default async function Page({
 }) {
   const params = await searchParams;
   const search = typeof params.search === "string" ? params.search : undefined;
-  const role = typeof params.role === "string" ? params.role : undefined;
+  const rawRole = typeof params.role === "string" ? params.role : undefined;
+  const role = rawRole === "USER" || rawRole === "ADMIN" ? rawRole : undefined;
   const banned =
     typeof params.banned === "string" ? params.banned === "true" : undefined;
-  const page = typeof params.page === "string" ? parseInt(params.page, 10) : 1;
+  const parsedPage =
+    typeof params.page === "string" ? parseInt(params.page, 10) : 1;
+  const page = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
 
   const result = await listUsersAction({
     search,
-    role: role as "USER" | "ADMIN" | undefined,
+    role,
     banned,
     page,
     limit: 20,

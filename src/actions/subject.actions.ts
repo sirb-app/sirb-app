@@ -54,14 +54,18 @@ async function revalidateSubjectPaths(collegeId: number) {
 
 export async function listSubjectsByCollegeAction(
   collegeId: number
-): Promise<SubjectWithCounts[]> {
+): Promise<SubjectWithCounts[] | { error: string }> {
   try {
     await requireAdmin();
+  } catch {
+    return { error: "فشل العملية" };
+  }
 
-    if (!Number.isInteger(collegeId)) {
-      return [];
-    }
+  if (!Number.isInteger(collegeId)) {
+    return { error: "معرف الكلية غير صالح" };
+  }
 
+  try {
     return await prisma.subject.findMany({
       where: { collegeId },
       orderBy: { createdAt: "desc" },
@@ -70,7 +74,7 @@ export async function listSubjectsByCollegeAction(
       },
     });
   } catch {
-    return [];
+    return { error: "فشل تحميل المواد" };
   }
 }
 export async function createSubjectAction(

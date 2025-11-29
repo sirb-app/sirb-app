@@ -117,7 +117,9 @@ export function DocumentsManager({
     null
   );
   const [indexingIds, setIndexingIds] = useState<Set<number>>(new Set());
-  const pollingRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
+  const pollingRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
 
   useEffect(() => {
     setResources(initialResources);
@@ -148,7 +150,7 @@ export function DocumentsManager({
       prev.map(r => (r.id === resourceId ? { ...r, isIndexed, ragStatus } : r))
     );
 
-    if (ragStatus === RagStatus.PENDING || ragStatus === RagStatus.PROCESSING) {
+    if (ragStatus === "PENDING" || ragStatus === "PROCESSING") {
       const timer = setTimeout(() => pollStatus(resourceId), 3000);
       pollingRef.current.set(resourceId, timer);
     } else {
@@ -159,9 +161,9 @@ export function DocumentsManager({
         return next;
       });
 
-      if (ragStatus === RagStatus.COMPLETED) {
+      if (ragStatus === "COMPLETED") {
         toast.success("تمت فهرسة المستند بنجاح");
-      } else if (ragStatus === RagStatus.FAILED) {
+      } else if (ragStatus === "FAILED") {
         toast.error("فشلت عملية الفهرسة");
       }
     }
@@ -174,6 +176,19 @@ export function DocumentsManager({
     },
     [pollStatus]
   );
+
+  // Auto-poll resources that are already in PENDING or PROCESSING state
+  useEffect(() => {
+    for (const resource of resources) {
+      if (
+        (resource.ragStatus === "PENDING" ||
+          resource.ragStatus === "PROCESSING") &&
+        !pollingRef.current.has(resource.id)
+      ) {
+        startPolling(resource.id);
+      }
+    }
+  }, [resources, startPolling]);
 
   const handleUpload = async (formData: FormData, form: HTMLFormElement) => {
     const file = formData.get("file") as File;
@@ -278,11 +293,10 @@ export function DocumentsManager({
 
       setResources(prev =>
         prev.map(r =>
-          r.id === resource.id ? { ...r, ragStatus: RagStatus.PENDING } : r
+          r.id === resource.id ? { ...r, ragStatus: "PENDING" } : r
         )
       );
 
-      toast.success("تم بدء عملية الفهرسة");
       startPolling(resource.id);
     });
   };
@@ -354,8 +368,8 @@ export function DocumentsManager({
     return (
       !resource.isIndexed &&
       resource.mimeType === "application/pdf" &&
-      resource.ragStatus !== RagStatus.PENDING &&
-      resource.ragStatus !== RagStatus.PROCESSING &&
+      resource.ragStatus !== "PENDING" &&
+      resource.ragStatus !== "PROCESSING" &&
       !indexingIds.has(resource.id)
     );
   };

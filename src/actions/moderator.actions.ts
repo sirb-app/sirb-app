@@ -1,9 +1,21 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+
 import type { Prisma } from "@/generated/prisma";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
-import { revalidatePath } from "next/cache";
+
+async function requireAdmin() {
+  const headersList = await headers();
+  const session = await auth.api.getSession({ headers: headersList });
+  if (!session || session.user.role !== "ADMIN") {
+    throw new Error("غير مصرح");
+  }
+  return session;
+}
 
 type ModeratorWithUser = Prisma.SubjectModeratorGetPayload<{
   include: {
@@ -44,6 +56,11 @@ async function revalidateModeratorPaths(subjectId: number) {
 export async function listModeratorsBySubjectAction(
   subjectId: number
 ): Promise<ModeratorWithUser[]> {
+  try {
+    await requireAdmin();
+  } catch {
+    return [];
+  }
   if (!Number.isInteger(subjectId)) return [];
   return prisma.subjectModerator.findMany({
     where: { subjectId },
@@ -65,6 +82,12 @@ export async function assignModeratorAction(
   subjectId: number,
   userId: string
 ): Promise<{ error: string } | { error: null; data: ModeratorWithUser }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "غير مصرح" };
+  }
+
   if (!Number.isInteger(subjectId)) {
     return { error: "مادة غير صالحة" };
   }
@@ -73,13 +96,27 @@ export async function assignModeratorAction(
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
-    });
+    const [subject, user] = await Promise.all([
+      prisma.subject.findUnique({
+        where: { id: subjectId },
+        select: { id: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, banned: true },
+      }),
+    ]);
+
+    if (!subject) {
+      return { error: "المادة غير موجودة" };
+    }
 
     if (!user) {
       return { error: "المستخدم غير موجود" };
+    }
+
+    if (user.banned) {
+      return { error: "لا يمكن تعيين مستخدم محظور كمشرف" };
     }
 
     const data = await prisma.subjectModerator.create({
@@ -117,6 +154,12 @@ export async function removeModeratorAction(
   id: number,
   subjectId: number
 ): Promise<{ error: string } | { error: null }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "غير مصرح" };
+  }
+
   if (!Number.isInteger(id) || !Number.isInteger(subjectId)) {
     return { error: "بيانات غير صالحة" };
   }
@@ -134,9 +177,7 @@ export async function removeModeratorAction(
   }
 }
 
-export async function searchUsersAction(
-  query: string
-): Promise<
+export async function searchUsersAction(query: string): Promise<
   Array<{
     id: string;
     name: string;
@@ -145,6 +186,12 @@ export async function searchUsersAction(
     role: string;
   }>
 > {
+  try {
+    await requireAdmin();
+  } catch {
+    return [];
+  }
+
   if (typeof query !== "string" || query.trim().length < 2) {
     return [];
   }

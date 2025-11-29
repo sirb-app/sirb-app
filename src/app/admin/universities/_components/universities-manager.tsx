@@ -74,12 +74,13 @@ export default function UniversitiesManager({
         if (field === "colleges") {
           av = a.colleges.length;
           bv = b.colleges.length;
+        } else if (field === "createdAt") {
+          av = new Date(a[field]).getTime();
+          bv = new Date(b[field]).getTime();
         } else {
           av = a[field] as typeof av;
           bv = b[field] as typeof bv;
         }
-        if (av instanceof Date) av = av.getTime();
-        if (bv instanceof Date) bv = bv.getTime();
         if (typeof av === "string" && typeof bv === "string") {
           const comp = av.localeCompare(bv, undefined, { sensitivity: "base" });
           return dir === "asc" ? comp : -comp;
@@ -133,13 +134,11 @@ export default function UniversitiesManager({
   const onSubmit = (formData: FormData) => {
     startTransition(async () => {
       const res = await createUniversityAction(formData);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تمت إضافة الجامعة");
         setDialogOpen(false);
-        const name = (formData.get("name") as string) ?? "";
-        const code = ((formData.get("code") as string) ?? "").toUpperCase();
         if ("data" in res && res.data) {
-          setData(prev => [{ ...res.data, name, code, colleges: [] }, ...prev]);
+          setData(prev => [{ ...res.data, colleges: [] }, ...prev]);
         }
       } else if (res.error) {
         toast.error(res.error);

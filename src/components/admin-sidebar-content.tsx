@@ -106,7 +106,11 @@ export function AdminSidebarContent({
           <div className="text-foreground text-xl font-bold">لوحة الإدارة</div>
         </div>
       )}
-      <nav className="flex-1 overflow-y-auto pr-1" role="navigation">
+      <nav
+        className="flex-1 overflow-y-auto pr-1"
+        role="navigation"
+        aria-label="Admin navigation"
+      >
         <NavSection title="نظرة عامة">
           {overview.map(item => (
             <NavLink key={item.href} item={item} wrap={linkWrapper} />

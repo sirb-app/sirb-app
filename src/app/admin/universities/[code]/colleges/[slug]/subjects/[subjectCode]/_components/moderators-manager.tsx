@@ -72,12 +72,12 @@ export function ModeratorsManager({
     if (!selectedUser) return;
     startTransition(async () => {
       const res = await assignModeratorAction(subjectId, selectedUser.id);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تم تعيين المشرف");
         setAssignOpen(false);
         setSelectedUser(null);
         router.refresh();
-      } else if (res.error) {
+      } else {
         toast.error(res.error);
       }
     });
@@ -87,12 +87,12 @@ export function ModeratorsManager({
     if (!targetModerator) return;
     startTransition(async () => {
       const res = await removeModeratorAction(targetModerator.id, subjectId);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تمت إزالة المشرف");
         setRemoveOpen(false);
         setTargetModerator(null);
         router.refresh();
-      } else if (res.error) {
+      } else {
         toast.error(res.error);
       }
     });
@@ -168,7 +168,7 @@ export function ModeratorsManager({
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={moderator.user.image ?? undefined} />
                   <AvatarFallback className="text-xs uppercase">
-                    {moderator.user.name.slice(0, 2)}
+                    {moderator.user.name?.slice(0, 2) ?? "??"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">

@@ -38,14 +38,18 @@ export function SubjectHeaderActions({
   const [editOpen, setEditOpen] = useState(false);
 
   const handleUpdate = (formData: FormData, form: HTMLFormElement) => {
+    const code = formData.get("code");
+    if (typeof code === "string") {
+      formData.set("code", code.toUpperCase());
+    }
     startTransition(async () => {
       const res = await updateSubjectAction(subjectId, formData);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تم تحديث المادة");
         form.reset();
         setEditOpen(false);
         router.refresh();
-      } else if (res.error) {
+      } else {
         toast.error(res.error);
       }
     });
@@ -77,7 +81,6 @@ export function SubjectHeaderActions({
             handleUpdate(formData, form);
           }}
         >
-          <input type="hidden" name="collegeId" value={collegeId} />
           <div className="space-y-2">
             <Label htmlFor="edit-subject-name">اسم المادة</Label>
             <Input

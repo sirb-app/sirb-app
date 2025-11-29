@@ -133,7 +133,13 @@ export async function getReports(
   universityId?: number,
   subjectId?: number
 ) {
-  if (page < 1 || pageSize < 1 || pageSize > 100) {
+  if (
+    !Number.isInteger(page) ||
+    !Number.isInteger(pageSize) ||
+    page < 1 ||
+    pageSize < 1 ||
+    pageSize > 100
+  ) {
     throw new Error("Invalid pagination parameters");
   }
   if (
@@ -580,7 +586,11 @@ export async function resolveReportWithAction(
       }
     }
 
-    if (action.banUser && isAdmin) {
+    if (action.banUser) {
+      if (!isAdmin) {
+        throw new Error("Only admins can ban users");
+      }
+
       let targetUserId: string | null = null;
 
       if (report.reportedUserId) {
@@ -589,25 +599,41 @@ export async function resolveReportWithAction(
         }
         targetUserId = report.reportedUserId;
       } else if (report.reportedCanvas?.contributorId) {
+        const contributor = await tx.user.findUnique({
+          where: { id: report.reportedCanvas.contributorId },
+          select: { role: true },
+        });
+        if (contributor?.role === "ADMIN") {
+          throw new Error("Cannot ban admin users");
+        }
         targetUserId = report.reportedCanvas.contributorId;
       } else if (report.reportedComment?.userId) {
+        const commenter = await tx.user.findUnique({
+          where: { id: report.reportedComment.userId },
+          select: { role: true },
+        });
+        if (commenter?.role === "ADMIN") {
+          throw new Error("Cannot ban admin users");
+        }
         targetUserId = report.reportedComment.userId;
       }
 
-      if (targetUserId) {
-        const banExpires = action.banDuration
-          ? new Date(Date.now() + action.banDuration * 24 * 60 * 60 * 1000)
-          : null;
-
-        await tx.user.update({
-          where: { id: targetUserId },
-          data: {
-            banned: true,
-            banReason: action.banReason || "Reported content violation",
-            banExpires,
-          },
-        });
+      if (!targetUserId) {
+        throw new Error("No user to ban for this report");
       }
+
+      const banExpires = action.banDuration
+        ? new Date(Date.now() + action.banDuration * 24 * 60 * 60 * 1000)
+        : null;
+
+      await tx.user.update({
+        where: { id: targetUserId },
+        data: {
+          banned: true,
+          banReason: action.banReason || "Reported content violation",
+          banExpires,
+        },
+      });
     }
 
     await tx.report.update({

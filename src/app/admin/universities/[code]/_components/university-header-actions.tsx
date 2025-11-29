@@ -55,13 +55,27 @@ export function UniversityHeaderActions({
           onSubmit={event => {
             event.preventDefault();
             const formData = new FormData(event.currentTarget);
+            const formCode = formData.get("code");
+            if (typeof formCode === "string") {
+              formData.set("code", formCode.toUpperCase());
+            }
             startTransition(async () => {
               const res = await updateUniversityAction(universityId, formData);
-              if (!("error" in res) || res.error === null) {
+              if (res.error === null) {
                 toast.success("تم تحديث بيانات الجامعة");
                 setOpen(false);
-                router.refresh();
-              } else if (res.error) {
+                const newCode = formData.get("code");
+                if (
+                  typeof newCode === "string" &&
+                  newCode.toUpperCase() !== code
+                ) {
+                  router.push(
+                    `/admin/universities/${encodeURIComponent(newCode.toUpperCase())}`
+                  );
+                } else {
+                  router.refresh();
+                }
+              } else {
                 toast.error(res.error);
               }
             });

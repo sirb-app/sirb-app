@@ -320,21 +320,31 @@ export async function approveContentAction(
         },
       });
 
-      await tx.userPoints.create({
-        data: {
+      const pointsReason = `content_approved:${contentId}`;
+      const existingPoints = await tx.userPoints.findFirst({
+        where: {
           userId: content.contributorId,
-          points: 10,
-          reason: "content_approved",
-          subjectId: content.chapter.subjectId,
+          reason: pointsReason,
         },
       });
 
-      await tx.user.update({
-        where: { id: content.contributorId },
-        data: {
-          totalPoints: { increment: 10 },
-        },
-      });
+      if (!existingPoints) {
+        await tx.userPoints.create({
+          data: {
+            userId: content.contributorId,
+            points: 10,
+            reason: pointsReason,
+            subjectId: content.chapter.subjectId,
+          },
+        });
+
+        await tx.user.update({
+          where: { id: content.contributorId },
+          data: {
+            totalPoints: { increment: 10 },
+          },
+        });
+      }
 
       return { alreadyApproved: false };
     });

@@ -91,11 +91,23 @@ export async function updateUniversityAction(
     return { error: "الكود يجب أن يكون بالإنجليزية بدون مسافات أو رموز" };
   }
   try {
+    const existing = await prisma.university.findUnique({
+      where: { id },
+      select: { code: true },
+    });
+
     const data = await prisma.university.update({
       where: { id },
       data: { name, code },
     });
+
     revalidatePath("/admin/universities");
+    revalidatePath(`/admin/universities/${encodeURIComponent(code)}`);
+    if (existing && existing.code !== code) {
+      revalidatePath(
+        `/admin/universities/${encodeURIComponent(existing.code)}`
+      );
+    }
     return { error: null, data };
   } catch (e) {
     if (
@@ -166,6 +178,19 @@ export async function updateCollegeAction(
   if (!Number.isInteger(universityId)) return { error: "جامعة غير صالحة" };
 
   try {
+    const college = await prisma.college.findUnique({
+      where: { id },
+      select: { universityId: true },
+    });
+
+    if (!college) {
+      return { error: "الكلية غير موجودة" };
+    }
+
+    if (college.universityId !== universityId) {
+      return { error: "الكلية لا تنتمي لهذه الجامعة" };
+    }
+
     const data = await prisma.college.update({
       where: { id },
       data: { name },
@@ -185,6 +210,19 @@ export async function deleteCollegeAction(
     return { error: "جامعة غير صالحة" };
   }
   try {
+    const college = await prisma.college.findUnique({
+      where: { id },
+      select: { universityId: true },
+    });
+
+    if (!college) {
+      return { error: "الكلية غير موجودة" };
+    }
+
+    if (college.universityId !== universityId) {
+      return { error: "الكلية لا تنتمي لهذه الجامعة" };
+    }
+
     await prisma.college.delete({ where: { id } });
     await revalidateUniversityPaths(universityId);
     return { error: null };

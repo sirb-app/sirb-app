@@ -15,7 +15,7 @@ export default async function AdminLayout({
     headers: headersList,
   });
 
-  if (!session || session.user.role !== "ADMIN") {
+  if (!session?.user || session.user.role !== "ADMIN") {
     notFound();
   }
   return (

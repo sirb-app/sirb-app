@@ -60,13 +60,13 @@ export function CollegeManager({
   const handleCreate = (formData: FormData, form: HTMLFormElement) => {
     startTransition(async () => {
       const res = await createCollegeAction(formData);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تمت إضافة الكلية");
         form.reset();
         setCreateOpen(false);
         router.refresh();
-      } else if (res.error) {
-        toast.error(res.error);
+      } else {
+        toast.error(res.error || "حدث خطأ");
       }
     });
   };
@@ -75,14 +75,14 @@ export function CollegeManager({
     if (!targetCollege) return;
     startTransition(async () => {
       const res = await updateCollegeAction(targetCollege.id, formData);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تم تحديث الكلية");
         form.reset();
         setEditOpen(false);
         setTargetCollege(null);
         router.refresh();
-      } else if (res.error) {
-        toast.error(res.error);
+      } else {
+        toast.error(res.error || "حدث خطأ");
       }
     });
   };
@@ -91,13 +91,13 @@ export function CollegeManager({
     if (!targetCollege) return;
     startTransition(async () => {
       const res = await deleteCollegeAction(targetCollege.id, universityId);
-      if (!("error" in res) || res.error === null) {
+      if (res.error === null) {
         toast.success("تم حذف الكلية");
         setDeleteOpen(false);
         setTargetCollege(null);
         router.refresh();
-      } else if (res.error) {
-        toast.error(res.error);
+      } else {
+        toast.error(res.error || "حدث خطأ");
       }
     });
   };
@@ -129,7 +129,6 @@ export function CollegeManager({
                 event.preventDefault();
                 const form = event.currentTarget;
                 const formData = new FormData(form);
-                formData.set("universityId", String(universityId));
                 handleCreate(formData, form);
               }}
             >
@@ -250,7 +249,6 @@ export function CollegeManager({
               if (!targetCollege) return;
               const form = event.currentTarget;
               const formData = new FormData(form);
-              formData.set("universityId", String(universityId));
               handleUpdate(formData, form);
             }}
           >
