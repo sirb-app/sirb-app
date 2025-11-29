@@ -674,7 +674,7 @@ model SubjectResource {
 
   title       String
   description String?
-  url         String // File storage URL
+  storageKey  String // R2 storage key
   fileSize    BigInt // bytes
   mimeType    String // application/pdf, image/png, etc
 

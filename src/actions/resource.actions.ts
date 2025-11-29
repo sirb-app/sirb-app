@@ -105,7 +105,7 @@ export async function createSubjectResource(input: {
       data: {
         title: validated.title,
         description: validated.description,
-        url: validated.key,
+        storageKey: validated.key,
         fileSize: validated.fileSize,
         mimeType: validated.mimeType,
         subjectId: validated.subjectId,
@@ -140,7 +140,7 @@ export async function triggerResourceIndexing(resourceId: number) {
         isIndexed: true,
         ragStatus: true,
         mimeType: true,
-        url: true,
+        storageKey: true,
       },
     });
 
@@ -274,7 +274,7 @@ export async function deleteSubjectResource(
 
     const resource = await prisma.subjectResource.findUnique({
       where: { id: validated },
-      select: { id: true, url: true, isIndexed: true },
+      select: { id: true, storageKey: true, isIndexed: true },
     });
 
     if (!resource) {
@@ -327,7 +327,7 @@ export async function deleteSubjectResource(
     try {
       const command = new DeleteObjectCommand({
         Bucket: BUCKET_NAME,
-        Key: resource.url,
+        Key: resource.storageKey,
       });
       await r2Client.send(command);
     } catch {

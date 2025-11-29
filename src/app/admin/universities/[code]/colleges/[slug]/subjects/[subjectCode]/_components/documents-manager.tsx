@@ -55,7 +55,7 @@ interface SubjectResourceItem {
   id: number;
   title: string;
   description: string | null;
-  url: string;
+  storageKey: string;
   fileSize: bigint;
   mimeType: string;
   createdAt: Date;
