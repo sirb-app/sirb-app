@@ -198,10 +198,11 @@ export function DocumentsManager({
 
       if (urlResult.error || !urlResult.data) {
         toast.error(urlResult.error ?? "فشل إنشاء رابط الرفع");
+        setUploadProgress(null);
         return;
       }
 
-      const { uploadUrl, fileUrl } = urlResult.data;
+      const { uploadUrl, key } = urlResult.data;
 
       const xhr = new XMLHttpRequest();
 
@@ -230,7 +231,7 @@ export function DocumentsManager({
       const result = await createSubjectResource({
         title,
         description,
-        url: fileUrl,
+        key,
         fileSize: BigInt(file.size),
         mimeType: file.type,
         subjectId,
@@ -294,6 +295,18 @@ export function DocumentsManager({
         toast.error(result.error);
         return;
       }
+
+      // Cancel any active polling for this resource
+      const timer = pollingRef.current.get(resource.id);
+      if (timer) {
+        clearTimeout(timer);
+        pollingRef.current.delete(resource.id);
+      }
+      setIndexingIds(prev => {
+        const next = new Set(prev);
+        next.delete(resource.id);
+        return next;
+      });
 
       setResources(prev => prev.filter(r => r.id !== resource.id));
       setDeleteTarget(null);

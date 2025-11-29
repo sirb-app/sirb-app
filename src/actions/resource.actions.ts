@@ -16,7 +16,7 @@ const BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
 const createResourceSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
-  url: z.string().url(),
+  key: z.string().min(1),
   fileSize: z.bigint().positive(),
   mimeType: z.string().min(1),
   subjectId: z.number().int().positive(),
@@ -32,17 +32,6 @@ async function requireAdmin() {
     throw new Error("غير مصرح");
   }
   return session;
-}
-
-function extractKeyFromUrl(url: string): string | null {
-  try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname;
-    const match = pathname.match(/^\/[^/]+\/(.+)$/);
-    return match ? match[1] : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function generateUploadUrl(input: {
@@ -68,10 +57,8 @@ export async function generateUploadUrl(input: {
     const uploadUrl = await getSignedUrl(r2Client, command, {
       expiresIn: 3600,
     });
-    const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT!;
-    const fileUrl = `${endpoint}/${BUCKET_NAME}/${key}`;
 
-    return { error: null, data: { uploadUrl, fileUrl } } as const;
+    return { error: null, data: { uploadUrl, key } } as const;
   } catch (error) {
     if (error instanceof Error) {
       return { error: error.message } as const;
@@ -83,7 +70,7 @@ export async function generateUploadUrl(input: {
 export async function createSubjectResource(input: {
   title: string;
   description?: string;
-  url: string;
+  key: string;
   fileSize: bigint;
   mimeType: string;
   subjectId: number;
@@ -118,7 +105,7 @@ export async function createSubjectResource(input: {
       data: {
         title: validated.title,
         description: validated.description,
-        url: validated.url,
+        url: validated.key,
         fileSize: validated.fileSize,
         mimeType: validated.mimeType,
         subjectId: validated.subjectId,
@@ -305,13 +292,28 @@ export async function deleteSubjectResource(
       }
 
       const deleteUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest/${validated}`;
-      const response = await fetch(deleteUrl, {
-        method: "DELETE",
-        headers: {
-          "X-API-Key": apiKey,
-          "X-User-ID": session.user.id,
-        },
-      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      let response: Response;
+      try {
+        response = await fetch(deleteUrl, {
+          method: "DELETE",
+          headers: {
+            "X-API-Key": apiKey,
+            "X-User-ID": session.user.id,
+          },
+          signal: controller.signal,
+        });
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err instanceof Error && err.name === "AbortError") {
+          return { error: "انتهت مهلة الاتصال بالخادم" } as const;
+        }
+        throw err;
+      }
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
@@ -322,17 +324,14 @@ export async function deleteSubjectResource(
       }
     }
 
-    const key = extractKeyFromUrl(resource.url);
-    if (key) {
-      try {
-        const command = new DeleteObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: key,
-        });
-        await r2Client.send(command);
-      } catch {
-        // R2 cleanup is best-effort - file may already be deleted
-      }
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: resource.url,
+      });
+      await r2Client.send(command);
+    } catch {
+      // R2 cleanup is best-effort
     }
 
     await prisma.subjectResource.delete({
