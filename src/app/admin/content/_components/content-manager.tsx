@@ -110,7 +110,8 @@ interface ContentManagerProps {
   universities: Array<{ id: number; name: string }>;
 }
 
-const statusLabels = {
+const statusLabels: Record<string, string> = {
+  DRAFT: "مسودة",
   PENDING: "قيد المراجعة",
   APPROVED: "موافق عليه",
   REJECTED: "مرفوض",
@@ -130,7 +131,7 @@ const contentTypeLabels: Record<keyof typeof contentTypeIcons, string> = {
 
 const statusFilters = [
   { value: "PENDING", label: "قيد المراجعة" },
-  { value: "APPROVED", label: "مقبول" },
+  { value: "APPROVED", label: "موافق عليه" },
   { value: "REJECTED", label: "مرفوض" },
   { value: "ALL", label: "جميع الحالات" },
 ];

@@ -27,12 +27,14 @@ export default async function Page({ searchParams }: PageProps) {
         ? (status as "PENDING" | "APPROVED" | "REJECTED")
         : "PENDING";
 
+  const universityId = params.university
+    ? parseInt(params.university, 10)
+    : undefined;
+
   const contentResult = await listContentAction({
     status: contentStatus,
     contentType: params.type?.toUpperCase(),
-    universityId: params.university
-      ? parseInt(params.university, 10)
-      : undefined,
+    universityId: Number.isNaN(universityId) ? undefined : universityId,
     search: params.search,
     page,
     limit: 20,

@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
 
+import { RagStatus } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { r2Client } from "@/lib/r2-client";
 import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { r2Client } from "@/lib/r2-client";
 
 const BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
 
@@ -16,7 +17,7 @@ const createResourceSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
   url: z.string().url(),
-  fileSize: z.number().int().positive(),
+  fileSize: z.bigint().positive(),
   mimeType: z.string().min(1),
   subjectId: z.number().int().positive(),
   chapterId: z.number().int().positive().optional(),
@@ -36,7 +37,9 @@ async function requireAdmin() {
 function extractKeyFromUrl(url: string): string | null {
   try {
     const urlObj = new URL(url);
-    return urlObj.pathname.replace(/^\/[^/]+\//, ""); // Remove bucket prefix
+    const pathname = urlObj.pathname;
+    const match = pathname.match(/^\/[^/]+\/(.+)$/);
+    return match ? match[1] : null;
   } catch {
     return null;
   }
@@ -51,8 +54,10 @@ export async function generateUploadUrl(input: {
     await requireAdmin();
 
     const timestamp = Date.now();
-    const sanitizedName = input.filename.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const key = `subjects/${input.subjectId}/${timestamp}-${sanitizedName}`;
+    const randomId = crypto.randomUUID().slice(0, 8);
+    const sanitizedName =
+      input.filename.replace(/[^a-zA-Z0-9.-]/g, "_") || "file";
+    const key = `subjects/${input.subjectId}/${timestamp}-${randomId}-${sanitizedName}`;
 
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
@@ -60,7 +65,9 @@ export async function generateUploadUrl(input: {
       ContentType: input.contentType,
     });
 
-    const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
+    const uploadUrl = await getSignedUrl(r2Client, command, {
+      expiresIn: 3600,
+    });
     const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT!;
     const fileUrl = `${endpoint}/${BUCKET_NAME}/${key}`;
 
@@ -77,7 +84,7 @@ export async function createSubjectResource(input: {
   title: string;
   description?: string;
   url: string;
-  fileSize: number;
+  fileSize: bigint;
   mimeType: string;
   subjectId: number;
   chapterId?: number;
@@ -158,7 +165,10 @@ export async function triggerResourceIndexing(resourceId: number) {
       return { error: "تمت فهرسة المورد مسبقًا" } as const;
     }
 
-    if (resource.ragStatus === "PENDING" || resource.ragStatus === "PROCESSING") {
+    if (
+      resource.ragStatus === RagStatus.PENDING ||
+      resource.ragStatus === RagStatus.PROCESSING
+    ) {
       return { error: "الفهرسة قيد التنفيذ" } as const;
     }
 
@@ -175,45 +185,59 @@ export async function triggerResourceIndexing(resourceId: number) {
 
     const ingestUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest`;
 
-    const response = await fetch(ingestUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": apiKey,
-        "X-User-ID": session.user.id,
-      },
-      body: JSON.stringify({
-        resource_id: resource.id,
-        file_url: resource.url,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const body = await response.json().catch(() => null);
+    try {
+      const response = await fetch(ingestUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": apiKey,
+          "X-User-ID": session.user.id,
+        },
+        body: JSON.stringify({
+          resource_id: resource.id,
+          file_url: resource.url,
+        }),
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
+      clearTimeout(timeoutId);
+
+      const body = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        await prisma.subjectResource.update({
+          where: { id: validated },
+          data: { ragStatus: RagStatus.FAILED },
+        });
+        return {
+          error: body?.detail ?? "فشل بدء عملية الفهرسة",
+          status: response.status,
+        } as const;
+      }
+
       await prisma.subjectResource.update({
         where: { id: validated },
-        data: { ragStatus: "FAILED" },
+        data: { ragStatus: RagStatus.PENDING },
       });
+
       return {
-        error: body?.detail ?? "فشل بدء عملية الفهرسة",
-        status: response.status,
+        error: null,
+        data: {
+          documentId: body?.document_id,
+          resourceId: resource.id,
+          status: body?.status ?? "PENDING",
+        },
       } as const;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === "AbortError") {
+        return { error: "انتهت مهلة الاتصال بالخادم" } as const;
+      }
+      throw err;
     }
-
-    await prisma.subjectResource.update({
-      where: { id: validated },
-      data: { ragStatus: "PENDING" },
-    });
-
-    return {
-      error: null,
-      data: {
-        documentId: body?.document_id,
-        resourceId: resource.id,
-        status: body?.status ?? "PENDING",
-      },
-    } as const;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { error: "معرف مورد غير صالح" } as const;
@@ -271,10 +295,6 @@ export async function deleteSubjectResource(
       return { error: "المورد غير موجود" } as const;
     }
 
-    await prisma.subjectResource.delete({
-      where: { id: validated },
-    });
-
     const key = extractKeyFromUrl(resource.url);
     if (key) {
       try {
@@ -287,6 +307,10 @@ export async function deleteSubjectResource(
         console.warn(`Failed to delete file from storage: ${key}`);
       }
     }
+
+    await prisma.subjectResource.delete({
+      where: { id: validated },
+    });
 
     if (revalidatePathname) {
       revalidatePath(revalidatePathname);

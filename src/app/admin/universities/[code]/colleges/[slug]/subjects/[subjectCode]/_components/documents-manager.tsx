@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RagStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import {
   AlertCircle,
@@ -55,11 +56,11 @@ interface SubjectResourceItem {
   title: string;
   description: string | null;
   url: string;
-  fileSize: number;
+  fileSize: bigint;
   mimeType: string;
   createdAt: Date;
   isIndexed: boolean;
-  ragStatus: string | null;
+  ragStatus: RagStatus | null;
   chapterId: number | null;
   chapter: { id: number; title: string; sequence: number } | null;
 }
@@ -77,14 +78,14 @@ interface DocumentsManagerProps {
 }
 
 // RAG status labels and colors
-const ragStatusLabels: Record<string, string> = {
+const ragStatusLabels: Record<RagStatus, string> = {
   PENDING: "في الانتظار",
   PROCESSING: "جاري الفهرسة",
   COMPLETED: "تمت الفهرسة",
   FAILED: "فشلت الفهرسة",
 };
 
-const ragStatusColors: Record<string, string> = {
+const ragStatusColors: Record<RagStatus, string> = {
   PENDING:
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
   PROCESSING:
@@ -94,7 +95,7 @@ const ragStatusColors: Record<string, string> = {
   FAILED: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
 };
 
-const ragStatusIcons: Record<string, React.ReactNode> = {
+const ragStatusIcons: Record<RagStatus, React.ReactNode> = {
   PENDING: <Clock className="h-3.5 w-3.5" />,
   PROCESSING: <Loader2 className="h-3.5 w-3.5 animate-spin" />,
   COMPLETED: <CheckCircle2 className="h-3.5 w-3.5" />,
@@ -118,12 +119,10 @@ export function DocumentsManager({
   const [indexingIds, setIndexingIds] = useState<Set<number>>(new Set());
   const pollingRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
-  // Update resources when props change
   useEffect(() => {
     setResources(initialResources);
   }, [initialResources]);
 
-  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       pollingRef.current.forEach(timer => clearTimeout(timer));
@@ -131,10 +130,17 @@ export function DocumentsManager({
     };
   }, []);
 
-  // Poll for status updates on resources with active indexing
   const pollStatus = useCallback(async (resourceId: number) => {
     const result = await getResourceStatus(resourceId);
-    if (result.error || !result.data) return;
+    if (result.error || !result.data) {
+      pollingRef.current.delete(resourceId);
+      setIndexingIds(prev => {
+        const next = new Set(prev);
+        next.delete(resourceId);
+        return next;
+      });
+      return;
+    }
 
     const { isIndexed, ragStatus } = result.data;
 
@@ -142,8 +148,7 @@ export function DocumentsManager({
       prev.map(r => (r.id === resourceId ? { ...r, isIndexed, ragStatus } : r))
     );
 
-    // Continue polling if still processing
-    if (ragStatus === "PENDING" || ragStatus === "PROCESSING") {
+    if (ragStatus === RagStatus.PENDING || ragStatus === RagStatus.PROCESSING) {
       const timer = setTimeout(() => pollStatus(resourceId), 3000);
       pollingRef.current.set(resourceId, timer);
     } else {
@@ -154,15 +159,14 @@ export function DocumentsManager({
         return next;
       });
 
-      if (ragStatus === "COMPLETED") {
+      if (ragStatus === RagStatus.COMPLETED) {
         toast.success("تمت فهرسة المستند بنجاح");
-      } else if (ragStatus === "FAILED") {
+      } else if (ragStatus === RagStatus.FAILED) {
         toast.error("فشلت عملية الفهرسة");
       }
     }
   }, []);
 
-  // Start polling for a resource
   const startPolling = useCallback(
     (resourceId: number) => {
       if (pollingRef.current.has(resourceId)) return;
@@ -186,7 +190,6 @@ export function DocumentsManager({
     try {
       setUploadProgress(0);
 
-      // Get presigned URL from server
       const urlResult = await generateUploadUrl({
         filename: file.name,
         contentType: file.type,
@@ -200,7 +203,6 @@ export function DocumentsManager({
 
       const { uploadUrl, fileUrl } = urlResult.data;
 
-      // Upload to MinIO/R2 using presigned URL
       const xhr = new XMLHttpRequest();
 
       await new Promise<void>((resolve, reject) => {
@@ -225,12 +227,11 @@ export function DocumentsManager({
         xhr.send(file);
       });
 
-      // Create SubjectResource record in database
       const result = await createSubjectResource({
         title,
         description,
         url: fileUrl,
-        fileSize: file.size,
+        fileSize: BigInt(file.size),
         mimeType: file.type,
         subjectId,
         chapterId,
@@ -274,16 +275,13 @@ export function DocumentsManager({
         return;
       }
 
-      // Update local state
       setResources(prev =>
         prev.map(r =>
-          r.id === resource.id ? { ...r, ragStatus: "PENDING" } : r
+          r.id === resource.id ? { ...r, ragStatus: RagStatus.PENDING } : r
         )
       );
 
       toast.success("تم بدء عملية الفهرسة");
-
-      // Start polling for status updates
       startPolling(resource.id);
     });
   };
@@ -297,17 +295,17 @@ export function DocumentsManager({
         return;
       }
 
-      // Remove from local state
       setResources(prev => prev.filter(r => r.id !== resource.id));
       setDeleteTarget(null);
       toast.success("تم حذف المستند");
     });
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const formatFileSize = (bytes: bigint) => {
+    const n = Number(bytes);
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const formatDate = (date: Date) => {
@@ -343,8 +341,8 @@ export function DocumentsManager({
     return (
       !resource.isIndexed &&
       resource.mimeType === "application/pdf" &&
-      resource.ragStatus !== "PENDING" &&
-      resource.ragStatus !== "PROCESSING" &&
+      resource.ragStatus !== RagStatus.PENDING &&
+      resource.ragStatus !== RagStatus.PROCESSING &&
       !indexingIds.has(resource.id)
     );
   };

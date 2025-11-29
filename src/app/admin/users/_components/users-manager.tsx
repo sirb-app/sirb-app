@@ -415,7 +415,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={user.image ?? undefined} />
                           <AvatarFallback className="text-xs uppercase">
-                            {user.name.slice(0, 2)}
+                            {(user.name || "??").slice(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">

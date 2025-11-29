@@ -20,7 +20,12 @@ export default async function UniversityByCodePage({
 }) {
   const resolved = (params ? await params : {}) as { code?: string | string[] };
   const raw = Array.isArray(resolved.code) ? resolved.code[0] : resolved.code;
-  const code = raw ? decodeURIComponent(raw).toUpperCase() : "";
+  let code = "";
+  try {
+    code = raw ? decodeURIComponent(raw).toUpperCase() : "";
+  } catch {
+    return notFound();
+  }
   if (!code || code.length > 32) return notFound();
 
   const university = await getUniversityByCodeAction(code);
@@ -77,7 +82,7 @@ export default async function UniversityByCodePage({
                 href="/admin/universities"
                 aria-label="الرجوع إلى قائمة الجامعات"
               >
-                ← الرجوع للقائمة
+                الرجوع للقائمة →
               </Link>
             </Button>
           </div>

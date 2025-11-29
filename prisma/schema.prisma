@@ -51,6 +51,13 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum RagStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id        String   @id @default(uuid())
   createdAt DateTime
@@ -668,14 +675,14 @@ model SubjectResource {
   title       String
   description String?
   url         String // File storage URL
-  fileSize    Int // bytes
+  fileSize    BigInt // bytes
   mimeType    String // application/pdf, image/png, etc
 
   subjectId Int
   chapterId Int?
 
-  isIndexed Boolean @default(false) // whether resource has been indexed for RAG
-  ragStatus String? // indexing job status (e.g. PENDING|COMPLETED|FAILED)
+  isIndexed Boolean    @default(false)
+  ragStatus RagStatus?
 
   subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   chapter Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
