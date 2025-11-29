@@ -198,7 +198,6 @@ export async function triggerResourceIndexing(resourceId: number) {
         },
         body: JSON.stringify({
           resource_id: resource.id,
-          file_url: resource.url,
         }),
         signal: controller.signal,
       });
@@ -282,17 +281,45 @@ export async function deleteSubjectResource(
   revalidatePathname?: string
 ) {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
 
     const validated = resourceIdSchema.parse(resourceId);
 
     const resource = await prisma.subjectResource.findUnique({
       where: { id: validated },
-      select: { id: true, url: true },
+      select: { id: true, url: true, isIndexed: true },
     });
 
     if (!resource) {
       return { error: "المورد غير موجود" } as const;
+    }
+
+    if (resource.isIndexed) {
+      const baseUrl = process.env.FASTAPI_BASE_URL?.trim();
+      const apiKey = process.env.INTERNAL_API_KEY;
+
+      if (!baseUrl || !apiKey) {
+        return {
+          error: "خادم الذكاء الاصطناعي غير مهيأ - لا يمكن حذف المورد المفهرس",
+        } as const;
+      }
+
+      const deleteUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest/${validated}`;
+      const response = await fetch(deleteUrl, {
+        method: "DELETE",
+        headers: {
+          "X-API-Key": apiKey,
+          "X-User-ID": session.user.id,
+        },
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        return {
+          error: body?.detail ?? "فشل حذف بيانات الفهرسة - حاول مرة أخرى",
+          status: response.status,
+        } as const;
+      }
     }
 
     const key = extractKeyFromUrl(resource.url);
@@ -304,7 +331,7 @@ export async function deleteSubjectResource(
         });
         await r2Client.send(command);
       } catch {
-        console.warn(`Failed to delete file from storage: ${key}`);
+        // R2 cleanup is best-effort - file may already be deleted
       }
     }
 
