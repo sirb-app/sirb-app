@@ -1,8 +1,8 @@
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Prisma } from "@/generated/prisma";
 import { BookOpen, GraduationCap, School, Trophy } from "lucide-react";
 import Image from "next/image";
+import EnrollmentButton from "./enrollment-button";
 
 type SubjectWithRelations = Prisma.SubjectGetPayload<{
   include: {
@@ -24,10 +24,15 @@ type SubjectInfoCardProps = {
         canvases: number;
       };
     } | null;
+    isEnrolled: boolean;
   };
+  readonly isAuthenticated: boolean;
 };
 
-export default function SubjectInfoCard({ subject }: SubjectInfoCardProps) {
+export default function SubjectInfoCard({
+  subject,
+  isAuthenticated,
+}: SubjectInfoCardProps) {
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6 md:p-8">
@@ -95,9 +100,11 @@ export default function SubjectInfoCard({ subject }: SubjectInfoCardProps) {
 
             {/* Enroll Button */}
             <div className="mt-auto">
-              <Button size="lg" variant="accent" className="w-full md:w-auto">
-                التسجيل في المقرر
-              </Button>
+              <EnrollmentButton
+                subjectId={subject.id}
+                initialIsEnrolled={subject.isEnrolled}
+                isAuthenticated={isAuthenticated}
+              />
             </div>
           </div>
         </div>
