@@ -33,7 +33,8 @@ export default function EnrollmentButton({
       return;
     }
 
-    setIsEnrolled(!isEnrolled);
+    const previousState = isEnrolled;
+    setIsEnrolled(!previousState);
 
     startTransition(async () => {
       try {
@@ -50,11 +51,11 @@ export default function EnrollmentButton({
 
           router.refresh();
         } else {
-          setIsEnrolled(!isEnrolled);
+          setIsEnrolled(previousState);
           toast.error(result.error || "حدث خطأ");
         }
       } catch (error) {
-        setIsEnrolled(!isEnrolled);
+        setIsEnrolled(previousState);
         toast.error("حدث خطأ أثناء تحديث التسجيل");
         console.error("Enrollment error:", error);
       }
