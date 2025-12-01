@@ -45,15 +45,21 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
 
   const handleCreate = (formData: FormData, form: HTMLFormElement) => {
     startTransition(async () => {
-      const { createChapterAction } = await import("@/actions/chapter.actions");
-      const res = await createChapterAction(formData);
-      if (!("error" in res) || res.error === null) {
-        toast.success("تمت إضافة الفصل");
-        form.reset();
-        setCreateOpen(false);
-        router.refresh();
-      } else if (res.error) {
-        toast.error(res.error);
+      try {
+        const { createChapterAction } = await import(
+          "@/actions/chapter.actions"
+        );
+        const res = await createChapterAction(formData);
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success("تمت إضافة الفصل");
+          form.reset();
+          setCreateOpen(false);
+          router.refresh();
+        }
+      } catch {
+        toast.error("حدث خطأ غير متوقع");
       }
     });
   };
@@ -61,16 +67,22 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
   const handleUpdate = (formData: FormData, form: HTMLFormElement) => {
     if (!targetChapter) return;
     startTransition(async () => {
-      const { updateChapterAction } = await import("@/actions/chapter.actions");
-      const res = await updateChapterAction(targetChapter.id, formData);
-      if (!("error" in res) || res.error === null) {
-        toast.success("تم تحديث الفصل");
-        form.reset();
-        setEditOpen(false);
-        setTargetChapter(null);
-        router.refresh();
-      } else if (res.error) {
-        toast.error(res.error);
+      try {
+        const { updateChapterAction } = await import(
+          "@/actions/chapter.actions"
+        );
+        const res = await updateChapterAction(targetChapter.id, formData);
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success("تم تحديث الفصل");
+          form.reset();
+          setEditOpen(false);
+          setTargetChapter(null);
+          router.refresh();
+        }
+      } catch {
+        toast.error("حدث خطأ غير متوقع");
       }
     });
   };
@@ -78,15 +90,21 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
   const handleDelete = () => {
     if (!targetChapter) return;
     startTransition(async () => {
-      const { deleteChapterAction } = await import("@/actions/chapter.actions");
-      const res = await deleteChapterAction(targetChapter.id, subjectId);
-      if (!("error" in res) || res.error === null) {
-        toast.success("تم حذف الفصل");
-        setDeleteOpen(false);
-        setTargetChapter(null);
-        router.refresh();
-      } else if (res.error) {
-        toast.error(res.error);
+      try {
+        const { deleteChapterAction } = await import(
+          "@/actions/chapter.actions"
+        );
+        const res = await deleteChapterAction(targetChapter.id, subjectId);
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success("تم حذف الفصل");
+          setDeleteOpen(false);
+          setTargetChapter(null);
+          router.refresh();
+        }
+      } catch {
+        toast.error("حدث خطأ غير متوقع");
       }
     });
   };
@@ -116,7 +134,6 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
                 handleCreate(formData, form);
               }}
             >
-              <input type="hidden" name="subjectId" value={subjectId} />
               <div className="space-y-2">
                 <Label htmlFor="new-chapter-title">عنوان الفصل</Label>
                 <Input
@@ -278,7 +295,6 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
               handleUpdate(formData, form);
             }}
           >
-            <input type="hidden" name="subjectId" value={subjectId} />
             <div className="space-y-2">
               <Label htmlFor="edit-chapter-title">عنوان الفصل</Label>
               <Input

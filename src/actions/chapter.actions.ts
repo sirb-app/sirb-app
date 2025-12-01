@@ -2,7 +2,6 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { slugify } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
@@ -22,53 +21,16 @@ async function requireAdmin() {
   const session = await auth.api.getSession({ headers: headersList });
 
   if (!session?.user || session.user.role !== "ADMIN") {
-    throw new Error("Unauthorized");
+    throw new Error("غير مصرح");
   }
 
   return session;
 }
 
-async function revalidateChapterPaths(subjectId: number) {
+function revalidateChapterPaths(subjectId: number) {
   if (!Number.isInteger(subjectId)) return;
-
-  try {
-    const subject = await prisma.subject.findUnique({
-      where: { id: subjectId },
-      select: {
-        id: true,
-        code: true,
-        college: {
-          select: {
-            name: true,
-            university: { select: { code: true } },
-          },
-        },
-      },
-    });
-
-    if (!subject?.college?.university) {
-      revalidatePath("/admin/universities");
-      return;
-    }
-
-    const universityCode = subject.college.university.code;
-    const encodedUnivCode = encodeURIComponent(universityCode);
-    const collegeSlug = slugify(subject.college.name);
-    const encodedCollegeSlug = encodeURIComponent(collegeSlug);
-    const subjectCode = subject.code;
-    const encodedSubjectCode = encodeURIComponent(subjectCode);
-
-    revalidatePath("/admin/universities");
-    revalidatePath(`/admin/universities/${encodedUnivCode}`);
-    revalidatePath(
-      `/admin/universities/${encodedUnivCode}/colleges/${encodedCollegeSlug}`
-    );
-    revalidatePath(
-      `/admin/universities/${encodedUnivCode}/colleges/${encodedCollegeSlug}/subjects/${encodedSubjectCode}`
-    );
-  } catch {
-    // Silent fail
-  }
+  revalidatePath("/admin/universities");
+  revalidatePath(`/admin/subjects/${subjectId}`);
 }
 
 function getUniqueConstraintArabicMessage(target: unknown): string {
@@ -138,7 +100,7 @@ export async function createChapterAction(
         _count: { select: { canvases: true } },
       },
     });
-    await revalidateChapterPaths(subjectId);
+    revalidateChapterPaths(subjectId);
     return { error: null, data };
   } catch (error) {
     if (
@@ -221,9 +183,9 @@ export async function updateChapterAction(
         _count: { select: { canvases: true } },
       },
     });
-    await revalidateChapterPaths(subjectId);
+    revalidateChapterPaths(subjectId);
     if (existing.subjectId !== subjectId) {
-      await revalidateChapterPaths(existing.subjectId);
+      revalidateChapterPaths(existing.subjectId);
     }
     return { error: null, data };
   } catch (error) {
@@ -268,7 +230,7 @@ export async function deleteChapterAction(
     }
 
     await prisma.chapter.delete({ where: { id } });
-    await revalidateChapterPaths(subjectId);
+    revalidateChapterPaths(subjectId);
     return { error: null };
   } catch {
     return { error: "فشل حذف الفصل" };

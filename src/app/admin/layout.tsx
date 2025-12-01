@@ -20,11 +20,13 @@ export default async function AdminLayout({
   }
   return (
     <div
-      className="bg-background text-foreground flex min-h-dvh w-full"
+      className="bg-background text-foreground flex w-full overflow-x-hidden"
       dir="rtl"
     >
       <AdminSidebar />
-      <main className="flex-1 p-4 md:mr-64 md:p-6">{children}</main>
+      <main className="min-h-[calc(100dvh-6rem)] min-w-0 flex-1 p-4 pb-24 md:mr-64 md:p-6 md:pb-24">
+        {children}
+      </main>
     </div>
   );
 }

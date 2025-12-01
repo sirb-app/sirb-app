@@ -26,7 +26,7 @@ export default async function Page({
 
   if ("error" in result) {
     return (
-      <div className="container py-8">
+      <div className="p-6">
         <div className="bg-destructive/10 text-destructive rounded-lg border p-4">
           {result.error}
         </div>
@@ -35,12 +35,10 @@ export default async function Page({
   }
 
   return (
-    <div className="container py-8">
-      <UsersManager
-        users={result.users}
-        total={result.total}
-        currentPage={page}
-      />
-    </div>
+    <UsersManager
+      users={result.users}
+      total={result.total}
+      currentPage={page}
+    />
   );
 }

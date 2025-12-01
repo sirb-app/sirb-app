@@ -120,6 +120,7 @@ export function DocumentsManager({
   const pollingRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(
     new Map()
   );
+  const notifiedRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     setResources(initialResources);
@@ -133,7 +134,18 @@ export function DocumentsManager({
   }, []);
 
   const pollStatus = useCallback(async (resourceId: number) => {
-    const result = await getResourceStatus(resourceId);
+    let result;
+    try {
+      result = await getResourceStatus(resourceId);
+    } catch {
+      pollingRef.current.delete(resourceId);
+      setIndexingIds(prev => {
+        const next = new Set(prev);
+        next.delete(resourceId);
+        return next;
+      });
+      return;
+    }
     if (result.error || !result.data) {
       pollingRef.current.delete(resourceId);
       setIndexingIds(prev => {
@@ -161,10 +173,13 @@ export function DocumentsManager({
         return next;
       });
 
-      if (ragStatus === "COMPLETED") {
-        toast.success("تمت فهرسة المستند بنجاح");
-      } else if (ragStatus === "FAILED") {
-        toast.error("فشلت عملية الفهرسة");
+      if (!notifiedRef.current.has(resourceId)) {
+        notifiedRef.current.add(resourceId);
+        if (ragStatus === "COMPLETED") {
+          toast.success("تمت فهرسة المستند بنجاح");
+        } else if (ragStatus === "FAILED") {
+          toast.error("فشلت عملية الفهرسة");
+        }
       }
     }
   }, []);

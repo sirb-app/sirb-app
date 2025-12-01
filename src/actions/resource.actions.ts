@@ -220,6 +220,10 @@ export async function triggerResourceIndexing(resourceId: number) {
     } catch (err) {
       clearTimeout(timeoutId);
       if (err instanceof Error && err.name === "AbortError") {
+        await prisma.subjectResource.update({
+          where: { id: validated },
+          data: { ragStatus: RagStatus.FAILED },
+        });
         return { error: "انتهت مهلة الاتصال بالخادم" } as const;
       }
       throw err;
@@ -369,14 +373,28 @@ export async function getResourceStatus(resourceId: number) {
 
     const statusUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest/${validated}/status`;
 
-    const response = await fetch(statusUrl, {
-      method: "GET",
-      headers: {
-        "X-API-Key": apiKey,
-        "X-User-ID": session.user.id,
-      },
-      cache: "no-store",
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let response: Response;
+    try {
+      response = await fetch(statusUrl, {
+        method: "GET",
+        headers: {
+          "X-API-Key": apiKey,
+          "X-User-ID": session.user.id,
+        },
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === "AbortError") {
+        return { error: "انتهت مهلة الاتصال بالخادم" } as const;
+      }
+      throw err;
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       if (response.status === 404) {

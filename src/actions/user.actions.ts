@@ -211,15 +211,20 @@ export async function updateUserRoleAction(
 
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { role: true, emailVerified: true, banned: true },
     });
 
     if (!targetUser) {
       return { error: "المستخدم غير موجود" };
     }
 
-    if (targetUser.role === "ADMIN") {
-      return { error: "لا يمكن تغيير صلاحيات المسؤولين" };
+    if (role === "ADMIN") {
+      if (!targetUser.emailVerified) {
+        return { error: "لا يمكن ترقية مستخدم غير موثق إلى مسؤول" };
+      }
+      if (targetUser.banned) {
+        return { error: "لا يمكن ترقية مستخدم محظور إلى مسؤول" };
+      }
     }
 
     await prisma.user.update({

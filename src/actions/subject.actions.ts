@@ -3,7 +3,6 @@
 import type { Prisma } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { slugify } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
@@ -22,31 +21,23 @@ async function requireAdmin() {
   return session;
 }
 
-async function revalidateSubjectPaths(collegeId: number) {
+async function revalidateSubjectPaths(collegeId: number, subjectId?: number) {
   if (!Number.isInteger(collegeId)) return;
 
   try {
     const college = await prisma.college.findUnique({
       where: { id: collegeId },
       select: {
-        id: true,
-        name: true,
         university: { select: { code: true } },
       },
     });
 
     if (!college?.university) return;
 
-    const universityCode = college.university.code;
-    const encodedCode = encodeURIComponent(universityCode);
-    const slug = slugify(college.name);
-    const encodedSlug = encodeURIComponent(slug);
-
     revalidatePath("/admin/universities");
-    revalidatePath(`/admin/universities/${encodedCode}`);
-    revalidatePath(
-      `/admin/universities/${encodedCode}/colleges/${encodedSlug}`
-    );
+    if (subjectId) {
+      revalidatePath(`/admin/subjects/${subjectId}`);
+    }
   } catch {
     // Silent fail
   }
@@ -138,6 +129,13 @@ export async function createSubjectAction(
     ) {
       return { error: "الكود مستخدم بالفعل" };
     }
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      (error as { code?: string }).code === "P2003"
+    ) {
+      return { error: "الكلية غير موجودة" };
+    }
     return { error: "فشل إنشاء المادة" };
   }
 }
@@ -198,7 +196,7 @@ export async function updateSubjectAction(
       },
     });
 
-    await revalidateSubjectPaths(existingSubject.collegeId);
+    await revalidateSubjectPaths(existingSubject.collegeId, id);
     return { error: null, data };
   } catch (error) {
     if (
@@ -243,7 +241,14 @@ export async function deleteSubjectAction(
     await prisma.subject.delete({ where: { id } });
     await revalidateSubjectPaths(collegeId);
     return { error: null };
-  } catch {
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      (error as { code?: string }).code === "P2003"
+    ) {
+      return { error: "لا يمكن حذف المادة لوجود فصول مرتبطة بها" };
+    }
     return { error: "فشل حذف المادة" };
   }
 }

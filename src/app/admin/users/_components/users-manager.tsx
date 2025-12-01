@@ -19,7 +19,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +36,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -59,6 +75,7 @@ import {
   ChevronRight,
   FileText,
   GraduationCap,
+  MoreHorizontal,
   Search,
   Shield,
   ShieldAlert,
@@ -67,6 +84,7 @@ import {
   User,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -314,12 +332,28 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">إدارة المستخدمين</h1>
-          <p className="text-muted-foreground mt-1">
-            {total.toLocaleString("ar-SA-u-nu-latn")} مستخدم
-          </p>
+      <div className="space-y-4">
+        <Breadcrumb className="text-muted-foreground">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/admin">لوحة التحكم</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>إدارة المستخدمين</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold sm:text-3xl">إدارة المستخدمين</h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {total.toLocaleString("ar-SA-u-nu-latn")} مستخدم
+            </p>
+          </div>
         </div>
       </div>
 
@@ -392,7 +426,8 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
         </div>
       ) : (
         <>
-          <div className="bg-card rounded-lg border shadow-sm">
+          {/* Desktop Table View */}
+          <div className="bg-card hidden rounded-lg border shadow-sm md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -537,6 +572,146 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="space-y-3 md:hidden">
+            {users.map(user => (
+              <Card
+                key={user.id}
+                className="cursor-pointer overflow-hidden"
+                onClick={() => openAction("details", user)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={user.image ?? undefined} />
+                        <AvatarFallback className="text-sm uppercase">
+                          {(user.name || "??").slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{user.name}</p>
+                        <p className="text-muted-foreground truncate text-sm">
+                          {user.email}
+                        </p>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={e => {
+                            e.stopPropagation();
+                            openAction("role", user);
+                          }}
+                          disabled={isPending || !!user.banned}
+                        >
+                          <Shield className="ml-2 h-4 w-4" />
+                          تغيير الصلاحية
+                        </DropdownMenuItem>
+                        {user.banned ? (
+                          <DropdownMenuItem
+                            onClick={e => {
+                              e.stopPropagation();
+                              openAction("unban", user);
+                            }}
+                            disabled={isPending}
+                          >
+                            <ShieldCheck className="ml-2 h-4 w-4" />
+                            إلغاء الحظر
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={e => {
+                              e.stopPropagation();
+                              openAction("ban", user);
+                            }}
+                            disabled={isPending || user.role === "ADMIN"}
+                          >
+                            <Ban className="ml-2 h-4 w-4" />
+                            حظر المستخدم
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={e => {
+                            e.stopPropagation();
+                            openAction("delete", user);
+                          }}
+                          disabled={isPending || user.role === "ADMIN"}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="ml-2 h-4 w-4" />
+                          حذف المستخدم
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      variant={user.role === "ADMIN" ? "default" : "secondary"}
+                      className="gap-1"
+                    >
+                      {user.role === "ADMIN" ? (
+                        <ShieldCheck className="h-3 w-3" />
+                      ) : (
+                        <Shield className="h-3 w-3" />
+                      )}
+                      {user.role === "ADMIN" ? "مسؤول" : "مستخدم"}
+                    </Badge>
+                    {user.banned ? (
+                      <Badge variant="destructive" className="gap-1">
+                        <ShieldAlert className="h-3 w-3" />
+                        محظور
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1">
+                        نشط
+                      </Badge>
+                    )}
+                    {!user.emailVerified && (
+                      <Badge variant="secondary" className="gap-1">
+                        غير موثق
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="bg-muted/50 grid grid-cols-3 gap-2 rounded-lg p-3 text-center text-xs">
+                    <div>
+                      <p className="text-muted-foreground">المساهمات</p>
+                      <p className="font-semibold">
+                        {user._count.contributedCanvases}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">التسجيلات</p>
+                      <p className="font-semibold">{user._count.enrollments}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">الإشراف</p>
+                      <p className="font-semibold">
+                        {user._count.moderatedSubjects}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    انضم في {formatDate(user.createdAt)}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {totalPages > 1 && (
@@ -694,6 +869,11 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
               </strong>{" "}
               إلى <strong>{newRole === "ADMIN" ? "مسؤول" : "مستخدم"}</strong>
             </p>
+            {!targetUser?.emailVerified && newRole === "ADMIN" && (
+              <p className="text-destructive text-sm">
+                لا يمكن ترقية مستخدم غير موثق إلى مسؤول
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="new-role">الصلاحية الجديدة</Label>
               <Select
@@ -705,7 +885,12 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="USER">مستخدم</SelectItem>
-                  <SelectItem value="ADMIN">مسؤول</SelectItem>
+                  <SelectItem
+                    value="ADMIN"
+                    disabled={!targetUser?.emailVerified}
+                  >
+                    مسؤول {!targetUser?.emailVerified && "(يتطلب توثيق)"}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -722,7 +907,9 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
             <Button
               type="button"
               onClick={handleRoleChange}
-              disabled={isPending}
+              disabled={
+                isPending || (newRole === "ADMIN" && !targetUser?.emailVerified)
+              }
             >
               {isPending ? "جارٍ التحديث..." : "تحديث"}
             </Button>

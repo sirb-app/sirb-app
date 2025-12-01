@@ -3,14 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-async function revalidateUniversityPaths(universityId: number) {
-  const university = await prisma.university.findUnique({
-    where: { id: universityId },
-    select: { code: true },
-  });
-  if (!university) return;
+function revalidateUniversityPaths() {
   revalidatePath("/admin/universities");
-  revalidatePath(`/admin/universities/${encodeURIComponent(university.code)}`);
 }
 
 export async function listUniversitiesAction() {
@@ -18,7 +12,12 @@ export async function listUniversitiesAction() {
     orderBy: { createdAt: "desc" },
     include: {
       colleges: {
-        include: { _count: { select: { subjects: true } } },
+        include: {
+          subjects: {
+            include: { _count: { select: { chapters: true } } },
+          },
+          _count: { select: { subjects: true } },
+        },
       },
     },
   });
@@ -57,7 +56,7 @@ export async function createUniversityAction(
   }
   try {
     const data = await prisma.university.create({ data: { name, code } });
-    revalidatePath("/admin/universities");
+    revalidateUniversityPaths();
     return { error: null, data };
   } catch (e) {
     if (
@@ -91,23 +90,12 @@ export async function updateUniversityAction(
     return { error: "الكود يجب أن يكون بالإنجليزية بدون مسافات أو رموز" };
   }
   try {
-    const existing = await prisma.university.findUnique({
-      where: { id },
-      select: { code: true },
-    });
-
     const data = await prisma.university.update({
       where: { id },
       data: { name, code },
     });
 
-    revalidatePath("/admin/universities");
-    revalidatePath(`/admin/universities/${encodeURIComponent(code)}`);
-    if (existing && existing.code !== code) {
-      revalidatePath(
-        `/admin/universities/${encodeURIComponent(existing.code)}`
-      );
-    }
+    revalidateUniversityPaths();
     return { error: null, data };
   } catch (e) {
     if (
@@ -126,7 +114,7 @@ export async function deleteUniversityAction(
 ): Promise<{ error: null } | { error: string }> {
   try {
     await prisma.university.delete({ where: { id } });
-    revalidatePath("/admin/universities");
+    revalidateUniversityPaths();
     return { error: null };
   } catch {
     return { error: "فشل الحذف" };
@@ -153,7 +141,7 @@ export async function createCollegeAction(
     const data = await prisma.college.create({
       data: { name, universityId },
     });
-    await revalidateUniversityPaths(universityId);
+    revalidateUniversityPaths();
     return { error: null, data };
   } catch {
     return { error: "فشل إنشاء الكلية" };
@@ -178,25 +166,21 @@ export async function updateCollegeAction(
   if (!Number.isInteger(universityId)) return { error: "جامعة غير صالحة" };
 
   try {
-    const college = await prisma.college.findUnique({
-      where: { id },
-      select: { universityId: true },
-    });
-
-    if (!college) {
-      return { error: "الكلية غير موجودة" };
-    }
-
-    if (college.universityId !== universityId) {
-      return { error: "الكلية لا تنتمي لهذه الجامعة" };
-    }
-
-    const data = await prisma.college.update({
-      where: { id },
+    const result = await prisma.college.updateMany({
+      where: { id, universityId },
       data: { name },
     });
-    await revalidateUniversityPaths(universityId);
-    return { error: null, data };
+
+    if (result.count === 0) {
+      return { error: "الكلية غير موجودة أو لا تنتمي لهذه الجامعة" };
+    }
+
+    const data = await prisma.college.findUnique({
+      where: { id },
+    });
+
+    revalidateUniversityPaths();
+    return { error: null, data: data! };
   } catch {
     return { error: "فشل تحديث الكلية" };
   }
@@ -210,21 +194,15 @@ export async function deleteCollegeAction(
     return { error: "جامعة غير صالحة" };
   }
   try {
-    const college = await prisma.college.findUnique({
-      where: { id },
-      select: { universityId: true },
+    const result = await prisma.college.deleteMany({
+      where: { id, universityId },
     });
 
-    if (!college) {
-      return { error: "الكلية غير موجودة" };
+    if (result.count === 0) {
+      return { error: "الكلية غير موجودة أو لا تنتمي لهذه الجامعة" };
     }
 
-    if (college.universityId !== universityId) {
-      return { error: "الكلية لا تنتمي لهذه الجامعة" };
-    }
-
-    await prisma.college.delete({ where: { id } });
-    await revalidateUniversityPaths(universityId);
+    revalidateUniversityPaths();
     return { error: null };
   } catch {
     return { error: "فشل حذف الكلية" };

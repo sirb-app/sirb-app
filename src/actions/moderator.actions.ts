@@ -6,7 +6,6 @@ import { headers } from "next/headers";
 import type { Prisma } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { slugify } from "@/lib/utils";
 
 async function requireAdmin() {
   const headersList = await headers();
@@ -28,10 +27,8 @@ async function revalidateModeratorPaths(subjectId: number) {
   const subject = await prisma.subject.findUnique({
     where: { id: subjectId },
     select: {
-      code: true,
       college: {
         select: {
-          name: true,
           university: { select: { code: true } },
         },
       },
@@ -39,18 +36,8 @@ async function revalidateModeratorPaths(subjectId: number) {
   });
   if (!subject) return;
 
-  const universityCode = subject.college.university.code;
-  const encodedCode = encodeURIComponent(universityCode);
-  const slug = slugify(subject.college.name);
-  const encodedSlug = encodeURIComponent(slug);
-  const encodedSubjectCode = encodeURIComponent(subject.code);
-
   revalidatePath("/admin/universities");
-  revalidatePath(`/admin/universities/${encodedCode}`);
-  revalidatePath(`/admin/universities/${encodedCode}/colleges/${encodedSlug}`);
-  revalidatePath(
-    `/admin/universities/${encodedCode}/colleges/${encodedSlug}/subjects/${encodedSubjectCode}`
-  );
+  revalidatePath(`/admin/subjects/${subjectId}`);
 }
 
 export async function listModeratorsBySubjectAction(

@@ -16,56 +16,27 @@ import { DocumentsManager } from "./_components/documents-manager";
 import { ModeratorsManager } from "./_components/moderators-manager";
 import { SubjectHeaderActions } from "./_components/subject-header-actions";
 
-export default async function SubjectByCodePage({
+export default async function SubjectPage({
   params,
 }: {
-  params?: Promise<{
-    code?: string | string[];
-    slug?: string | string[];
-    subjectCode?: string | string[];
-  }>;
+  params?: Promise<{ subjectId?: string | string[] }>;
 }) {
   const resolved = (params ? await params : {}) as {
-    code?: string | string[];
-    slug?: string | string[];
-    subjectCode?: string | string[];
+    subjectId?: string | string[];
   };
 
-  const rawCode = Array.isArray(resolved.code)
-    ? resolved.code[0]
-    : resolved.code;
-  const rawSlug = Array.isArray(resolved.slug)
-    ? resolved.slug[0]
-    : resolved.slug;
-  const rawSubjectCode = Array.isArray(resolved.subjectCode)
-    ? resolved.subjectCode[0]
-    : resolved.subjectCode;
+  const rawId = Array.isArray(resolved.subjectId)
+    ? resolved.subjectId[0]
+    : resolved.subjectId;
 
-  const universityCode = rawCode
-    ? decodeURIComponent(rawCode).toUpperCase()
-    : "";
-  const collegeSlug = rawSlug ? decodeURIComponent(rawSlug).toLowerCase() : "";
-  const subjectCode = rawSubjectCode
-    ? decodeURIComponent(rawSubjectCode).toUpperCase()
-    : "";
+  const subjectId = rawId ? parseInt(rawId, 10) : NaN;
 
-  if (
-    !universityCode ||
-    universityCode.length > 32 ||
-    !collegeSlug ||
-    !subjectCode
-  ) {
+  if (isNaN(subjectId) || subjectId <= 0) {
     return notFound();
   }
 
-  const subject = await prisma.subject.findFirst({
-    where: {
-      code: subjectCode,
-      college: {
-        university: { code: universityCode },
-        name: { equals: collegeSlug.replace(/-/g, " "), mode: "insensitive" },
-      },
-    },
+  const subject = await prisma.subject.findUnique({
+    where: { id: subjectId },
     include: {
       college: {
         include: {
@@ -116,7 +87,7 @@ export default async function SubjectByCodePage({
   const numberFormatter = new Intl.NumberFormat("ar-SA-u-nu-latn");
 
   return (
-    <div className="space-y-6 p-6" dir="rtl">
+    <div className="space-y-6" dir="rtl">
       <div className="space-y-4">
         <Breadcrumb>
           <BreadcrumbList>
@@ -134,22 +105,16 @@ export default async function SubjectByCodePage({
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link
-                  href={`/admin/universities/${encodeURIComponent(subject.college.university.code)}`}
-                >
+                <Link href="/admin/universities">
                   {subject.college.university.name}
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link
-                  href={`/admin/universities/${encodeURIComponent(subject.college.university.code)}/colleges/${encodeURIComponent(collegeSlug)}`}
-                >
-                  {subject.college.name}
-                </Link>
-              </BreadcrumbLink>
+              <span className="text-muted-foreground">
+                {subject.college.name}
+              </span>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -183,11 +148,7 @@ export default async function SubjectByCodePage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-2">
-              <Link
-                href={`/admin/universities/${encodeURIComponent(subject.college.university.code)}/colleges/${encodeURIComponent(collegeSlug)}`}
-              >
-                ← الرجوع للكلية
-              </Link>
+              <Link href="/admin/universities">إدارة الجامعات →</Link>
             </Button>
           </div>
         </div>
@@ -244,10 +205,12 @@ export default async function SubjectByCodePage({
         </Link>
       </section>
 
-      <ModeratorsManager
-        subjectId={subject.id}
-        moderators={subject.moderators}
-      />
+      <section id="moderators">
+        <ModeratorsManager
+          subjectId={subject.id}
+          moderators={subject.moderators}
+        />
+      </section>
 
       <ChaptersManager subjectId={subject.id} chapters={subject.chapters} />
 
