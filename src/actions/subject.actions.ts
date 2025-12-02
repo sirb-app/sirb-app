@@ -21,25 +21,11 @@ async function requireAdmin() {
   return session;
 }
 
-async function revalidateSubjectPaths(collegeId: number, subjectId?: number) {
+function revalidateSubjectPaths(collegeId: number, subjectId?: number) {
   if (!Number.isInteger(collegeId)) return;
-
-  try {
-    const college = await prisma.college.findUnique({
-      where: { id: collegeId },
-      select: {
-        university: { select: { code: true } },
-      },
-    });
-
-    if (!college?.university) return;
-
-    revalidatePath("/admin/universities");
-    if (subjectId) {
-      revalidatePath(`/admin/subjects/${subjectId}`);
-    }
-  } catch {
-    // Silent fail
+  revalidatePath("/admin/universities");
+  if (subjectId) {
+    revalidatePath(`/admin/subjects/${subjectId}`);
   }
 }
 
@@ -119,7 +105,7 @@ export async function createSubjectAction(
         _count: { select: { chapters: true } },
       },
     });
-    await revalidateSubjectPaths(collegeId);
+    revalidateSubjectPaths(collegeId);
     return { error: null, data };
   } catch (error) {
     if (
@@ -196,7 +182,7 @@ export async function updateSubjectAction(
       },
     });
 
-    await revalidateSubjectPaths(existingSubject.collegeId, id);
+    revalidateSubjectPaths(existingSubject.collegeId, id);
     return { error: null, data };
   } catch (error) {
     if (
@@ -239,7 +225,7 @@ export async function deleteSubjectAction(
     }
 
     await prisma.subject.delete({ where: { id } });
-    await revalidateSubjectPaths(collegeId);
+    revalidateSubjectPaths(collegeId);
     return { error: null };
   } catch (error) {
     if (

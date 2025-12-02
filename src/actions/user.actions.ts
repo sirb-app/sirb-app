@@ -201,7 +201,8 @@ export async function updateUserRoleAction(
       return { error: "معرف المستخدم غير صالح" };
     }
 
-    if (!role || !["USER", "ADMIN"].includes(role)) {
+    const validRoles: UserRole[] = ["USER", "ADMIN"];
+    if (!role || !validRoles.includes(role)) {
       return { error: "الصلاحية غير صالحة" };
     }
 

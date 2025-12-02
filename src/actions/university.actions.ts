@@ -166,21 +166,27 @@ export async function updateCollegeAction(
   if (!Number.isInteger(universityId)) return { error: "جامعة غير صالحة" };
 
   try {
-    const result = await prisma.college.updateMany({
-      where: { id, universityId },
-      data: { name },
+    const data = await prisma.$transaction(async tx => {
+      const college = await tx.college.findFirst({
+        where: { id, universityId },
+      });
+
+      if (!college) {
+        return null;
+      }
+
+      return tx.college.update({
+        where: { id },
+        data: { name },
+      });
     });
 
-    if (result.count === 0) {
+    if (!data) {
       return { error: "الكلية غير موجودة أو لا تنتمي لهذه الجامعة" };
     }
 
-    const data = await prisma.college.findUnique({
-      where: { id },
-    });
-
     revalidateUniversityPaths();
-    return { error: null, data: data! };
+    return { error: null, data };
   } catch {
     return { error: "فشل تحديث الكلية" };
   }

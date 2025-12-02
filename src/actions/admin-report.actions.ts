@@ -622,9 +622,12 @@ export async function resolveReportWithAction(
         throw new Error("No user to ban for this report");
       }
 
-      const banExpires = action.banDuration
-        ? new Date(Date.now() + action.banDuration * 24 * 60 * 60 * 1000)
-        : null;
+      const banExpires =
+        action.banDuration &&
+        Number.isInteger(action.banDuration) &&
+        action.banDuration > 0
+          ? new Date(Date.now() + action.banDuration * 24 * 60 * 60 * 1000)
+          : null;
 
       await tx.user.update({
         where: { id: targetUserId },

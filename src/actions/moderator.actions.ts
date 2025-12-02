@@ -49,20 +49,24 @@ export async function listModeratorsBySubjectAction(
     return [];
   }
   if (!Number.isInteger(subjectId)) return [];
-  return prisma.subjectModerator.findMany({
-    where: { subjectId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
+  try {
+    return await prisma.subjectModerator.findMany({
+      where: { subjectId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
         },
       },
-    },
-  });
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function assignModeratorAction(

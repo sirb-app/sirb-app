@@ -354,7 +354,7 @@ export function DocumentsManager({
     return new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(new Date(date));
+    }).format(date);
   };
 
   const getStatusDisplay = (resource: SubjectResourceItem) => {
