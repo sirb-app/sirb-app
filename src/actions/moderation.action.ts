@@ -13,6 +13,11 @@ const RejectCanvasSchema = z.object({
   reason: z.string().min(5, "Reason must be at least 5 characters"),
 });
 
+const RejectQuizSchema = z.object({
+  quizId: z.number(),
+  reason: z.string().min(5, "Reason must be at least 5 characters"),
+});
+
 // --- Helpers ---
 
 async function getSession() {
@@ -62,6 +67,25 @@ async function getCanvasWithSubject(canvasId: number) {
   return canvas;
 }
 
+async function getQuizWithSubject(quizId: number) {
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    select: {
+      id: true,
+      status: true,
+      isDeleted: true,
+      chapter: {
+        select: {
+          subjectId: true,
+        },
+      },
+    },
+  });
+
+  if (!quiz || quiz.isDeleted) throw new Error("Quiz not found");
+  return quiz;
+}
+
 // --- Actions ---
 
 export async function getModerationQueue(subjectId: number) {
@@ -85,7 +109,38 @@ export async function getModerationQueue(subjectId: number) {
       },
       chapter: {
         select: {
+          id: true,
           title: true,
+          subjectId: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const pendingQuizzes = await prisma.quiz.findMany({
+    where: {
+      chapter: { subjectId },
+      status: ContentStatus.PENDING,
+      isDeleted: false,
+    },
+    include: {
+      contributor: {
+        select: {
+          name: true,
+          image: true,
+        },
+      },
+      chapter: {
+        select: {
+          id: true,
+          title: true,
+          subjectId: true,
+        },
+      },
+      questions: {
+        select: {
+          id: true,
         },
       },
     },
@@ -97,6 +152,8 @@ export async function getModerationQueue(subjectId: number) {
       OR: [
         { reportedCanvas: { chapter: { subjectId }, isDeleted: false } },
         { reportedComment: { canvas: { chapter: { subjectId }, isDeleted: false } } },
+        { reportedQuiz: { chapter: { subjectId }, isDeleted: false } },
+        { reportedQuizComment: { quiz: { chapter: { subjectId }, isDeleted: false } } },
       ],
       status: "PENDING",
     },
@@ -126,11 +183,33 @@ export async function getModerationQueue(subjectId: number) {
           },
         },
       },
+      reportedQuiz: {
+        select: {
+          id: true,
+          title: true,
+          chapterId: true,
+          chapter: { select: { subjectId: true } },
+        },
+      },
+      reportedQuizComment: {
+        select: {
+          id: true,
+          text: true,
+          quizId: true,
+          quiz: {
+            select: {
+              id: true,
+              chapterId: true,
+              chapter: { select: { subjectId: true } },
+            },
+          },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return { pendingCanvases, reports };
+  return { pendingCanvases, pendingQuizzes, reports };
 }
 
 export async function approveCanvas(canvasId: number) {
@@ -171,4 +250,83 @@ export async function rejectCanvas(data: z.infer<typeof RejectCanvasSchema>) {
   });
 
   return { success: true };
+}
+
+export async function approveQuiz(quizId: number) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const quiz = await getQuizWithSubject(quizId);
+  await checkModeratorAccess(session.user.id, quiz.chapter.subjectId);
+
+  await prisma.quiz.update({
+    where: { id: quizId },
+    data: {
+      status: ContentStatus.APPROVED,
+      rejectionReason: null,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function rejectQuiz(data: z.infer<typeof RejectQuizSchema>) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = RejectQuizSchema.parse(data);
+  const quiz = await getQuizWithSubject(validated.quizId);
+  await checkModeratorAccess(session.user.id, quiz.chapter.subjectId);
+
+  await prisma.quiz.update({
+    where: { id: validated.quizId },
+    data: {
+      status: ContentStatus.REJECTED,
+      rejectionReason: validated.reason,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function getQuizForModeratorPreview(quizId: number) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  // Get quiz with all details
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId, isDeleted: false },
+    include: {
+      contributor: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      chapter: {
+        select: {
+          id: true,
+          title: true,
+          subjectId: true,
+        },
+      },
+      questions: {
+        include: {
+          options: {
+            orderBy: { sequence: "asc" },
+          },
+        },
+        orderBy: { sequence: "asc" },
+      },
+    },
+  });
+
+  if (!quiz) {
+    throw new Error("Quiz not found");
+  }
+
+  // Check moderator access for this subject
+  await checkModeratorAccess(session.user.id, quiz.chapter.subjectId);
+
+  return quiz;
 }

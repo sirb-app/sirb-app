@@ -11,6 +11,7 @@ import type { ContentStatus } from "@/generated/prisma";
 import { FileX } from "lucide-react";
 import { useMemo, useState } from "react";
 import CanvasContributionCard from "./canvas-contribution-card";
+import QuizContributionCard from "./quiz-contribution-card";
 
 const statusLabels = {
   DRAFT: "مسودات",
@@ -46,6 +47,26 @@ type Canvas = {
   };
 };
 
+type Quiz = {
+  id: number;
+  title: string;
+  status: ContentStatus;
+  rejectionReason: string | null;
+  updatedAt: Date;
+  chapter: {
+    id: number;
+    title: string;
+    subject: {
+      id: number;
+      name: string;
+      code: string;
+    };
+  };
+  _count: {
+    questions: number;
+  };
+};
+
 type ContributionsTabProps = {
   readonly canvasesByStatus: {
     DRAFT: Canvas[];
@@ -53,52 +74,63 @@ type ContributionsTabProps = {
     REJECTED: Canvas[];
     APPROVED: Canvas[];
   };
+  readonly quizzesByStatus: {
+    DRAFT: Quiz[];
+    PENDING: Quiz[];
+    REJECTED: Quiz[];
+    APPROVED: Quiz[];
+  };
 };
 
 export default function ContributionsTab({
   canvasesByStatus,
+  quizzesByStatus,
 }: ContributionsTabProps) {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("all");
   const [selectedChapterId, setSelectedChapterId] = useState<string>("all");
 
   const subjects = useMemo(() => {
     const allCanvases = Object.values(canvasesByStatus).flat();
+    const allQuizzes = Object.values(quizzesByStatus).flat();
+    const allContributions = [...allCanvases, ...allQuizzes];
     const uniqueSubjects = new Map();
 
-    allCanvases.forEach(canvas => {
-      const subjectId = canvas.chapter.subject.id;
+    allContributions.forEach(contribution => {
+      const subjectId = contribution.chapter.subject.id;
       if (!uniqueSubjects.has(subjectId)) {
         uniqueSubjects.set(subjectId, {
           id: subjectId,
-          name: canvas.chapter.subject.name,
-          code: canvas.chapter.subject.code,
+          name: contribution.chapter.subject.name,
+          code: contribution.chapter.subject.code,
         });
       }
     });
 
     return Array.from(uniqueSubjects.values());
-  }, [canvasesByStatus]);
+  }, [canvasesByStatus, quizzesByStatus]);
 
   const chapters = useMemo(() => {
     if (selectedSubjectId === "all") return [];
 
     const allCanvases = Object.values(canvasesByStatus).flat();
+    const allQuizzes = Object.values(quizzesByStatus).flat();
+    const allContributions = [...allCanvases, ...allQuizzes];
     const uniqueChapters = new Map();
 
-    allCanvases.forEach(canvas => {
-      if (canvas.chapter.subject.id.toString() === selectedSubjectId) {
-        const chapterId = canvas.chapter.id;
+    allContributions.forEach(contribution => {
+      if (contribution.chapter.subject.id.toString() === selectedSubjectId) {
+        const chapterId = contribution.chapter.id;
         if (!uniqueChapters.has(chapterId)) {
           uniqueChapters.set(chapterId, {
             id: chapterId,
-            title: canvas.chapter.title,
+            title: contribution.chapter.title,
           });
         }
       }
     });
 
     return Array.from(uniqueChapters.values());
-  }, [canvasesByStatus, selectedSubjectId]);
+  }, [canvasesByStatus, quizzesByStatus, selectedSubjectId]);
 
   const filteredCanvasesByStatus = useMemo(() => {
     const filtered: typeof canvasesByStatus = {
@@ -125,13 +157,38 @@ export default function ContributionsTab({
     return filtered;
   }, [canvasesByStatus, selectedSubjectId, selectedChapterId]);
 
-  const hasAnyContributions = Object.values(canvasesByStatus).some(
-    arr => arr.length > 0
-  );
+  const filteredQuizzesByStatus = useMemo(() => {
+    const filtered: typeof quizzesByStatus = {
+      DRAFT: [],
+      PENDING: [],
+      REJECTED: [],
+      APPROVED: [],
+    };
 
-  const hasFilteredContributions = Object.values(
-    filteredCanvasesByStatus
-  ).some(arr => arr.length > 0);
+    Object.entries(quizzesByStatus).forEach(([status, quizzes]) => {
+      filtered[status as keyof typeof filtered] = quizzes.filter(quiz => {
+        const matchesSubject =
+          selectedSubjectId === "all" ||
+          quiz.chapter.subject.id.toString() === selectedSubjectId;
+
+        const matchesChapter =
+          selectedChapterId === "all" ||
+          quiz.chapter.id.toString() === selectedChapterId;
+
+        return matchesSubject && matchesChapter;
+      });
+    });
+
+    return filtered;
+  }, [quizzesByStatus, selectedSubjectId, selectedChapterId]);
+
+  const hasAnyContributions =
+    Object.values(canvasesByStatus).some(arr => arr.length > 0) ||
+    Object.values(quizzesByStatus).some(arr => arr.length > 0);
+
+  const hasFilteredContributions =
+    Object.values(filteredCanvasesByStatus).some(arr => arr.length > 0) ||
+    Object.values(filteredQuizzesByStatus).some(arr => arr.length > 0);
 
   const handleSubjectChange = (value: string) => {
     setSelectedSubjectId(value);
@@ -217,23 +274,31 @@ export default function ContributionsTab({
           {(["DRAFT", "PENDING", "REJECTED", "APPROVED"] as const).map(
             status => {
               const canvases = filteredCanvasesByStatus[status];
+              const quizzes = filteredQuizzesByStatus[status];
+              const totalCount = canvases.length + quizzes.length;
 
               return (
                 <div key={status} className="space-y-4">
                   <h3 className="text-lg font-semibold">
-                    {statusLabels[status]} ({canvases.length})
+                    {statusLabels[status]} ({totalCount})
                   </h3>
 
-                  {canvases.length === 0 ? (
-                    <div className="text-muted-foreground bg-muted/10 rounded-lg border-2 border-dashed py-8 text-center text-sm">
+                  {totalCount === 0 ? (
+                    <div className="text-muted-foreground bg-muted/15 rounded-lg border-2 border-dashed py-8 text-center text-sm">
                       {emptyMessages[status]}
                     </div>
                   ) : (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {canvases.map(canvas => (
                         <CanvasContributionCard
-                          key={canvas.id}
+                          key={`canvas-${canvas.id}`}
                           canvas={canvas}
+                        />
+                      ))}
+                      {quizzes.map(quiz => (
+                        <QuizContributionCard
+                          key={`quiz-${quiz.id}`}
+                          quiz={quiz}
                         />
                       ))}
                     </div>

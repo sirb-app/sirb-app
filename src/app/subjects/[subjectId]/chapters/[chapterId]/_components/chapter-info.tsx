@@ -55,7 +55,7 @@ export default function ChapterInfo({ chapter, subjectId }: ChapterInfoProps) {
             <h1 className="text-3xl leading-tight font-bold md:text-4xl">
               {stripTitlePrefix(chapter.title)}
             </h1>
-            <span className="bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
+            <span className="bg-primary/15 border-primary/30 text-primary rounded-full border px-4 py-1.5 text-sm font-medium">
               الفصل {chapter.sequence}
             </span>
           </div>

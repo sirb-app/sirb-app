@@ -143,7 +143,7 @@ function ChapterItem({
                 onClick={onCanvasClick}
                 className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
                   isCurrentCanvas
-                    ? "bg-primary/10 text-primary font-medium"
+                    ? "bg-primary/15 border-primary/30 border text-primary font-medium"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >

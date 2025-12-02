@@ -25,6 +25,26 @@ type Canvas = {
   };
 };
 
+type Quiz = {
+  id: number;
+  title: string;
+  status: ContentStatus;
+  rejectionReason: string | null;
+  updatedAt: Date;
+  chapter: {
+    id: number;
+    title: string;
+    subject: {
+      id: number;
+      name: string;
+      code: string;
+    };
+  };
+  _count: {
+    questions: number;
+  };
+};
+
 type Enrollment = {
   id: number;
   subject: {
@@ -50,17 +70,23 @@ type DashboardTabsProps = {
     REJECTED: Canvas[];
     APPROVED: Canvas[];
   };
+  readonly quizzesByStatus: {
+    DRAFT: Quiz[];
+    PENDING: Quiz[];
+    REJECTED: Quiz[];
+    APPROVED: Quiz[];
+  };
   readonly enrollments: Enrollment[];
 };
 
 export default function DashboardTabs({
   canvasesByStatus,
+  quizzesByStatus,
   enrollments,
 }: DashboardTabsProps) {
-  const totalContributions = Object.values(canvasesByStatus).reduce(
-    (sum, arr) => sum + arr.length,
-    0
-  );
+  const totalContributions =
+    Object.values(canvasesByStatus).reduce((sum, arr) => sum + arr.length, 0) +
+    Object.values(quizzesByStatus).reduce((sum, arr) => sum + arr.length, 0);
 
   return (
     <Tabs defaultValue="learning" className="w-full" dir="rtl">
@@ -78,7 +104,7 @@ export default function DashboardTabs({
       </TabsContent>
 
       <TabsContent value="contributions" className="mt-6">
-        <ContributionsTab canvasesByStatus={canvasesByStatus} />
+        <ContributionsTab canvasesByStatus={canvasesByStatus} quizzesByStatus={quizzesByStatus} />
       </TabsContent>
     </Tabs>
   );

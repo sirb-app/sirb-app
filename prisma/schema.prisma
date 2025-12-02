@@ -26,9 +26,9 @@ enum VoteType {
 }
 
 enum QuestionType {
-  MULTIPLE_CHOICE
+  MCQ_SINGLE
+  MCQ_MULTI
   TRUE_FALSE
-  SHORT_ANSWER
 }
 
 enum CompletionType {
@@ -74,7 +74,12 @@ model User {
   canvasVotes         CanvasVote[]
 
   // Quiz system relations
-  quizAttempts UserQuizAttempt[]
+  contributedQuizzes Quiz[]            @relation("ContributedQuizzes")
+  quizAttempts       QuizAttempt[]
+  questionAnswers    QuestionAnswer[]
+  quizVotes          QuizVote[]
+  quizComments       QuizComment[]
+  quizCommentVotes   QuizCommentVote[]
 
   // Progress tracking relations
   enrollments        Enrollment[]
@@ -214,6 +219,7 @@ model Chapter {
 
   subject            Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   canvases           Canvas[]
+  quizzes            Quiz[]
   chapterCompletions ChapterCompletion[]
 
   @@unique([subjectId, sequence])
@@ -231,7 +237,7 @@ model ContentBlock {
 
   canvasId    Int
   sequence    Int // Global sequence across all content types
-  contentType String // "TEXT" | "VIDEO" | "FILE"
+  contentType String // "TEXT" | "VIDEO" | "FILE" | "QUESTION" (future)
 
   canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
 
@@ -239,6 +245,7 @@ model ContentBlock {
   textContent TextContent?
   video       Video?
   file        File?
+  question    Question? // Future: canvas questions
 
   @@unique([canvasId, sequence]) // Enforces global uniqueness!
   @@index([canvasId])
@@ -286,7 +293,6 @@ model Canvas {
   chapter       Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   contributor   User             @relation(fields: [contributorId], references: [id], onDelete: Cascade)
   contentBlocks ContentBlock[]
-  quizzes       Quiz[]
   votes         CanvasVote[]
   userProgress  CanvasProgress[]
   comments      Comment[]
@@ -366,99 +372,208 @@ model Quiz {
 
   title           String
   description     String?
-  instructions    String?
-  timeLimit       Int? // minutes, null = no limit
-  attemptsAllowed Int     @default(-1) // -1 = unlimited
-  passScore       Float? // 0.0 to 1.0
-  sequence        Int // Order within canvas
-  canvasId        Int
+  sequence        Int
+  status          ContentStatus @default(DRAFT)
+  rejectionReason String?
+  moderatorNotes  String?
+  isDeleted       Boolean       @default(false)
 
-  canvas    Canvas            @relation(fields: [canvasId], references: [id], onDelete: Cascade)
-  questions QuizQuestion[]
-  attempts  UserQuizAttempt[]
+  // CHANGED: chapterId instead of canvasId
+  chapterId     Int
+  contributorId String // UUID reference to User
 
-  @@unique([canvasId, sequence])
-  @@index([canvasId])
+  // Denormalized counts (like Canvas)
+  attemptCount   Int @default(0)
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+
+  chapter     Chapter       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributor User          @relation("ContributedQuizzes", fields: [contributorId], references: [id], onDelete: Cascade)
+  questions   Question[]
+  attempts    QuizAttempt[]
+  votes       QuizVote[]
+  comments    QuizComment[]
+  reports     Report[]
+
+  @@unique([chapterId, sequence])
+  @@index([chapterId, status])
+  @@index([contributorId])
+  @@index([status])
+  @@index([netScore])
   @@map("quizzes")
 }
 
-model QuizQuestion {
+model Question {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  questionText String
-  questionType QuestionType
-  points       Int          @default(1)
-  sequence     Int // question order within quiz
-  quizId       Int
+  questionText  String       @db.Text
+  questionType  QuestionType
+  sequence      Int
+  justification String?      @db.Text // Educational explanation
 
-  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  options QuizOption[]
-  answers UserAnswer[]
+  // Polymorphic ownership (quiz OR content block)
+  quizId         Int?
+  contentBlockId Int? @unique // Future: canvas questions
 
-  @@unique([quizId, sequence]) // prevent duplicate question ordering
-  @@index([quizId]) // for loading quiz questions
-  @@map("quiz_questions")
+  quiz         Quiz?            @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  contentBlock ContentBlock?    @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+  options      QuestionOption[]
+  answers      QuestionAnswer[]
+
+  @@unique([quizId, sequence])
+  @@index([quizId])
+  @@index([contentBlockId])
+  @@map("questions")
 }
 
-model QuizOption {
+model QuestionOption {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   optionText String
   isCorrect  Boolean @default(false)
-  sequence   Int // option order within question
+  sequence   Int // Order matters
+
+  questionId        Int
+  question          Question                 @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedInAnswers SelectedQuestionOption[]
+
+  @@unique([questionId, sequence])
+  @@index([questionId])
+  @@map("question_options")
+}
+
+model QuizAttempt {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  score          Int // Number of correct answers
+  totalQuestions Int // Total questions in quiz
+  percentage     Float // Calculated percentage
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  userId String
+  quizId Int
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz    Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers QuestionAnswer[]
+
+  @@index([userId, quizId])
+  @@index([quizId])
+  @@map("quiz_attempts")
+}
+
+model QuestionAnswer {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  isCorrect Boolean
+
+  userId     String
   questionId Int
+  attemptId  Int // Required - this is for quiz attempts only
 
-  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  answers  UserAnswer[]
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question        Question                 @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  attempt         QuizAttempt              @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  selectedOptions SelectedQuestionOption[]
 
-  @@unique([questionId, sequence]) // prevent duplicate option ordering
-  @@index([questionId]) // for loading question options
-  @@map("quiz_options")
+  @@unique([attemptId, questionId]) // One answer per question per attempt
+  @@index([userId])
+  @@index([questionId])
+  @@index([attemptId])
+  @@map("question_answers")
 }
 
-model UserQuizAttempt {
+model SelectedQuestionOption {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  answerId Int
+  optionId Int
+
+  answer QuestionAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  option QuestionOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([answerId, optionId]) // Each option selected only once per answer
+  @@index([answerId])
+  @@index([optionId])
+  @@map("selected_question_options")
+}
+
+model QuizVote {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  score       Float? // 0.0 to 1.0, calculated after completion
-  maxScore    Int // total points possible
-  startedAt   DateTime  @default(now())
-  completedAt DateTime? // null = in progress
-  userId      String // UUID reference to User
-  quizId      Int
+  voteType VoteType
+  userId   String
+  quizId   Int
 
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  answers UserAnswer[]
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
-  @@index([userId, quizId]) // for user's attempts on specific quiz
-  @@index([quizId]) // for quiz statistics
-  @@map("user_quiz_attempts")
+  @@unique([userId, quizId])
+  @@index([quizId, voteType])
+  @@map("quiz_votes")
 }
 
-model UserAnswer {
+model QuizComment {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  selectedOptionId Int? // for multiple_choice/true_false
-  textAnswer       String? // for short_answer
-  isCorrect        Boolean? // calculated after submission
-  attemptId        Int
-  questionId       Int
+  text            String
+  isAnnouncement  Boolean   @default(false)
+  isPinned        Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  editedAt        DateTime?
+  userId          String
+  quizId          Int
+  parentCommentId Int?
 
-  attempt  UserQuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question QuizQuestion    @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  option   QuizOption?     @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+  // Denormalized counts
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
 
-  @@unique([attemptId, questionId]) // one answer per question per attempt
-  @@index([attemptId]) // for loading attempt answers
-  @@map("user_answers")
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz          Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  parentComment QuizComment?      @relation("QuizCommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       QuizComment[]     @relation("QuizCommentReplies")
+  votes         QuizCommentVote[]
+  reports       Report[]
+
+  @@index([quizId, isDeleted, createdAt])
+  @@index([parentCommentId])
+  @@index([quizId, isPinned, isAnnouncement])
+  @@index([quizId, parentCommentId, isDeleted, netScore])
+  @@map("quiz_comments")
+}
+
+model QuizCommentVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType  VoteType
+  userId    String
+  commentId Int
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment QuizComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId, voteType])
+  @@map("quiz_comment_votes")
 }
 
 // PROGRESS TRACKING
@@ -612,22 +727,26 @@ model Report {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  reason            ReportReason
-  description       String?
-  status            ReportStatus @default(PENDING)
-  resolutionNotes   String?
-  resolvedAt        DateTime?
-  reporterUserId    String // UUID reference to User
-  reportedCanvasId  Int? // One of these three must be non-null
-  reportedCommentId Int?
-  reportedUserId    String?
-  resolvedBy        String? // UUID reference to User (admin/moderator)
+  reason                ReportReason
+  description           String?
+  status                ReportStatus @default(PENDING)
+  resolutionNotes       String?
+  resolvedAt            DateTime?
+  reporterUserId        String // UUID reference to User
+  reportedCanvasId      Int? // One of these must be non-null
+  reportedCommentId     Int?
+  reportedUserId        String?
+  reportedQuizId        Int?
+  reportedQuizCommentId Int?
+  resolvedBy            String? // UUID reference to User (admin/moderator)
 
-  reporter        User     @relation("ReportedBy", fields: [reporterUserId], references: [id], onDelete: Cascade)
-  reportedCanvas  Canvas?  @relation(fields: [reportedCanvasId], references: [id], onDelete: SetNull)
-  reportedComment Comment? @relation(fields: [reportedCommentId], references: [id], onDelete: SetNull)
-  reportedUser    User?    @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
-  resolver        User?    @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
+  reporter            User         @relation("ReportedBy", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reportedCanvas      Canvas?      @relation(fields: [reportedCanvasId], references: [id], onDelete: SetNull)
+  reportedComment     Comment?     @relation(fields: [reportedCommentId], references: [id], onDelete: SetNull)
+  reportedUser        User?        @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  reportedQuiz        Quiz?        @relation(fields: [reportedQuizId], references: [id], onDelete: SetNull)
+  reportedQuizComment QuizComment? @relation(fields: [reportedQuizCommentId], references: [id], onDelete: SetNull)
+  resolver            User?        @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt]) // for moderation queue
   @@index([reporterUserId]) // for user's reports

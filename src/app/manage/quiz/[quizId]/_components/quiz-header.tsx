@@ -1,6 +1,6 @@
 "use client";
 
-import { deleteCanvas, updateCanvas } from "@/actions/canvas-manage.action";
+import { deleteQuiz, updateQuiz } from "@/actions/quiz-manage.action";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,29 +36,32 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type CanvasHeaderProps = {
-  canvas: {
+type QuizHeaderProps = {
+  quiz: {
     id: number;
     title: string;
     description: string | null;
     status: ContentStatus;
     rejectionReason?: string | null;
-    chapterId: number;
-    chapter: { subjectId: number };
+    chapter: {
+      id: number;
+      title: string;
+      subjectId: number;
+    };
   };
 };
 
-export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
+export default function QuizHeader({ quiz }: QuizHeaderProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const [title, setTitle] = useState(canvas.title);
-  const [description, setDescription] = useState(canvas.description || "");
+  const [title, setTitle] = useState(quiz.title);
+  const [description, setDescription] = useState(quiz.description || "");
 
   const getStatusBadge = () => {
-    switch (canvas.status) {
+    switch (quiz.status) {
       case "DRAFT":
         return <Badge variant="secondary">مسودة</Badge>;
       case "PENDING":
@@ -84,8 +87,8 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
     if (!title.trim()) return;
     try {
       setIsLoading(true);
-      await updateCanvas({
-        canvasId: canvas.id,
+      await updateQuiz({
+        quizId: quiz.id,
         title,
         description,
       });
@@ -100,18 +103,18 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
   };
 
   const handleCancelEdit = () => {
-    setTitle(canvas.title);
-    setDescription(canvas.description || "");
+    setTitle(quiz.title);
+    setDescription(quiz.description || "");
     setIsEditing(false);
   };
 
-  const handleDeleteCanvas = async () => {
+  const handleDeleteQuiz = async () => {
     try {
       setIsLoading(true);
-      await deleteCanvas(canvas.id);
-      toast.success("تم حذف الشرح");
+      await deleteQuiz(quiz.id);
+      toast.success("تم حذف الاختبار");
       router.push(
-        `/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}`
+        `/subjects/${quiz.chapter.subjectId}/chapters/${quiz.chapter.id}`
       );
     } catch (error) {
       toast.error("حدث خطأ أثناء الحذف");
@@ -119,8 +122,8 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
     }
   };
 
-  const previewUrl = `/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}/canvases/${canvas.id}`;
-  const isEditable = canvas.status !== "PENDING";
+  const previewUrl = `/subjects/${quiz.chapter.subjectId}/chapters/${quiz.chapter.id}/quizzes/${quiz.id}`;
+  const isEditable = quiz.status !== "PENDING";
 
   return (
     <div className="space-y-4 border-b pb-6">
@@ -135,7 +138,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   className="text-lg font-bold"
-                  placeholder="عنوان الشرح"
+                  placeholder="عنوان الاختبار"
                 />
                 <Textarea
                   value={description}
@@ -143,7 +146,6 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                   placeholder="وصف مختصر (اختياري)"
                   rows={2}
                 />
-                {/* Buttons in RTL order: Cancel then Save */}
                 <div className="flex gap-2">
                   <Button
                     size="sm"
@@ -165,7 +167,6 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
             ) : (
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Options Dropdown */}
                   {isEditable && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -190,36 +191,36 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                           onClick={() => setIsDeleteDialogOpen(true)}
                         >
                           <Trash2 className="text-destructive ml-2 h-4 w-4" />
-                          <span>حذف الشرح</span>
+                          <span>حذف الاختبار</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
 
-                  <h1 className="text-2xl font-bold">{canvas.title}</h1>
+                  <h1 className="text-2xl font-bold">{quiz.title}</h1>
 
                   {getStatusBadge()}
                 </div>
-                {canvas.description && (
+                {quiz.description && (
                   <p className="text-muted-foreground mt-1 pr-11">
-                    {canvas.description}
+                    {quiz.description}
                   </p>
                 )}
               </div>
             )}
 
-            {canvas.status === "REJECTED" && canvas.rejectionReason && (
+            {quiz.status === "REJECTED" && quiz.rejectionReason && (
               <div className="bg-destructive/15 border-destructive/30 text-destructive mt-2 flex items-start gap-2 rounded-md border p-3 text-sm">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
                   <span className="font-semibold">سبب الرفض: </span>
-                  {canvas.rejectionReason}
+                  {quiz.rejectionReason}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Preview Action Only */}
+          {/* Preview Action */}
           <div className="flex shrink-0 items-center gap-2">
             <Button variant="outline" asChild>
               <Link href={previewUrl} target="_blank">
@@ -237,15 +238,15 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>حذف الشرح نهائياً؟</AlertDialogTitle>
+            <AlertDialogTitle>حذف الاختبار نهائياً؟</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف هذا الشرح وجميع محتوياته. لا يمكن التراجع عن هذا الإجراء.
+              سيتم حذف هذا الاختبار وجميع أسئلته. لا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteCanvas}
+              onClick={handleDeleteQuiz}
               className="bg-destructive hover:bg-destructive/90"
             >
               حذف

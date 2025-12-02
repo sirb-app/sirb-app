@@ -6,7 +6,7 @@ import DashboardStats from "./_components/dashboard-stats";
 import DashboardTabs from "./_components/dashboard-tabs";
 
 async function getDashboardData(userId: string) {
-  const [contributedCanvases, enrollments, userStats] = await Promise.all([
+  const [contributedCanvases, contributedQuizzes, enrollments, userStats] = await Promise.all([
     prisma.canvas.findMany({
       where: {
         contributorId: userId,
@@ -29,6 +29,34 @@ async function getDashboardData(userId: string) {
         _count: {
           select: {
             contentBlocks: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    }),
+
+    prisma.quiz.findMany({
+      where: {
+        contributorId: userId,
+        isDeleted: false,
+      },
+      include: {
+        chapter: {
+          select: {
+            id: true,
+            title: true,
+            subject: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            questions: true,
           },
         },
       },
@@ -70,6 +98,9 @@ async function getDashboardData(userId: string) {
         _count: {
           select: {
             contributedCanvases: {
+              where: { isDeleted: false },
+            },
+            contributedQuizzes: {
               where: { isDeleted: false },
             },
             enrollments: true,
@@ -151,11 +182,21 @@ async function getDashboardData(userId: string) {
     APPROVED: contributedCanvases.filter(c => c.status === "APPROVED"),
   };
 
+  const quizzesByStatus = {
+    DRAFT: contributedQuizzes.filter(q => q.status === "DRAFT"),
+    PENDING: contributedQuizzes.filter(q => q.status === "PENDING"),
+    REJECTED: contributedQuizzes.filter(q => q.status === "REJECTED"),
+    APPROVED: contributedQuizzes.filter(q => q.status === "APPROVED"),
+  };
+
   return {
     canvasesByStatus,
+    quizzesByStatus,
     enrollments: enrollmentsWithProgress,
     stats: {
-      totalContributions: userStats?._count.contributedCanvases || 0,
+      totalContributions:
+        (userStats?._count.contributedCanvases || 0) +
+        (userStats?._count.contributedQuizzes || 0),
       totalEnrollments: userStats?._count.enrollments || 0,
       completedCanvases: userStats?._count.canvasProgress || 0,
       totalPoints: userStats?.totalPoints || 0,
@@ -185,6 +226,7 @@ export default async function DashboardPage() {
       <div className="mt-8">
         <DashboardTabs
           canvasesByStatus={dashboardData.canvasesByStatus}
+          quizzesByStatus={dashboardData.quizzesByStatus}
           enrollments={dashboardData.enrollments}
         />
       </div>

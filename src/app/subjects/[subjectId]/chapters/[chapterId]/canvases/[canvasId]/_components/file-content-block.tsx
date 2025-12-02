@@ -39,7 +39,7 @@ export default function FileContentBlock({ file }: FileContentBlockProps) {
     <div className="bg-card block rounded-lg border p-4 sm:p-6">
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         {/* File Icon */}
-        <div className="bg-primary/10 flex-shrink-0 rounded-lg p-3">
+        <div className="bg-primary/15 border-primary/30 flex-shrink-0 rounded-lg border p-3">
           <File className="text-primary h-6 w-6" />
         </div>
 
