@@ -1,68 +1,82 @@
 "use client";
 
-import { reorderBlocks } from "@/actions/canvas-manage.action";
+import { reorderQuestions } from "@/actions/quiz-question.action";
 import { Button } from "@/components/ui/button";
 import { Plus, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import AddContentModal from "./add-content-modal";
-import ContentBlockCard from "./content-block-card";
+import AddQuestionModal from "./add-question-modal";
+import QuestionCard from "./question-card";
 
-type ContentBlock = {
+type QuestionOption = {
   id: number;
   sequence: number;
-  contentType: "TEXT" | "VIDEO" | "FILE";
-  data?: any;
+  optionText: string;
+  isCorrect: boolean;
 };
 
-type ContentBlockListProps = {
-  initialBlocks: ContentBlock[];
-  canvasId: number;
+type Question = {
+  id: number;
+  sequence: number;
+  questionType: "MCQ_SINGLE" | "MCQ_MULTI" | "TRUE_FALSE";
+  questionText: string;
+  justification: string | null;
+  options: QuestionOption[];
+};
+
+type QuestionListProps = {
+  initialQuestions: Question[];
+  quizId: number;
   isReadOnly?: boolean;
 };
 
-export default function ContentBlockList({
-  initialBlocks,
-  canvasId,
+export default function QuestionList({
+  initialQuestions,
+  quizId,
   isReadOnly = false,
-}: ContentBlockListProps) {
+}: QuestionListProps) {
   const router = useRouter();
-  const [blocks, setBlocks] = useState(initialBlocks);
+  const [questions, setQuestions] = useState(initialQuestions);
   const [isReordering, setIsReordering] = useState(false);
   const [hasOrderChanges, setHasOrderChanges] = useState(false);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedBlock, setSelectedBlock] = useState<ContentBlock | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(
+    null
+  );
 
   useEffect(() => {
-    setBlocks(initialBlocks);
+    setQuestions(initialQuestions);
     setHasOrderChanges(false);
-  }, [initialBlocks]);
+  }, [initialQuestions]);
 
-  const moveBlock = (index: number, direction: "up" | "down") => {
-    const newBlocks = [...blocks];
+  const moveQuestion = (index: number, direction: "up" | "down") => {
+    const newQuestions = [...questions];
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newBlocks.length) return;
+    if (targetIndex < 0 || targetIndex >= newQuestions.length) return;
 
-    [newBlocks[index], newBlocks[targetIndex]] = [
-      newBlocks[targetIndex],
-      newBlocks[index],
+    [newQuestions[index], newQuestions[targetIndex]] = [
+      newQuestions[targetIndex],
+      newQuestions[index],
     ];
-    const resequenced = newBlocks.map((b, i) => ({ ...b, sequence: i + 1 }));
+    const resequenced = newQuestions.map((q, i) => ({
+      ...q,
+      sequence: i + 1,
+    }));
 
-    setBlocks(resequenced);
+    setQuestions(resequenced);
     setHasOrderChanges(true);
   };
 
   const handleSaveOrder = async () => {
     try {
       setIsReordering(true);
-      const updates = blocks.map(b => ({
-        blockId: b.id,
-        sequence: b.sequence,
+      const updates = questions.map(q => ({
+        questionId: q.id,
+        sequence: q.sequence,
       }));
-      await reorderBlocks({ canvasId, updates });
+      await reorderQuestions({ quizId, updates });
       toast.success("تم حفظ الترتيب");
       setHasOrderChanges(false);
       router.refresh();
@@ -73,21 +87,21 @@ export default function ContentBlockList({
     }
   };
 
-  const handleEdit = (block: ContentBlock) => {
-    setSelectedBlock(block);
+  const handleEdit = (question: Question) => {
+    setSelectedQuestion(question);
     setIsAddModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
-    setSelectedBlock(null);
+    setSelectedQuestion(null);
   };
 
   return (
     <div className="space-y-6">
       {/* Header with Add & Save Buttons */}
       <div className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 mb-6 flex items-center justify-between border-b py-4 backdrop-blur">
-        <h2 className="text-lg font-bold">محتوى الدرس</h2>
+        <h2 className="text-lg font-bold">أسئلة الاختبار</h2>
 
         {!isReadOnly && (
           <div className="flex items-center gap-2">
@@ -110,46 +124,47 @@ export default function ContentBlockList({
               className="gap-2"
             >
               <Plus className="h-4 w-4" />
-              إضافة محتوى
+              إضافة سؤال
             </Button>
           </div>
         )}
       </div>
 
-      {/* Blocks List */}
+      {/* Questions List */}
       <div className="min-h-[200px] space-y-2">
-        {blocks.length === 0 && (
+        {questions.length === 0 && (
           <div className="bg-muted/15 text-muted-foreground flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-16">
-            <p className="mb-4">لا يوجد محتوى مضاف حتى الآن</p>
+            <p className="mb-4">لا توجد أسئلة مضافة حتى الآن</p>
             {!isReadOnly && (
               <Button variant="outline" onClick={() => setIsAddModalOpen(true)}>
-                ابدأ بإضافة أول محتوى
+                ابدأ بإضافة أول سؤال
               </Button>
             )}
           </div>
         )}
 
-        {blocks.map((block, index) => (
-          <ContentBlockCard
-            key={block.id}
-            block={block}
+        {questions.map((question, index) => (
+          <QuestionCard
+            key={question.id}
+            question={question}
+            questionNumber={index + 1}
             isFirst={index === 0}
-            isLast={index === blocks.length - 1}
-            onMoveUp={() => moveBlock(index, "up")}
-            onMoveDown={() => moveBlock(index, "down")}
-            onEdit={() => handleEdit(block)}
-            canvasId={canvasId}
+            isLast={index === questions.length - 1}
+            onMoveUp={() => moveQuestion(index, "up")}
+            onMoveDown={() => moveQuestion(index, "down")}
+            onEdit={() => handleEdit(question)}
+            quizId={quizId}
             isReadOnly={isReadOnly}
           />
         ))}
       </div>
 
-      {/* Add Content Modal */}
-      <AddContentModal
+      {/* Add Question Modal */}
+      <AddQuestionModal
         isOpen={isAddModalOpen}
         onClose={handleCloseModal}
-        canvasId={canvasId}
-        initialData={selectedBlock}
+        quizId={quizId}
+        initialData={selectedQuestion}
       />
     </div>
   );

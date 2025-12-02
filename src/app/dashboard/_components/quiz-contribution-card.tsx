@@ -10,13 +10,13 @@ import {
   Clock,
   ExternalLink,
   FileEdit,
-  FileText,
+  HelpCircle,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
 
-type CanvasContributionCardProps = {
-  readonly canvas: {
+type QuizContributionCardProps = {
+  readonly quiz: {
     id: number;
     title: string;
     status: ContentStatus;
@@ -30,7 +30,7 @@ type CanvasContributionCardProps = {
       };
     };
     _count: {
-      contentBlocks: number;
+      questions: number;
     };
   };
 };
@@ -68,9 +68,9 @@ function getStatusBadge(status: ContentStatus) {
   }
 }
 
-export default function CanvasContributionCard({
-  canvas,
-}: CanvasContributionCardProps) {
+export default function QuizContributionCard({
+  quiz,
+}: QuizContributionCardProps) {
   return (
     <Card className="hover:border-primary/50 transition-colors">
       <CardContent className="p-4">
@@ -78,40 +78,40 @@ export default function CanvasContributionCard({
           {/* Header: Title + Badge */}
           <div className="flex items-start justify-between gap-2">
             <h4 className="line-clamp-2 flex-1 font-semibold leading-tight">
-              {canvas.title}
+              {quiz.title}
             </h4>
-            {getStatusBadge(canvas.status)}
+            {getStatusBadge(quiz.status)}
           </div>
 
           {/* Metadata */}
           <div className="text-muted-foreground space-y-1.5 text-sm">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 shrink-0" />
-              <span className="truncate">{canvas.chapter.subject.name}</span>
+              <span className="truncate">{quiz.chapter.subject.name}</span>
             </div>
             <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 shrink-0" />
-              <span>{canvas._count.contentBlocks} محتوى</span>
+              <HelpCircle className="h-4 w-4 shrink-0" />
+              <span>{quiz._count.questions} سؤال</span>
             </div>
             <div className="text-xs" suppressHydrationWarning>
               آخر تحديث:{" "}
-              {new Date(canvas.updatedAt).toLocaleDateString("ar-SA")}
+              {new Date(quiz.updatedAt).toLocaleDateString("ar-SA")}
             </div>
           </div>
 
           {/* Rejection Reason (if applicable) */}
-          {canvas.status === "REJECTED" && canvas.rejectionReason && (
+          {quiz.status === "REJECTED" && quiz.rejectionReason && (
             <div className="bg-destructive/15 border-destructive/30 text-destructive rounded-md border p-2.5 text-xs">
               <p className="mb-1 font-semibold">سبب الرفض:</p>
-              <p className="line-clamp-2">{canvas.rejectionReason}</p>
+              <p className="line-clamp-2">{quiz.rejectionReason}</p>
             </div>
           )}
 
-          {/* Action Button - Links to /manage/canvas/[id] */}
+          {/* Action Button - Links to /manage/quiz/[id] */}
           <Button variant="outline" size="sm" className="w-full" asChild>
-            <Link href={`/manage/canvas/${canvas.id}`}>
+            <Link href={`/manage/quiz/${quiz.id}`}>
               <ExternalLink className="ml-2 h-4 w-4" />
-              {canvas.status === "DRAFT" || canvas.status === "REJECTED"
+              {quiz.status === "DRAFT" || quiz.status === "REJECTED"
                 ? "تعديل"
                 : "عرض التفاصيل"}
             </Link>

@@ -41,7 +41,7 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
       {statCards.map((stat, index) => (
         <Card key={index}>
           <CardContent className="flex items-center gap-4 p-6">
-            <div className="bg-primary/10 text-primary rounded-lg p-3">
+            <div className="bg-primary/15 border-primary/30 text-primary rounded-lg border p-3">
               {stat.icon}
             </div>
             <div className="flex-1">

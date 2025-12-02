@@ -71,7 +71,7 @@ export default async function ModerationPage({ searchParams }: PageProps) {
     }
   }
 
-  const { pendingCanvases, reports } =
+  const { pendingCanvases, pendingQuizzes, reports } =
     await getModerationQueue(currentSubjectId);
 
   return (
@@ -80,6 +80,7 @@ export default async function ModerationPage({ searchParams }: PageProps) {
         subjects={subjects}
         currentSubjectId={currentSubjectId}
         pendingCanvases={pendingCanvases}
+        pendingQuizzes={pendingQuizzes}
         reports={reports}
       />
     </div>

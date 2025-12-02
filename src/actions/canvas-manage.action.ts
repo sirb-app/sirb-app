@@ -521,6 +521,22 @@ export async function reorderBlocks(data: z.infer<typeof ReorderBlocksSchema>) {
   await checkCanvasOwnership(validated.canvasId, session.user.id);
 
   await prisma.$transaction(async tx => {
+    // Verify all blocks belong to this canvas before reordering
+    const blockIds = validated.updates.map(u => u.blockId);
+    const blocks = await tx.contentBlock.findMany({
+      where: { id: { in: blockIds } },
+      select: { id: true, canvasId: true },
+    });
+
+    if (blocks.length !== blockIds.length) {
+      throw new Error("One or more blocks not found");
+    }
+
+    const invalidBlock = blocks.find(b => b.canvasId !== validated.canvasId);
+    if (invalidBlock) {
+      throw new Error("One or more blocks do not belong to this canvas");
+    }
+
     // Two-phase update to avoid unique constraint violations:
     // Phase 1: Move all blocks to temporary negative sequences
     for (let i = 0; i < validated.updates.length; i++) {
