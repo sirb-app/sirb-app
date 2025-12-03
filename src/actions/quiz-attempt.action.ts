@@ -212,7 +212,7 @@ export async function completeQuizAttempt(attemptId: number) {
 
   // Calculate score
   const correctCount = attempt.answers.filter(a => a.isCorrect).length;
-  const totalQuestions = attempt.quiz.questions.length;
+  const totalQuestions = attempt.totalQuestions;
   const percentage = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
 
   // Update attempt
