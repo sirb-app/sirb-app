@@ -161,13 +161,18 @@ export async function updateQuestion(data: z.infer<typeof UpdateQuestionSchema>)
       throw new Error("Question not found or does not belong to this quiz");
     }
 
-    // Update question text and justification
+    // Update question text and justification (only include provided fields)
+    const updateData: { questionText?: string; justification?: string | null } = {};
+    if (validated.questionText !== undefined) {
+      updateData.questionText = validated.questionText;
+    }
+    if (validated.justification !== undefined) {
+      updateData.justification = validated.justification;
+    }
+
     await tx.question.update({
       where: { id: validated.questionId },
-      data: {
-        questionText: validated.questionText,
-        justification: validated.justification,
-      },
+      data: updateData,
     });
 
     // If options provided, replace all options
