@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma";
 import CanvasHeader from "./canvas-header";
 import FileContentBlock from "./file-content-block";
+import QuestionContentBlock from "./question-content-block";
 import TextContentBlock from "./text-content-block";
 import VideoContentBlock from "./video-content-block";
 
@@ -21,11 +22,34 @@ type CanvasWithContent = Prisma.CanvasGetPayload<{
         contentType: true;
         textContent: true;
         video: {
-          include: {
+          select: {
+            id: true;
+            title: true;
+            description: true;
+            youtubeVideoId: true;
+            duration: true;
+            isOriginal: true;
             progress: { select: { lastPosition: true } };
           };
         };
-        file: true;
+        file: {
+          select: {
+            id: true;
+            title: true;
+            description: true;
+            url: true;
+            mimeType: true;
+            fileSize: true;
+            isOriginal: true;
+          };
+        };
+        canvasQuestion: {
+          include: {
+            options: {
+              orderBy: { sequence: "asc" };
+            };
+          };
+        };
       };
     };
   };
@@ -62,6 +86,10 @@ export default function CanvasContent({ canvas }: CanvasContentProps) {
 
           if (block.contentType === "FILE" && block.file) {
             return <FileContentBlock key={block.id} file={block.file} />;
+          }
+
+          if (block.contentType === "QUESTION" && block.canvasQuestion) {
+            return <QuestionContentBlock key={block.id} question={block.canvasQuestion} />;
           }
 
           return null;

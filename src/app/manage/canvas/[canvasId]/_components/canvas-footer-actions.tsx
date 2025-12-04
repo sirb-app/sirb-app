@@ -51,16 +51,21 @@ export default function CanvasFooterActions({
   if (status === "APPROVED") return null;
 
   return (
-    <div className="mt-12 flex justify-end border-t pt-6">
+    <div className="mt-8 flex justify-end border-t pt-4 sm:mt-12 sm:pt-6">
       {(status === "DRAFT" || status === "REJECTED") && (
         <Button
           onClick={handleSubmit}
           disabled={isLoading || !hasContent}
-          size="lg"
-          className="gap-2"
+          size="sm"
+          className="sm:size-lg w-full gap-1.5 text-xs sm:w-auto sm:gap-2 sm:text-sm"
         >
-          <Send className="h-4 w-4" />
-          {status === "REJECTED" ? "إعادة الإرسال للمراجعة" : "إرسال للمراجعة"}
+          <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">
+            {status === "REJECTED"
+              ? "إعادة الإرسال للمراجعة"
+              : "إرسال للمراجعة"}
+          </span>
+          <span className="sm:hidden">إرسال</span>
         </Button>
       )}
 
@@ -69,11 +74,12 @@ export default function CanvasFooterActions({
           variant="secondary"
           onClick={handleCancel}
           disabled={isLoading}
-          size="lg"
-          className="gap-2"
+          size="sm"
+          className="sm:size-lg w-full gap-1.5 text-xs sm:w-auto sm:gap-2 sm:text-sm"
         >
-          <Undo className="h-4 w-4" />
-          إلغاء الطلب والعودة للتعديل
+          <Undo className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">إلغاء الطلب والعودة للتعديل</span>
+          <span className="sm:hidden">إلغاء</span>
         </Button>
       )}
     </div>

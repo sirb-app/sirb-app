@@ -2,7 +2,8 @@
 
 import { reorderBlocks } from "@/actions/canvas-manage.action";
 import { Button } from "@/components/ui/button";
-import { Plus, Save } from "lucide-react";
+import { Eye, Plus, Save } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -19,12 +20,14 @@ type ContentBlock = {
 type ContentBlockListProps = {
   initialBlocks: ContentBlock[];
   canvasId: number;
+  previewUrl: string;
   isReadOnly?: boolean;
 };
 
 export default function ContentBlockList({
   initialBlocks,
   canvasId,
+  previewUrl,
   isReadOnly = false,
 }: ContentBlockListProps) {
   const router = useRouter();
@@ -86,43 +89,70 @@ export default function ContentBlockList({
   return (
     <div className="space-y-6">
       {/* Header with Add & Save Buttons */}
-      <div className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 mb-6 flex items-center justify-between border-b py-4 backdrop-blur">
-        <h2 className="text-lg font-bold">محتوى الدرس</h2>
+      <div className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 mb-4 flex flex-row items-center justify-between gap-3 border-b py-3 backdrop-blur sm:mb-6 sm:py-4">
+        <h2 className="text-base font-bold sm:text-lg">محتوى الدرس</h2>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="gap-1.5 text-xs sm:gap-2 sm:text-sm"
+          >
+            <Link href={previewUrl} target="_blank">
+              <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm">معاينة</span>
+            </Link>
+          </Button>
 
         {!isReadOnly && (
-          <div className="flex items-center gap-2">
+            <>
             {hasOrderChanges && (
               <Button
                 onClick={handleSaveOrder}
                 disabled={isReordering}
                 variant="secondary"
                 size="sm"
-                className="gap-2"
+                  className="gap-1.5 text-xs sm:gap-2 sm:text-sm"
               >
-                <Save className="h-4 w-4" />
+                  <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">
                 {isReordering ? "جاري الحفظ..." : "حفظ الترتيب الجديد"}
+                  </span>
+                  <span className="sm:hidden">
+                    {isReordering ? "جاري الحفظ..." : "حفظ"}
+                  </span>
               </Button>
             )}
 
             <Button
               onClick={() => setIsAddModalOpen(true)}
               size="sm"
-              className="gap-2"
+                className="gap-1.5 text-xs sm:gap-2 sm:text-sm"
             >
-              <Plus className="h-4 w-4" />
-              إضافة محتوى
+                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">إضافة محتوى</span>
+                <span className="sm:hidden">إضافة</span>
             </Button>
+            </>
+          )}
           </div>
-        )}
       </div>
 
       {/* Blocks List */}
-      <div className="min-h-[200px] space-y-2">
+      <div className="min-h-[200px] space-y-2 sm:space-y-3">
         {blocks.length === 0 && (
-          <div className="bg-muted/15 text-muted-foreground flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-16">
-            <p className="mb-4">لا يوجد محتوى مضاف حتى الآن</p>
+          <div className="bg-muted/15 text-muted-foreground flex flex-col items-center justify-center rounded-lg border-2 border-dashed py-12 sm:rounded-xl sm:py-16">
+            <p className="mb-3 text-sm sm:mb-4 sm:text-base">
+              لا يوجد محتوى مضاف حتى الآن
+            </p>
             {!isReadOnly && (
-              <Button variant="outline" onClick={() => setIsAddModalOpen(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddModalOpen(true)}
+                className="sm:size-default"
+              >
                 ابدأ بإضافة أول محتوى
               </Button>
             )}
