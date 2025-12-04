@@ -9,8 +9,17 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useModerationAccess } from "@/hooks/use-moderation-access";
 import { cn } from "@/lib/utils";
-import { BookOpen, LogIn, LogOut, Menu, UserPlus, Users } from "lucide-react";
+import {
+  BookOpen,
+  LogIn,
+  LogOut,
+  Menu,
+  Shield,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -34,6 +43,7 @@ export const NavigationMobile = ({
 }: NavigationMobileProps) => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const activePathname = usePathname();
+  const hasModerationAccess = useModerationAccess(user);
 
   return (
     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -111,6 +121,16 @@ export const NavigationMobile = ({
                     <BookOpen className="h-4 w-4" />
                     <span>مقرراتي</span>
                   </Link>
+                  {hasModerationAccess && (
+                    <Link
+                      href="/moderation"
+                      onClick={() => setIsSheetOpen(false)}
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+                    >
+                      <Shield className="h-4 w-4" />
+                      <span>الإشراف</span>
+                    </Link>
+                  )}
                   <Link
                     href="/profile"
                     onClick={() => setIsSheetOpen(false)}

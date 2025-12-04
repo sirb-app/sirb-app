@@ -189,14 +189,18 @@ export async function completeQuizAttempt(attemptId: number) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
-  // Get attempt with answers
+  // Get attempt with answers only (no need to load full quiz with questions)
   const attempt = await prisma.quizAttempt.findUnique({
     where: { id: attemptId },
-    include: {
-      answers: true,
-      quiz: {
-        include: {
-          questions: true,
+    select: {
+      id: true,
+      userId: true,
+      quizId: true,
+      totalQuestions: true,
+      completedAt: true,
+      answers: {
+        select: {
+          isCorrect: true,
         },
       },
     },
@@ -215,7 +219,7 @@ export async function completeQuizAttempt(attemptId: number) {
   const totalQuestions = attempt.totalQuestions;
   const percentage = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
 
-  // Update attempt
+  // Update attempt and increment quiz attempt count in a single transaction
   await prisma.$transaction(async tx => {
     await tx.quizAttempt.update({
       where: { id: attemptId },
@@ -227,7 +231,7 @@ export async function completeQuizAttempt(attemptId: number) {
       },
     });
 
-    // Increment attempt count on quiz
+    // Increment attempt count on quiz (optimized - no need to fetch quiz data)
     await tx.quiz.update({
       where: { id: attempt.quizId },
       data: {

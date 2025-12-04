@@ -67,7 +67,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
         );
       case "APPROVED":
         return (
-          <Badge className="border-success/30 bg-success/20 hover:bg-success/30">
+          <Badge className="border-success/30 bg-success/20 hover:bg-success/30 text-success">
             منشور
           </Badge>
         );

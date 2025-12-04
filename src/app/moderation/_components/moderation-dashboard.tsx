@@ -300,7 +300,7 @@ export default function ModerationDashboard({
                           <Button
                             variant="default"
                             size="sm"
-                            className="w-full sm:w-auto"
+                            className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
                             onClick={() => handleApproveCanvas(canvas.id)}
                           >
                             <Check className="ml-2 h-4 w-4" />
@@ -371,7 +371,7 @@ export default function ModerationDashboard({
                           <Button
                             variant="default"
                             size="sm"
-                            className="w-full sm:w-auto"
+                            className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
                             onClick={() => handleApproveQuiz(quiz.id)}
                           >
                             <Check className="ml-2 h-4 w-4" />

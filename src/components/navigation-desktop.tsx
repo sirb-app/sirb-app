@@ -9,8 +9,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useModerationAccess } from "@/hooks/use-moderation-access";
 import { cn } from "@/lib/utils";
-import { BookOpen, ChevronDown, LogOut, Users } from "lucide-react";
+import { BookOpen, ChevronDown, LogOut, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ModeToggle } from "./mode-toggle";
@@ -52,6 +53,8 @@ export const NavigationDesktopAuth = ({
   user,
   isPending,
 }: NavigationDesktopAuthProps) => {
+  const hasModerationAccess = useModerationAccess(user);
+
   return (
     <div className="hidden items-center gap-3 md:flex">
       <ModeToggle />
@@ -86,6 +89,17 @@ export const NavigationDesktopAuth = ({
                 <span>مقرراتي</span>
               </Link>
             </DropdownMenuItem>
+            {hasModerationAccess && (
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/moderation"
+                  className="flex flex-row-reverse items-center gap-2"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span>الإشراف</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem asChild>
               <Link
                 href="/profile"

@@ -13,7 +13,7 @@ import ContentBlockCard from "./content-block-card";
 type ContentBlock = {
   id: number;
   sequence: number;
-  contentType: "TEXT" | "VIDEO" | "FILE";
+  contentType: "TEXT" | "VIDEO" | "FILE" | "QUESTION";
   data?: any;
 };
 
@@ -105,38 +105,38 @@ export default function ContentBlockList({
             </Link>
           </Button>
 
-        {!isReadOnly && (
+          {!isReadOnly && (
             <>
-            {hasOrderChanges && (
-              <Button
-                onClick={handleSaveOrder}
-                disabled={isReordering}
-                variant="secondary"
-                size="sm"
+              {hasOrderChanges && (
+                <Button
+                  onClick={handleSaveOrder}
+                  disabled={isReordering}
+                  variant="secondary"
+                  size="sm"
                   className="gap-1.5 text-xs sm:gap-2 sm:text-sm"
-              >
+                >
                   <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">
-                {isReordering ? "جاري الحفظ..." : "حفظ الترتيب الجديد"}
+                    {isReordering ? "جاري الحفظ..." : "حفظ الترتيب الجديد"}
                   </span>
                   <span className="sm:hidden">
                     {isReordering ? "جاري الحفظ..." : "حفظ"}
                   </span>
-              </Button>
-            )}
+                </Button>
+              )}
 
-            <Button
-              onClick={() => setIsAddModalOpen(true)}
-              size="sm"
+              <Button
+                onClick={() => setIsAddModalOpen(true)}
+                size="sm"
                 className="gap-1.5 text-xs sm:gap-2 sm:text-sm"
-            >
+              >
                 <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">إضافة محتوى</span>
                 <span className="sm:hidden">إضافة</span>
-            </Button>
+              </Button>
             </>
           )}
-          </div>
+        </div>
       </div>
 
       {/* Blocks List */}

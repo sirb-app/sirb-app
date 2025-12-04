@@ -11,8 +11,6 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { QuestionType } from "@/generated/prisma";
@@ -125,7 +123,8 @@ export default function QuizInterface({
       setHasStarted(true);
       toast.success("بدأ الاختبار");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "فشل بدء الاختبار";
+      const errorMessage =
+        error instanceof Error ? error.message : "فشل بدء الاختبار";
       toast.error(errorMessage);
     }
   };
@@ -160,7 +159,8 @@ export default function QuizInterface({
       questionId: currentQuestion.id,
       selectedOptionIds,
     }).catch(error => {
-      const errorMessage = error instanceof Error ? error.message : "فشل حفظ الإجابة";
+      const errorMessage =
+        error instanceof Error ? error.message : "فشل حفظ الإجابة";
       toast.error(errorMessage);
     });
   };
@@ -170,7 +170,9 @@ export default function QuizInterface({
 
     // Check if all questions are answered
     if (answeredCount < totalQuestions) {
-      toast.error(`يرجى الإجابة على جميع الأسئلة (${answeredCount}/${totalQuestions})`);
+      toast.error(
+        `يرجى الإجابة على جميع الأسئلة (${answeredCount}/${totalQuestions})`
+      );
       return;
     }
 
@@ -182,7 +184,8 @@ export default function QuizInterface({
         `/subjects/${subjectId}/chapters/${chapterId}/quizzes/${quiz.id}/summary?attemptId=${attemptId}`
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "فشل إنهاء الاختبار";
+      const errorMessage =
+        error instanceof Error ? error.message : "فشل إنهاء الاختبار";
       toast.error(errorMessage);
       setIsSubmitting(false);
     }
@@ -224,10 +227,13 @@ export default function QuizInterface({
               {bestAttempt && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">أفضل نتيجة:</span>
-                  <span className="flex items-center gap-2 font-bold text-success">
+                  <span className="text-success flex items-center gap-2 font-bold">
                     <Trophy className="h-4 w-4" />
                     {bestAttempt.score}/{bestAttempt.totalQuestions} (
-                    {Math.round((bestAttempt.score / bestAttempt.totalQuestions) * 100)}%)
+                    {Math.round(
+                      (bestAttempt.score / bestAttempt.totalQuestions) * 100
+                    )}
+                    %)
                   </span>
                 </div>
               )}
@@ -238,7 +244,9 @@ export default function QuizInterface({
                 <li>• يمكنك التنقل بين الأسئلة بحرية</li>
                 <li>• لا يمكن تغيير الإجابة بعد اختيارها</li>
                 <li>• سيتم عرض النتيجة والتوضيح فوراً بعد الإجابة</li>
-                <li>• استخدم زر &quot;التالي&quot; للانتقال إلى السؤال التالي</li>
+                <li>
+                  • استخدم زر &quot;التالي&quot; للانتقال إلى السؤال التالي
+                </li>
                 <li>• يمكنك إعادة المحاولة بدون حد</li>
               </ul>
             </div>
@@ -278,7 +286,7 @@ export default function QuizInterface({
               <span className="sr-only">السابق</span>
             </Button>
 
-            <CarouselContent className="py-2 px-4">
+            <CarouselContent className="px-4 py-2">
               {quiz.questions.map((q, index) => {
                 const answer = answers.get(q.id);
                 const isAnswered = !!answer;
@@ -336,14 +344,16 @@ export default function QuizInterface({
         <Button
           variant="destructive"
           onClick={handleCompleteQuiz}
-          disabled={answeredCount < totalQuestions}
+          disabled={answeredCount < totalQuestions || isSubmitting}
           size="lg"
           className="w-full sm:w-auto"
         >
           <Check className="ml-2 h-5 w-5" />
-          إنهاء الاختبار وعرض الملخص
-          {answeredCount < totalQuestions && (
-            <span className="mr-2">({answeredCount}/{totalQuestions})</span>
+          {isSubmitting ? "جاري الإنهاء..." : "إنهاء الاختبار وعرض الملخص"}
+          {answeredCount < totalQuestions && !isSubmitting && (
+            <span className="mr-2">
+              ({answeredCount}/{totalQuestions})
+            </span>
           )}
         </Button>
       </div>

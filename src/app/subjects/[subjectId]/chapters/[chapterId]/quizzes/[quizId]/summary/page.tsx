@@ -176,7 +176,7 @@ export default async function QuizSummaryPage({
                           السؤال {index + 1}
                         </span>
                         {isCorrect ? (
-                          <Badge className="bg-success text-success-foreground">
+                          <Badge className="bg-success text-success">
                             <Check className="ml-1 h-3 w-3" />
                             صحيحة
                           </Badge>
