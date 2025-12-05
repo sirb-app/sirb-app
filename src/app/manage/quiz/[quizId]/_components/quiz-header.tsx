@@ -72,7 +72,7 @@ export default function QuizHeader({ quiz }: QuizHeaderProps) {
         );
       case "APPROVED":
         return (
-          <Badge className="border-success/30 bg-success/20 hover:bg-success/30">
+          <Badge className="border-success/30 bg-success/20 hover:bg-success/30 text-success">
             منشور
           </Badge>
         );

@@ -159,7 +159,7 @@ function QuizCard({
                   className={cn(
                     "absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-sm",
                     scorePercentage >= 90
-                      ? "bg-success/90 text-success-foreground"
+                      ? "bg-success/90 text-success"
                       : scorePercentage >= 70
                         ? "bg-accent/90 text-accent-foreground"
                         : "bg-destructive/90 text-destructive-foreground"

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 type QuizFooterActionsProps = {
   quizId: number;
   chapterId: number;
+  subjectId: number;
   status: ContentStatus;
   hasQuestions: boolean;
 };
@@ -19,6 +20,7 @@ type QuizFooterActionsProps = {
 export default function QuizFooterActions({
   quizId,
   chapterId,
+  subjectId,
   status,
   hasQuestions,
 }: QuizFooterActionsProps) {
@@ -55,8 +57,8 @@ export default function QuizFooterActions({
     return (
       <div className="mt-12 flex justify-center border-t pt-6">
         <Button variant="outline" asChild>
-          <Link href={`/manage/chapter/${chapterId}`}>
-            العودة إلى إدارة الفصل
+          <Link href={`/subjects/${subjectId}/chapters/${chapterId}`}>
+            العودة إلى الفصل
           </Link>
         </Button>
       </div>

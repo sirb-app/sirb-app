@@ -169,7 +169,7 @@ function CanvasCard({
       >
         <Card
           className={cn(
-            "hover:border-primary/50 h-full gap-0 p-0 transition-all hover:shadow-md",
+            "hover:border-primary/50 flex h-full flex-col gap-0 p-0 transition-all hover:shadow-md",
             !isAuthenticated && "opacity-75"
           )}
         >

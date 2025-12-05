@@ -93,6 +93,7 @@ export default async function QuizManagePage({ params }: PageProps) {
       <QuizFooterActions
         quizId={quiz.id}
         chapterId={quiz.chapter.id}
+        subjectId={quiz.chapter.subjectId}
         status={quiz.status}
         hasQuestions={quiz.questions.length > 0}
       />

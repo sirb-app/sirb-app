@@ -1,5 +1,6 @@
 import CanvasListSkeleton from "@/components/canvas-list-skeleton";
 import ChapterInfoSkeleton from "@/components/chapter-info-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
@@ -9,10 +10,19 @@ export default function Loading() {
         <ChapterInfoSkeleton />
       </section>
 
-      {/* Canvas Grid Below */}
-      <section aria-label="قائمة المحتويات">
-        <CanvasListSkeleton />
-      </section>
+      {/* Tabs */}
+      <div className="mt-8 space-y-6">
+        {/* Tabs List */}
+        <div className="flex w-full items-center gap-1 rounded-lg bg-muted p-1">
+          <Skeleton className="h-8 flex-1 bg-background" />
+          <Skeleton className="h-8 flex-1 bg-transparent" />
+        </div>
+
+        {/* Tab Content */}
+        <section aria-label="قائمة المحتويات">
+          <CanvasListSkeleton />
+        </section>
+      </div>
     </div>
   );
 }
