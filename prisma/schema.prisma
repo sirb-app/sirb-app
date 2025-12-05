@@ -237,15 +237,15 @@ model ContentBlock {
 
   canvasId    Int
   sequence    Int // Global sequence across all content types
-  contentType String // "TEXT" | "VIDEO" | "FILE" | "QUESTION" (future)
+  contentType String // "TEXT" | "VIDEO" | "FILE" | "QUESTION"
 
   canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
 
   // One-to-one relations (content owns the block)
-  textContent TextContent?
-  video       Video?
-  file        File?
-  question    Question? // Future: canvas questions
+  textContent    TextContent?
+  video          Video?
+  file           File?
+  canvasQuestion CanvasQuestion? // Canvas questions (decoupled from quiz questions)
 
   @@unique([canvasId, sequence]) // Enforces global uniqueness!
   @@index([canvasId])
@@ -346,6 +346,42 @@ model File {
   @@map("files")
 }
 
+// Canvas questions - standalone interactive questions (decoupled from quiz questions)
+model CanvasQuestion {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questionText  String       @db.Text
+  questionType  QuestionType // MCQ_SINGLE, MCQ_MULTI, TRUE_FALSE
+  justification String?      @db.Text // Explanation shown after answering
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int                     @unique
+  contentBlock   ContentBlock            @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+  options        CanvasQuestionOption[]
+
+  @@index([contentBlockId])
+  @@map("canvas_questions")
+}
+
+model CanvasQuestionOption {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  optionText String
+  isCorrect  Boolean @default(false)
+  sequence   Int // Order of options (1-4 for MCQ)
+
+  questionId Int
+  question   CanvasQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, sequence])
+  @@index([questionId])
+  @@map("canvas_question_options")
+}
+
 model CanvasVote {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
@@ -414,18 +450,14 @@ model Question {
   sequence      Int
   justification String?      @db.Text // Educational explanation
 
-  // Polymorphic ownership (quiz OR content block)
-  quizId         Int?
-  contentBlockId Int? @unique // Future: canvas questions
+  quizId Int
 
-  quiz         Quiz?            @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  contentBlock ContentBlock?    @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
-  options      QuestionOption[]
-  answers      QuestionAnswer[]
+  quiz    Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options QuestionOption[]
+  answers QuestionAnswer[]
 
   @@unique([quizId, sequence])
   @@index([quizId])
-  @@index([contentBlockId])
   @@map("questions")
 }
 

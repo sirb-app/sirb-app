@@ -23,6 +23,13 @@ async function getCanvasDetails(canvasId: number, userId: string) {
           textContent: true,
           video: true,
           file: true,
+          canvasQuestion: {
+            include: {
+              options: {
+                orderBy: { sequence: "asc" },
+              },
+            },
+          },
         },
       },
       chapter: {
@@ -54,6 +61,8 @@ async function getCanvasDetails(canvasId: number, userId: string) {
       data = block.video;
     } else if (block.contentType === "FILE" && block.file) {
       data = block.file;
+    } else if (block.contentType === "QUESTION" && block.canvasQuestion) {
+      data = block.canvasQuestion;
     }
     return { ...block, data };
   });
@@ -90,13 +99,14 @@ export default async function CanvasManagePage({ params }: PageProps) {
   const isReadOnly = canvas.status === ContentStatus.PENDING;
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
+    <div className="container mx-auto max-w-4xl px-3 py-4 sm:px-4 sm:py-6 md:py-8">
       <CanvasHeader canvas={canvas} />
 
-      <div className="mt-8">
+      <div className="mt-4 sm:mt-6 md:mt-8">
         <ContentBlockList
           initialBlocks={canvas.contentBlocks as any}
           canvasId={canvas.id}
+          previewUrl={`/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}/canvases/${canvas.id}`}
           isReadOnly={isReadOnly}
         />
       </div>

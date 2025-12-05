@@ -25,13 +25,11 @@ import { ContentStatus } from "@/generated/prisma";
 import {
   AlertCircle,
   Check,
-  Eye,
   MoreVertical,
   Pencil,
   Trash2,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -69,7 +67,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
         );
       case "APPROVED":
         return (
-          <Badge className="border-success/30 bg-success/20 hover:bg-success/30">
+          <Badge className="border-success/30 bg-success/20 hover:bg-success/30 text-success">
             منشور
           </Badge>
         );
@@ -119,14 +117,13 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
     }
   };
 
-  const previewUrl = `/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}/canvases/${canvas.id}`;
   const isEditable = canvas.status !== "PENDING";
 
   return (
-    <div className="space-y-4 border-b pb-6">
-      <div className="flex flex-col gap-6">
+    <div className="space-y-3 border-b pb-4 sm:space-y-4 sm:pb-6">
+      <div className="flex flex-col gap-4 sm:gap-6">
         {/* Top Bar: Title/Badge & Actions */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
           {/* Title Section */}
           <div className="flex-1 space-y-2">
             {isEditing ? (
@@ -196,12 +193,14 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                     </DropdownMenu>
                   )}
 
-                  <h1 className="text-2xl font-bold">{canvas.title}</h1>
+                  <h1 className="text-xl font-bold sm:text-2xl">
+                    {canvas.title}
+                  </h1>
 
                   {getStatusBadge()}
                 </div>
                 {canvas.description && (
-                  <p className="text-muted-foreground mt-1 pr-11">
+                  <p className="text-muted-foreground mt-1 text-sm sm:pr-11 sm:text-base">
                     {canvas.description}
                   </p>
                 )}
@@ -217,16 +216,6 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Preview Action Only */}
-          <div className="flex shrink-0 items-center gap-2">
-            <Button variant="outline" asChild>
-              <Link href={previewUrl} target="_blank">
-                <Eye className="mr-2 h-4 w-4" />
-                معاينة
-              </Link>
-            </Button>
           </div>
         </div>
       </div>

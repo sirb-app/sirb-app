@@ -46,14 +46,14 @@ function getStatusBadge(status: ContentStatus) {
       );
     case "PENDING":
       return (
-        <Badge className="border-accent/30 bg-accent/20 hover:bg-accent/30 gap-1">
+        <Badge className="border-accent/30 bg-accent/20 hover:bg-accent/30 text-foreground gap-1">
           <Clock className="h-3 w-3" />
           قيد المراجعة
         </Badge>
       );
     case "APPROVED":
       return (
-        <Badge className="border-success/30 bg-success/20 hover:bg-success/30 gap-1">
+        <Badge className="border-success/30 bg-success/20 hover:bg-success/30 text-success gap-1">
           <Check className="h-3 w-3" />
           منشور
         </Badge>
@@ -77,7 +77,7 @@ export default function QuizContributionCard({
         <div className="space-y-3">
           {/* Header: Title + Badge */}
           <div className="flex items-start justify-between gap-2">
-            <h4 className="line-clamp-2 flex-1 font-semibold leading-tight">
+            <h4 className="line-clamp-2 flex-1 leading-tight font-semibold">
               {quiz.title}
             </h4>
             {getStatusBadge(quiz.status)}
@@ -94,8 +94,7 @@ export default function QuizContributionCard({
               <span>{quiz._count.questions} سؤال</span>
             </div>
             <div className="text-xs" suppressHydrationWarning>
-              آخر تحديث:{" "}
-              {new Date(quiz.updatedAt).toLocaleDateString("ar-SA")}
+              آخر تحديث: {new Date(quiz.updatedAt).toLocaleDateString("ar-SA")}
             </div>
           </div>
 

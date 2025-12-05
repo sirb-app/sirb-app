@@ -23,7 +23,10 @@ const uploadRequestSchema = z.object({
   contentType: z
     .string()
     .refine(
-      (type) => ALLOWED_MIME_TYPES.includes(type as (typeof ALLOWED_MIME_TYPES)[number]),
+      type =>
+        ALLOWED_MIME_TYPES.includes(
+          type as (typeof ALLOWED_MIME_TYPES)[number]
+        ),
       { message: "File type not allowed" }
     ),
   size: z.number().max(MAX_FILE_SIZE, "File size must be less than 10MB"),

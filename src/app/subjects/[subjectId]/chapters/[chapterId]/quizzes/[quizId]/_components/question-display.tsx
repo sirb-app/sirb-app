@@ -134,7 +134,7 @@ export default function QuestionDisplay({
                 // Determine styling based on state
                 let styling = "";
                 if (isAnswered) {
-                  // After answering: show correct answers in green, wrong selections in red
+                  // After answering: show correct answers in success color, wrong selections in red
                   if (isCorrectAnswer) {
                     styling = "border-success bg-success/15";
                   } else if (isSelected) {
@@ -182,7 +182,7 @@ export default function QuestionDisplay({
                 // Determine styling based on state
                 let styling = "";
                 if (isAnswered) {
-                  // After answering: show correct answers in green, wrong selections in red
+                  // After answering: show correct answers in success color, wrong selections in red
                   if (isCorrectAnswer) {
                     styling = "border-success bg-success/15";
                   } else if (isSelected) {
