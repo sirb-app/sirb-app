@@ -3,6 +3,8 @@
 import {
   createSubjectResource,
   deleteSubjectResource,
+  deleteTopicsForResource,
+  extractTopicsForResource,
   generateUploadUrl,
   getResourceStatus,
   triggerResourceIndexing,
@@ -26,6 +28,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -41,9 +49,13 @@ import {
   AlertCircle,
   Bot,
   CheckCircle2,
+  ChevronDown,
   Clock,
   FileText,
+  Lightbulb,
+  LightbulbOff,
   Loader2,
+  RefreshCw,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -61,8 +73,11 @@ interface SubjectResourceItem {
   createdAt: Date;
   isIndexed: boolean;
   ragStatus: RagStatus | null;
+  topicsExtracted: boolean;
   chapterId: number | null;
   chapter: { id: number; title: string; sequence: number } | null;
+  chunksCount?: number | null;
+  topicsCount?: number | null;
 }
 
 interface ChapterOption {
@@ -117,6 +132,10 @@ export function DocumentsManager({
     null
   );
   const [indexingIds, setIndexingIds] = useState<Set<number>>(new Set());
+  const [extractingIds, setExtractingIds] = useState<Set<number>>(new Set());
+  const [deletingTopicsIds, setDeletingTopicsIds] = useState<Set<number>>(
+    new Set()
+  );
   const pollingRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(
     new Map()
   );
@@ -156,10 +175,14 @@ export function DocumentsManager({
       return;
     }
 
-    const { isIndexed, ragStatus } = result.data;
+    const { isIndexed, ragStatus, chunksCount, topicsCount } = result.data;
 
     setResources(prev =>
-      prev.map(r => (r.id === resourceId ? { ...r, isIndexed, ragStatus } : r))
+      prev.map(r =>
+        r.id === resourceId
+          ? { ...r, isIndexed, ragStatus, chunksCount, topicsCount }
+          : r
+      )
     );
 
     if (ragStatus === "PENDING" || ragStatus === "PROCESSING") {
@@ -285,7 +308,10 @@ export function DocumentsManager({
     }
   };
 
-  const handleTriggerIndexing = async (resource: SubjectResourceItem) => {
+  const handleTriggerIndexing = async (
+    resource: SubjectResourceItem,
+    extractTopics: boolean = true
+  ) => {
     if (resource.mimeType !== "application/pdf") {
       toast.error("الفهرسة مدعومة لملفات PDF فقط");
       return;
@@ -294,7 +320,7 @@ export function DocumentsManager({
     setIndexingIds(prev => new Set(prev).add(resource.id));
 
     startTransition(async () => {
-      const result = await triggerResourceIndexing(resource.id);
+      const result = await triggerResourceIndexing(resource.id, extractTopics);
 
       if (result.error) {
         toast.error(result.error);
@@ -313,6 +339,89 @@ export function DocumentsManager({
       );
 
       startPolling(resource.id);
+    });
+  };
+
+  const handleExtractTopics = async (
+    resource: SubjectResourceItem,
+    force: boolean = false
+  ) => {
+    setExtractingIds(prev => new Set(prev).add(resource.id));
+
+    startTransition(async () => {
+      const result = await extractTopicsForResource(resource.id, force);
+
+      setExtractingIds(prev => {
+        const next = new Set(prev);
+        next.delete(resource.id);
+        return next;
+      });
+
+      if (result.error || !result.data) {
+        toast.error(result.error ?? "فشل استخراج المواضيع");
+        return;
+      }
+
+      const { topicsExtracted, linksCreated } = result.data;
+      toast.success(
+        `تم استخراج ${topicsExtracted} موضوع و ${linksCreated} رابط`
+      );
+
+      const statusResult = await getResourceStatus(resource.id);
+      if (statusResult.data) {
+        setResources(prev =>
+          prev.map(r =>
+            r.id === resource.id
+              ? {
+                  ...r,
+                  topicsExtracted: true,
+                  chunksCount: statusResult.data.chunksCount,
+                  topicsCount: statusResult.data.topicsCount,
+                }
+              : r
+          )
+        );
+      } else {
+        // Even without status data, update topicsExtracted
+        setResources(prev =>
+          prev.map(r =>
+            r.id === resource.id ? { ...r, topicsExtracted: true } : r
+          )
+        );
+      }
+    });
+  };
+
+  const handleDeleteTopics = async (resource: SubjectResourceItem) => {
+    setDeletingTopicsIds(prev => new Set(prev).add(resource.id));
+
+    startTransition(async () => {
+      const result = await deleteTopicsForResource(resource.id);
+
+      setDeletingTopicsIds(prev => {
+        const next = new Set(prev);
+        next.delete(resource.id);
+        return next;
+      });
+
+      if (result.error || !result.data) {
+        toast.error(result.error ?? "فشل حذف المواضيع");
+        return;
+      }
+
+      const { linksDeleted, orphansDeleted } = result.data;
+      toast.success(
+        `تم حذف ${linksDeleted} رابط و ${orphansDeleted} موضوع يتيم`
+      );
+
+      // Update local state
+      setResources(prev =>
+        prev.map(r =>
+          r.id === resource.id
+            ? { ...r, topicsExtracted: false, topicsCount: 0 }
+            : r
+        )
+      );
     });
   };
 
@@ -386,6 +495,25 @@ export function DocumentsManager({
       resource.ragStatus !== "PENDING" &&
       resource.ragStatus !== "PROCESSING" &&
       !indexingIds.has(resource.id)
+    );
+  };
+
+  const canExtractTopics = (resource: SubjectResourceItem) => {
+    return (
+      resource.isIndexed &&
+      !extractingIds.has(resource.id) &&
+      !indexingIds.has(resource.id) &&
+      !deletingTopicsIds.has(resource.id)
+    );
+  };
+
+  const canDeleteTopics = (resource: SubjectResourceItem) => {
+    return (
+      resource.isIndexed &&
+      resource.topicsExtracted &&
+      !extractingIds.has(resource.id) &&
+      !indexingIds.has(resource.id) &&
+      !deletingTopicsIds.has(resource.id)
     );
   };
 
@@ -574,18 +702,102 @@ export function DocumentsManager({
                       <span dir="ltr">{formatFileSize(resource.fileSize)}</span>
                       <span dir="ltr">{resource.mimeType}</span>
                       <span>{formatDate(resource.createdAt)}</span>
+                      {resource.isIndexed && resource.chunksCount != null && (
+                        <span>{resource.chunksCount} قطعة</span>
+                      )}
+                      {resource.isIndexed && resource.topicsCount != null && (
+                        <span className="flex items-center gap-1">
+                          <Lightbulb className="h-3 w-3" />
+                          {resource.topicsCount} موضوع
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       {canTriggerIndexing(resource) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isPending}
+                            >
+                              <Bot className="ml-1.5 h-3.5 w-3.5" />
+                              تفعيل البحث الذكي
+                              <ChevronDown className="mr-1 h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleTriggerIndexing(resource, true)
+                              }
+                            >
+                              <Lightbulb className="ml-2 h-4 w-4" />
+                              فهرسة مع استخراج المواضيع
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleTriggerIndexing(resource, false)
+                              }
+                            >
+                              <FileText className="ml-2 h-4 w-4" />
+                              فهرسة بدون مواضيع
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                      {canExtractTopics(resource) && (
+                        <>
+                          {!resource.topicsExtracted ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleExtractTopics(resource)}
+                              disabled={isPending}
+                            >
+                              <Lightbulb className="ml-1.5 h-3.5 w-3.5" />
+                              استخراج المواضيع
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleExtractTopics(resource, true)
+                              }
+                              disabled={isPending}
+                              title="إعادة استخراج المواضيع"
+                            >
+                              <RefreshCw className="ml-1.5 h-3.5 w-3.5" />
+                              إعادة الاستخراج
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {canDeleteTopics(resource) && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleTriggerIndexing(resource)}
+                          onClick={() => handleDeleteTopics(resource)}
                           disabled={isPending}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="حذف المواضيع المستخرجة"
                         >
-                          <Bot className="ml-1.5 h-3.5 w-3.5" />
-                          تفعيل البحث الذكي
+                          <LightbulbOff className="ml-1.5 h-3.5 w-3.5" />
+                          حذف المواضيع
                         </Button>
+                      )}
+                      {deletingTopicsIds.has(resource.id) && (
+                        <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          جاري حذف المواضيع...
+                        </span>
+                      )}
+                      {extractingIds.has(resource.id) && (
+                        <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          جاري استخراج المواضيع...
+                        </span>
                       )}
                       {indexingIds.has(resource.id) && (
                         <span className="text-muted-foreground flex items-center gap-1.5 text-xs">

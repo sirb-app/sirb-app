@@ -681,8 +681,9 @@ model SubjectResource {
   subjectId Int
   chapterId Int?
 
-  isIndexed Boolean    @default(false)
-  ragStatus RagStatus?
+  isIndexed       Boolean    @default(false)
+  ragStatus       RagStatus?
+  topicsExtracted Boolean    @default(false)
 
   subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   chapter Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)

@@ -127,7 +127,10 @@ export async function createSubjectResource(input: {
   }
 }
 
-export async function triggerResourceIndexing(resourceId: number) {
+export async function triggerResourceIndexing(
+  resourceId: number,
+  extractTopics: boolean = true
+) {
   try {
     const session = await requireAdmin();
 
@@ -185,6 +188,7 @@ export async function triggerResourceIndexing(resourceId: number) {
         },
         body: JSON.stringify({
           resource_id: resource.id,
+          extract_topics: extractTopics,
         }),
         signal: controller.signal,
       });
@@ -194,20 +198,24 @@ export async function triggerResourceIndexing(resourceId: number) {
       const body = await response.json().catch(() => null);
 
       if (!response.ok) {
-        await prisma.subjectResource.update({
-          where: { id: validated },
-          data: { ragStatus: RagStatus.FAILED },
-        });
+        await prisma.subjectResource
+          .update({
+            where: { id: validated },
+            data: { ragStatus: RagStatus.FAILED },
+          })
+          .catch(() => {});
         return {
           error: body?.detail ?? "فشل بدء عملية الفهرسة",
           status: response.status,
         } as const;
       }
 
-      await prisma.subjectResource.update({
-        where: { id: validated },
-        data: { ragStatus: RagStatus.PENDING },
-      });
+      await prisma.subjectResource
+        .update({
+          where: { id: validated },
+          data: { ragStatus: RagStatus.PENDING },
+        })
+        .catch(() => {});
 
       return {
         error: null,
@@ -416,12 +424,245 @@ export async function getResourceStatus(resourceId: number) {
         id: validated,
         isIndexed: data.is_indexed,
         ragStatus: data.status === "NOT_STARTED" ? null : data.status,
+        chunksCount: data.chunks_count ?? null,
+        topicsCount: data.topics_count ?? null,
       },
     } as const;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { error: "معرف مورد غير صالح" } as const;
     }
+    if (error instanceof Error) {
+      return { error: error.message } as const;
+    }
+    return { error: "حدث خطأ غير متوقع" } as const;
+  }
+}
+
+export async function extractTopicsForResource(
+  resourceId: number,
+  force: boolean = false
+) {
+  try {
+    const session = await requireAdmin();
+
+    const validated = resourceIdSchema.parse(resourceId);
+
+    const resource = await prisma.subjectResource.findUnique({
+      where: { id: validated },
+      select: { id: true, isIndexed: true },
+    });
+
+    if (!resource) {
+      return { error: "المورد غير موجود" } as const;
+    }
+
+    if (!resource.isIndexed) {
+      return { error: "يجب فهرسة المورد أولاً" } as const;
+    }
+
+    const baseUrl = process.env.FASTAPI_BASE_URL;
+    const apiKey = process.env.INTERNAL_API_KEY;
+
+    if (!baseUrl || !apiKey) {
+      return { error: "خادم الفهرسة غير مهيأ" } as const;
+    }
+
+    const topicsUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest/${validated}/topics`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    try {
+      const response = await fetch(topicsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": apiKey,
+          "X-User-ID": session.user.id,
+        },
+        body: JSON.stringify({ force }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const body = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        return {
+          error: body?.detail ?? "فشل استخراج المواضيع",
+          status: response.status,
+        } as const;
+      }
+
+      await prisma.subjectResource.update({
+        where: { id: validated },
+        data: { topicsExtracted: true },
+      });
+
+      return {
+        error: null,
+        data: {
+          documentId: body?.document_id,
+          chunksProcessed: body?.chunks_processed ?? 0,
+          topicsExtracted: body?.topics_extracted ?? 0,
+          linksCreated: body?.links_created ?? 0,
+        },
+      } as const;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === "AbortError") {
+        return { error: "انتهت مهلة الاتصال بالخادم" } as const;
+      }
+      throw err;
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { error: "معرف مورد غير صالح" } as const;
+    }
+    if (error instanceof Error) {
+      return { error: error.message } as const;
+    }
+    return { error: "حدث خطأ غير متوقع" } as const;
+  }
+}
+
+export async function deleteTopicsForResource(resourceId: number) {
+  try {
+    const session = await requireAdmin();
+
+    const validated = resourceIdSchema.parse(resourceId);
+
+    const resource = await prisma.subjectResource.findUnique({
+      where: { id: validated },
+      select: { id: true, isIndexed: true },
+    });
+
+    if (!resource) {
+      return { error: "المورد غير موجود" } as const;
+    }
+
+    if (!resource.isIndexed) {
+      return { error: "المورد غير مفهرس" } as const;
+    }
+
+    const baseUrl = process.env.FASTAPI_BASE_URL;
+    const apiKey = process.env.INTERNAL_API_KEY;
+
+    if (!baseUrl || !apiKey) {
+      return { error: "خادم الفهرسة غير مهيأ" } as const;
+    }
+
+    const deleteUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/ingest/${validated}/topics`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(deleteUrl, {
+        method: "DELETE",
+        headers: {
+          "X-API-Key": apiKey,
+          "X-User-ID": session.user.id,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const body = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        return {
+          error: body?.detail ?? "فشل حذف المواضيع",
+          status: response.status,
+        } as const;
+      }
+
+      // Update local database to reflect topics removed
+      await prisma.subjectResource.update({
+        where: { id: validated },
+        data: { topicsExtracted: false },
+      });
+
+      return {
+        error: null,
+        data: {
+          linksDeleted: body?.links_deleted ?? 0,
+          orphansDeleted: body?.orphans_deleted ?? 0,
+        },
+      } as const;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === "AbortError") {
+        return { error: "انتهت مهلة الاتصال بالخادم" } as const;
+      }
+      throw err;
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { error: "معرف مورد غير صالح" } as const;
+    }
+    if (error instanceof Error) {
+      return { error: error.message } as const;
+    }
+    return { error: "حدث خطأ غير متوقع" } as const;
+  }
+}
+
+export async function cleanupOrphanTopics() {
+  try {
+    const session = await requireAdmin();
+
+    const baseUrl = process.env.FASTAPI_BASE_URL;
+    const apiKey = process.env.INTERNAL_API_KEY;
+
+    if (!baseUrl || !apiKey) {
+      return { error: "خادم الفهرسة غير مهيأ" } as const;
+    }
+
+    const cleanupUrl = `${baseUrl.replace(/\/$/, "")}/api/v1/topics/cleanup`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(cleanupUrl, {
+        method: "POST",
+        headers: {
+          "X-API-Key": apiKey,
+          "X-User-ID": session.user.id,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const body = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        return {
+          error: body?.detail ?? "فشل تنظيف المواضيع",
+          status: response.status,
+        } as const;
+      }
+
+      return {
+        error: null,
+        data: {
+          orphansFound: body?.orphans_found ?? 0,
+          orphansDeleted: body?.orphans_deleted ?? 0,
+        },
+      } as const;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === "AbortError") {
+        return { error: "انتهت مهلة الاتصال بالخادم" } as const;
+      }
+      throw err;
+    }
+  } catch (error) {
     if (error instanceof Error) {
       return { error: error.message } as const;
     }
