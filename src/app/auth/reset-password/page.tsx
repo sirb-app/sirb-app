@@ -1,7 +1,11 @@
 import { ResetPasswordForm } from "@/components/reset-password-form";
-import { Button } from "@/components/ui/button";
-import { ArrowLeftIcon } from "lucide-react";
-import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { redirect } from "next/navigation";
 
 type PageProps = {
@@ -14,21 +18,19 @@ export default async function Page({ searchParams }: PageProps) {
   if (!token) redirect("/auth/login");
 
   return (
-    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
-      <div className="space-y-4">
-        <Button size="icon" asChild>
-          <Link href="/auth/login">
-            <ArrowLeftIcon />
-          </Link>
-        </Button>
-
-        <h1 className="text-3xl font-bold">Reset Password</h1>
-
-        <p className="text-muted-foreground">
-          Please enter your new password. Make sure it is at least 8 characters.
-        </p>
-
-        <ResetPasswordForm token={token} />
+    <div className="bg-muted/40 flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">إعادة تعيين كلمة المرور</CardTitle>
+            <CardDescription>
+              يرجى إدخال كلمة المرور الجديدة. تأكد من أنها 8 أحرف على الأقل.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResetPasswordForm token={token} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

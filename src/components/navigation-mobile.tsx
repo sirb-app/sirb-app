@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ModeToggle } from "./mode-toggle";
 import { SignOutButton } from "./sign-out-button";
 
@@ -42,13 +42,18 @@ export const NavigationMobile = ({
   isPending,
 }: NavigationMobileProps) => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const activePathname = usePathname();
   const hasModerationAccess = useModerationAccess(user);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
       <SheetTrigger asChild className="md:hidden">
-        {isPending && !user ? (
+        {!mounted || isPending ? (
           <Button variant="ghost" size="sm" disabled>
             <Skeleton className="h-5 w-5" />
           </Button>
@@ -100,7 +105,7 @@ export const NavigationMobile = ({
               الحساب
             </h3>
             <div className="flex flex-col gap-2 px-3">
-              {isPending && !user ? (
+              {!mounted || isPending ? (
                 <>
                   <div className="text-muted-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">
                     <Skeleton className="h-4 w-4" />

@@ -1,37 +1,53 @@
+import { OAuthButton } from "@/components/oauth-button";
 import { RegisterForm } from "@/components/register-form";
-import { SignInOauthButton } from "@/components/sign-in-oauth-button";
-import { Button } from "@/components/ui/button";
-import { ArrowLeftIcon } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import Link from "next/link";
 
 export default function Page() {
   return (
-    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
-      <div className="space-y-4">
-        <Button size="icon" asChild>
-          <Link href="/">
-            <ArrowLeftIcon />
-          </Link>
-        </Button>
-        <h1 className="text-3xl font-bold">Register</h1>
-      </div>
+    <div className="bg-muted/40 flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">إنشاء حساب جديد</CardTitle>
+            <CardDescription>ابدأ مع حسابك المجاني</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <RegisterForm />
 
-      <div className="space-y-4">
-        <RegisterForm />
+            <p className="text-muted-foreground text-center text-sm">
+              لديك حساب؟{" "}
+              <Link
+                href="/auth/login"
+                className="text-primary font-medium hover:underline"
+              >
+                تسجيل الدخول
+              </Link>
+            </p>
 
-        <p className="text-muted-foreground text-sm">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="hover:text-foreground">
-            Login
-          </Link>
-        </p>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="border-border w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="bg-card text-muted-foreground px-4">
+                  أو المتابعة بواسطة
+                </span>
+              </div>
+            </div>
 
-        <hr className="max-w-sm" />
-      </div>
-
-      <div className="flex max-w-sm flex-col gap-4">
-        <SignInOauthButton signUp provider="google" />
-        <SignInOauthButton signUp provider="github" />
+            <div className="grid grid-cols-2 gap-3">
+              <OAuthButton provider="google" />
+              <OAuthButton provider="github" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
