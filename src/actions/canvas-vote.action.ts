@@ -1,11 +1,15 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { awardPoints, revokePoints } from "@/lib/points";
+import { POINT_REASONS, POINT_VALUES } from "@/lib/points-config";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
-import { revalidatePath } from "next/cache";
 
-export async function voteCanvas(canvasId: number, voteType: "LIKE" | "DISLIKE") {
+export async function voteCanvas(
+  canvasId: number,
+  voteType: "LIKE" | "DISLIKE"
+) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -15,6 +19,24 @@ export async function voteCanvas(canvasId: number, voteType: "LIKE" | "DISLIKE")
   }
 
   try {
+    // Get canvas details (for subject and contributor)
+    const canvas = await prisma.canvas.findUnique({
+      where: { id: canvasId },
+      select: {
+        contributorId: true,
+        chapter: { select: { subjectId: true } },
+      },
+    });
+
+    if (!canvas) throw new Error("Canvas not found");
+
+    // Prevent self-voting
+    if (canvas.contributorId === session.user.id) {
+      throw new Error("Cannot vote on your own content");
+    }
+
+    const subjectId = canvas.chapter.subjectId;
+
     // Get existing vote
     const existingVote = await prisma.canvasVote.findUnique({
       where: {
@@ -25,14 +47,15 @@ export async function voteCanvas(canvasId: number, voteType: "LIKE" | "DISLIKE")
       },
     });
 
-    if (existingVote) {
-      // Same vote → Remove vote
-      if (existingVote.voteType === voteType) {
-        await prisma.$transaction([
-          prisma.canvasVote.delete({
+    await prisma.$transaction(async tx => {
+      if (existingVote) {
+        // Same vote → Remove vote
+        if (existingVote.voteType === voteType) {
+          await tx.canvasVote.delete({
             where: { id: existingVote.id },
-          }),
-          prisma.canvas.update({
+          });
+
+          await tx.canvas.update({
             where: { id: canvasId },
             data: {
               upvotesCount: {
@@ -45,16 +68,27 @@ export async function voteCanvas(canvasId: number, voteType: "LIKE" | "DISLIKE")
                 decrement: voteType === "LIKE" ? 1 : -1,
               },
             },
-          }),
-        ]);
-      } else {
-        // Different vote → Change vote
-        await prisma.$transaction([
-          prisma.canvasVote.update({
+          });
+
+          // Revoke points if removing LIKE vote
+          if (voteType === "LIKE") {
+            await revokePoints({
+              userId: canvas.contributorId,
+              points: POINT_VALUES.CANVAS_UPVOTE,
+              reason: POINT_REASONS.CANVAS_UPVOTE_REVOKED,
+              subjectId,
+              metadata: { canvasId, voterId: session.user.id },
+              tx,
+            });
+          }
+        } else {
+          // Different vote → Change vote
+          await tx.canvasVote.update({
             where: { id: existingVote.id },
             data: { voteType },
-          }),
-          prisma.canvas.update({
+          });
+
+          await tx.canvas.update({
             where: { id: canvasId },
             data: {
               upvotesCount: {
@@ -67,20 +101,45 @@ export async function voteCanvas(canvasId: number, voteType: "LIKE" | "DISLIKE")
                 increment: voteType === "LIKE" ? 2 : -2,
               },
             },
-          }),
-        ]);
-      }
-    } else {
-      // New vote
-      await prisma.$transaction([
-        prisma.canvasVote.create({
+          });
+
+          // Handle point changes for vote switch
+          if (existingVote.voteType === "LIKE" && voteType === "DISLIKE") {
+            // Changed from LIKE to DISLIKE → revoke points
+            await revokePoints({
+              userId: canvas.contributorId,
+              points: POINT_VALUES.CANVAS_UPVOTE,
+              reason: POINT_REASONS.CANVAS_UPVOTE_REVOKED,
+              subjectId,
+              metadata: { canvasId, voterId: session.user.id },
+              tx,
+            });
+          } else if (
+            existingVote.voteType === "DISLIKE" &&
+            voteType === "LIKE"
+          ) {
+            // Changed from DISLIKE to LIKE → award points
+            await awardPoints({
+              userId: canvas.contributorId,
+              points: POINT_VALUES.CANVAS_UPVOTE,
+              reason: POINT_REASONS.CANVAS_UPVOTE_RECEIVED,
+              subjectId,
+              metadata: { canvasId, voterId: session.user.id },
+              tx,
+            });
+          }
+        }
+      } else {
+        // New vote
+        await tx.canvasVote.create({
           data: {
             userId: session.user.id,
             canvasId: canvasId,
             voteType: voteType,
           },
-        }),
-        prisma.canvas.update({
+        });
+
+        await tx.canvas.update({
           where: { id: canvasId },
           data: {
             upvotesCount: {
@@ -93,11 +152,21 @@ export async function voteCanvas(canvasId: number, voteType: "LIKE" | "DISLIKE")
               increment: voteType === "LIKE" ? 1 : -1,
             },
           },
-        }),
-      ]);
-    }
+        });
 
-    revalidatePath(`/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]`);
+        // Award points for new LIKE vote (no caps)
+        if (voteType === "LIKE") {
+          await awardPoints({
+            userId: canvas.contributorId,
+            points: POINT_VALUES.CANVAS_UPVOTE,
+            reason: POINT_REASONS.CANVAS_UPVOTE_RECEIVED,
+            subjectId,
+            metadata: { canvasId, voterId: session.user.id },
+            tx,
+          });
+        }
+      }
+    });
 
     return { success: true };
   } catch (error) {
@@ -105,4 +174,3 @@ export async function voteCanvas(canvasId: number, voteType: "LIKE" | "DISLIKE")
     throw new Error("Failed to vote");
   }
 }
-

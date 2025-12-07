@@ -71,7 +71,7 @@ export async function toggleCanvasCompletion(
     });
 
     // Revalidate the chapter page to show updated status
-    revalidatePath("/subjects/[subjectId]/chapters/[chapterId]");
+    revalidatePath("/subjects/[subjectId]/chapters/[chapterId]", "page");
 
     return { success: true };
   } catch (error) {

@@ -1,6 +1,12 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { awardPoints, revokePoints } from "@/lib/points";
+import {
+  POINT_REASONS,
+  POINT_THRESHOLDS,
+  POINT_VALUES,
+} from "@/lib/points-config";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { revalidatePath } from "next/cache";
@@ -27,26 +33,53 @@ export async function addComment(
   await checkRateLimit(session.user.id, "comment");
 
   try {
-    const comment = await prisma.comment.create({
-      data: {
-        text: trimmedText,
-        userId: session.user.id,
-        canvasId: canvasId,
-        parentCommentId: parentCommentId || null,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
+    const comment = await prisma.$transaction(async tx => {
+      // Create comment
+      const newComment = await tx.comment.create({
+        data: {
+          text: trimmedText,
+          userId: session.user.id,
+          canvasId: canvasId,
+          parentCommentId: parentCommentId || null,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
+          canvas: {
+            select: {
+              chapter: {
+                select: {
+                  subjectId: true,
+                },
+              },
+            },
           },
         },
-      },
+      });
+
+      // Award points if comment meets quality threshold (≥20 characters)
+      if (trimmedText.length >= POINT_THRESHOLDS.COMMENT_MIN_LENGTH) {
+        await awardPoints({
+          userId: session.user.id,
+          points: POINT_VALUES.COMMENT_CREATED,
+          reason: POINT_REASONS.COMMENT_CREATED,
+          subjectId: newComment.canvas.chapter.subjectId,
+          metadata: { commentId: newComment.id, canvasId },
+          tx,
+        });
+      }
+
+      return newComment;
     });
 
     revalidatePath(
-      `/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]`
+      "/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]",
+      "page"
     );
 
     return { success: true, comment };
@@ -89,7 +122,8 @@ export async function editComment(commentId: number, text: string) {
     });
 
     revalidatePath(
-      `/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]`
+      "/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]",
+      "page"
     );
 
     return { success: true };
@@ -126,7 +160,8 @@ export async function deleteComment(commentId: number) {
     });
 
     revalidatePath(
-      `/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]`
+      "/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]",
+      "page"
     );
 
     return { success: true };
@@ -149,6 +184,34 @@ export async function voteComment(
   }
 
   try {
+    // Get comment details (for author and subject)
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId, isDeleted: false },
+      select: {
+        userId: true,
+        canvas: {
+          select: {
+            chapter: {
+              select: {
+                subjectId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!comment) {
+      throw new Error("Comment not found");
+    }
+
+    // Prevent self-voting
+    if (comment.userId === session.user.id) {
+      throw new Error("Cannot vote on your own comment");
+    }
+
+    const subjectId = comment.canvas.chapter.subjectId;
+
     // Get existing vote
     const existingVote = await prisma.commentVote.findUnique({
       where: {
@@ -159,14 +222,15 @@ export async function voteComment(
       },
     });
 
-    if (existingVote) {
-      // Same vote → Remove vote
-      if (existingVote.voteType === voteType) {
-        await prisma.$transaction([
-          prisma.commentVote.delete({
+    await prisma.$transaction(async tx => {
+      if (existingVote) {
+        // Same vote → Remove vote
+        if (existingVote.voteType === voteType) {
+          await tx.commentVote.delete({
             where: { id: existingVote.id },
-          }),
-          prisma.comment.update({
+          });
+
+          await tx.comment.update({
             where: { id: commentId },
             data: {
               upvotesCount: {
@@ -179,16 +243,30 @@ export async function voteComment(
                 decrement: voteType === "LIKE" ? 1 : -1,
               },
             },
-          }),
-        ]);
-      } else {
-        // Different vote → Change vote
-        await prisma.$transaction([
-          prisma.commentVote.update({
+          });
+
+          // Revoke points if removing LIKE vote
+          if (voteType === "LIKE") {
+            await revokePoints({
+              userId: comment.userId,
+              points: POINT_VALUES.COMMENT_UPVOTE,
+              reason: POINT_REASONS.COMMENT_UPVOTE_REVOKED,
+              subjectId,
+              metadata: {
+                commentId,
+                voterId: session.user.id,
+              },
+              tx,
+            });
+          }
+        } else {
+          // Different vote → Change vote
+          await tx.commentVote.update({
             where: { id: existingVote.id },
             data: { voteType },
-          }),
-          prisma.comment.update({
+          });
+
+          await tx.comment.update({
             where: { id: commentId },
             data: {
               upvotesCount: {
@@ -201,20 +279,51 @@ export async function voteComment(
                 increment: voteType === "LIKE" ? 2 : -2,
               },
             },
-          }),
-        ]);
-      }
-    } else {
-      // New vote
-      await prisma.$transaction([
-        prisma.commentVote.create({
+          });
+
+          // Handle point changes for vote switch
+          if (existingVote.voteType === "LIKE" && voteType === "DISLIKE") {
+            // Changed from LIKE to DISLIKE → revoke points
+            await revokePoints({
+              userId: comment.userId,
+              points: POINT_VALUES.COMMENT_UPVOTE,
+              reason: POINT_REASONS.COMMENT_UPVOTE_REVOKED,
+              subjectId,
+              metadata: {
+                commentId,
+                voterId: session.user.id,
+              },
+              tx,
+            });
+          } else if (
+            existingVote.voteType === "DISLIKE" &&
+            voteType === "LIKE"
+          ) {
+            // Changed from DISLIKE to LIKE → award points
+            await awardPoints({
+              userId: comment.userId,
+              points: POINT_VALUES.COMMENT_UPVOTE,
+              reason: POINT_REASONS.COMMENT_UPVOTE_RECEIVED,
+              subjectId,
+              metadata: {
+                commentId,
+                voterId: session.user.id,
+              },
+              tx,
+            });
+          }
+        }
+      } else {
+        // New vote
+        await tx.commentVote.create({
           data: {
             userId: session.user.id,
             commentId: commentId,
             voteType: voteType,
           },
-        }),
-        prisma.comment.update({
+        });
+
+        await tx.comment.update({
           where: { id: commentId },
           data: {
             upvotesCount: {
@@ -227,13 +336,24 @@ export async function voteComment(
               increment: voteType === "LIKE" ? 1 : -1,
             },
           },
-        }),
-      ]);
-    }
+        });
 
-    revalidatePath(
-      `/subjects/[subjectId]/chapters/[chapterId]/canvases/[canvasId]`
-    );
+        // Award points for new LIKE vote (no caps)
+        if (voteType === "LIKE") {
+          await awardPoints({
+            userId: comment.userId,
+            points: POINT_VALUES.COMMENT_UPVOTE,
+            reason: POINT_REASONS.COMMENT_UPVOTE_RECEIVED,
+            subjectId,
+            metadata: {
+              commentId,
+              voterId: session.user.id,
+            },
+            tx,
+          });
+        }
+      }
+    });
 
     return { success: true };
   } catch (error) {

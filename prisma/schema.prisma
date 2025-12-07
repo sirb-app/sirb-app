@@ -357,8 +357,8 @@ model CanvasQuestion {
   justification String?      @db.Text // Explanation shown after answering
 
   // One-to-one relation with ContentBlock
-  contentBlockId Int                     @unique
-  contentBlock   ContentBlock            @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+  contentBlockId Int                    @unique
+  contentBlock   ContentBlock           @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
   options        CanvasQuestionOption[]
 
   @@index([contentBlockId])
@@ -796,15 +796,17 @@ model UserPoints {
 
   points    Int      @default(0)
   earnedAt  DateTime @default(now())
-  reason    String? // "content_approved", "quiz_completed", "helpful_comment", etc.
+  reason    String? // Point award reason (e.g., "canvas_approved", "quiz_upvote_received")
+  metadata  Json? // Contextual data for idempotency (e.g., canvasId, voterId)
   userId    String // UUID reference to User
-  subjectId Int? // null for global points
+  subjectId Int // Required - all points are subject-specific
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   @@index([userId, earnedAt]) // for user point history
   @@index([subjectId, earnedAt]) // for subject leaderboards
-  @@index([earnedAt]) // for global leaderboards
+  @@index([earnedAt]) // for global leaderboards (sum across all subjects)
+  @@index([reason]) // for point breakdown by type
   @@map("user_points")
 }
