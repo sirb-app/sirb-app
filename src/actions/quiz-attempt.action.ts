@@ -1,6 +1,8 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { awardPoints } from "@/lib/points";
+import { POINT_REASONS, POINT_VALUES } from "@/lib/points-config";
 import { prisma } from "@/lib/prisma";
 import { checkAnswerCorrectness } from "@/lib/quiz-validation";
 import { headers } from "next/headers";
@@ -11,7 +13,9 @@ import { z } from "zod";
 const SubmitQuestionAnswerSchema = z.object({
   attemptId: z.number(),
   questionId: z.number(),
-  selectedOptionIds: z.array(z.number()).min(1, "At least one option must be selected"),
+  selectedOptionIds: z
+    .array(z.number())
+    .min(1, "At least one option must be selected"),
 });
 
 // --- Helpers ---
@@ -78,7 +82,9 @@ export async function startQuizAttempt(quizId: number) {
   return { success: true, attemptId: attempt.id, isNew: true };
 }
 
-export async function submitQuestionAnswer(data: z.infer<typeof SubmitQuestionAnswerSchema>) {
+export async function submitQuestionAnswer(
+  data: z.infer<typeof SubmitQuestionAnswerSchema>
+) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
@@ -217,7 +223,8 @@ export async function completeQuizAttempt(attemptId: number) {
   // Calculate score
   const correctCount = attempt.answers.filter(a => a.isCorrect).length;
   const totalQuestions = attempt.totalQuestions;
-  const percentage = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+  const percentage =
+    totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
 
   // Update attempt and increment quiz attempt count in a single transaction
   await prisma.$transaction(async tx => {
@@ -231,12 +238,33 @@ export async function completeQuizAttempt(attemptId: number) {
       },
     });
 
-    // Increment attempt count on quiz (optimized - no need to fetch quiz data)
+    // Get quiz details for contributor and subject
+    const quiz = await tx.quiz.findUnique({
+      where: { id: attempt.quizId },
+      select: {
+        contributorId: true,
+        chapter: { select: { subjectId: true } },
+      },
+    });
+
+    if (!quiz) throw new Error("Quiz not found");
+
+    // Increment attempt count on quiz
     await tx.quiz.update({
       where: { id: attempt.quizId },
       data: {
         attemptCount: { increment: 1 },
       },
+    });
+
+    // Award points to quiz contributor for completion (no caps)
+    await awardPoints({
+      userId: quiz.contributorId,
+      points: POINT_VALUES.QUIZ_ATTEMPT,
+      reason: POINT_REASONS.QUIZ_ATTEMPT_RECEIVED,
+      subjectId: quiz.chapter.subjectId,
+      metadata: { quizId: attempt.quizId, attemptId, percentage },
+      tx,
     });
   });
 

@@ -34,7 +34,7 @@ export async function reportCanvas(
     });
 
     if (existingReport) {
-      throw new Error("تم الإبلاغ مسبقاً");
+      return { success: false, error: "تم الإبلاغ مسبقاً" };
     }
 
     await prisma.report.create({
@@ -49,10 +49,7 @@ export async function reportCanvas(
     return { success: true };
   } catch (error) {
     console.error("Error reporting canvas:", error);
-    if (error instanceof Error && error.message === "تم الإبلاغ مسبقاً") {
-      throw error;
-    }
-    throw new Error("Failed to report canvas");
+    return { success: false, error: "فشل في إرسال البلاغ" };
   }
 }
 
@@ -84,7 +81,7 @@ export async function reportComment(
     });
 
     if (existingReport) {
-      throw new Error("تم الإبلاغ مسبقاً");
+      return { success: false, error: "تم الإبلاغ مسبقاً" };
     }
 
     await prisma.report.create({
@@ -99,9 +96,6 @@ export async function reportComment(
     return { success: true };
   } catch (error) {
     console.error("Error reporting comment:", error);
-    if (error instanceof Error && error.message === "تم الإبلاغ مسبقاً") {
-      throw error;
-    }
-    throw new Error("Failed to report comment");
+    return { success: false, error: "فشل في إرسال البلاغ" };
   }
 }

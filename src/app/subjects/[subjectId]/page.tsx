@@ -37,29 +37,30 @@ async function getSubjectData(subjectId: string, userId: string | null) {
     notFound();
   }
 
-  const topContributor = await prisma.canvas.groupBy({
-    by: ["contributorId"],
+  // Get top contributor by subject-specific points (not global points)
+  const topContributorByPoints = await prisma.userPoints.groupBy({
+    by: ["userId"],
     where: {
-      chapter: {
-        subjectId: parseInt(subjectId),
-      },
-      status: "APPROVED",
+      subjectId: parseInt(subjectId),
     },
-    _count: {
-      id: true,
+    _sum: {
+      points: true,
     },
     orderBy: {
-      _count: {
-        id: "desc",
+      _sum: {
+        points: "desc",
       },
     },
     take: 1,
   });
 
   let topContributorInfo = null;
-  if (topContributor.length > 0) {
+  if (
+    topContributorByPoints.length > 0 &&
+    (topContributorByPoints[0]._sum.points ?? 0) > 0
+  ) {
     const contributorData = await prisma.user.findUnique({
-      where: { id: topContributor[0].contributorId },
+      where: { id: topContributorByPoints[0].userId },
       select: {
         id: true,
         name: true,
@@ -70,9 +71,7 @@ async function getSubjectData(subjectId: string, userId: string | null) {
     if (contributorData) {
       topContributorInfo = {
         ...contributorData,
-        _count: {
-          canvases: topContributor[0]._count.id,
-        },
+        points: topContributorByPoints[0]._sum.points ?? 0,
       };
     }
   }
@@ -100,18 +99,12 @@ export default async function Page({ params }: PageProps) {
     headers: await headers(),
   });
 
-  const subject = await getSubjectData(
-    subjectId,
-    session?.user.id ?? null
-  );
+  const subject = await getSubjectData(subjectId, session?.user.id ?? null);
 
   return (
     <div className="container mx-auto max-w-7xl px-3 py-8 md:px-8 lg:px-16">
       <section className="mb-12" aria-label="معلومات المقرر">
-        <SubjectInfoCard
-          subject={subject}
-          isAuthenticated={!!session}
-        />
+        <SubjectInfoCard subject={subject} isAuthenticated={!!session} />
       </section>
 
       <section aria-label="فصول المقرر">

@@ -2,6 +2,8 @@
 
 import { VoteType } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
+import { awardPoints, revokePoints } from "@/lib/points";
+import { POINT_REASONS, POINT_VALUES } from "@/lib/points-config";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -23,13 +25,35 @@ async function getSession() {
 
 // --- Quiz Vote Actions ---
 
-export async function toggleQuizVote(data: z.infer<typeof ToggleQuizVoteSchema>) {
+export async function toggleQuizVote(
+  data: z.infer<typeof ToggleQuizVoteSchema>
+) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
   const validated = ToggleQuizVoteSchema.parse(data);
 
   await prisma.$transaction(async tx => {
+    // Get quiz details (for contributor and subject)
+    const quiz = await tx.quiz.findUnique({
+      where: { id: validated.quizId },
+      select: {
+        contributorId: true,
+        upvotesCount: true,
+        downvotesCount: true,
+        chapter: { select: { subjectId: true } },
+      },
+    });
+
+    if (!quiz) throw new Error("Quiz not found");
+
+    // Prevent self-voting
+    if (quiz.contributorId === session.user.id) {
+      throw new Error("Cannot vote on your own content");
+    }
+
+    const subjectId = quiz.chapter.subjectId;
+
     // Check for existing vote
     const existingVote = await tx.quizVote.findUnique({
       where: {
@@ -39,16 +63,6 @@ export async function toggleQuizVote(data: z.infer<typeof ToggleQuizVoteSchema>)
         },
       },
     });
-
-    const quiz = await tx.quiz.findUnique({
-      where: { id: validated.quizId },
-      select: {
-        upvotesCount: true,
-        downvotesCount: true,
-      },
-    });
-
-    if (!quiz) throw new Error("Quiz not found");
 
     let upvotesDelta = 0;
     let downvotesDelta = 0;
@@ -62,6 +76,15 @@ export async function toggleQuizVote(data: z.infer<typeof ToggleQuizVoteSchema>)
 
         if (validated.voteType === VoteType.LIKE) {
           upvotesDelta = -1;
+          // Revoke points for removed LIKE
+          await revokePoints({
+            userId: quiz.contributorId,
+            points: POINT_VALUES.QUIZ_UPVOTE,
+            reason: POINT_REASONS.QUIZ_UPVOTE_REVOKED,
+            subjectId,
+            metadata: { quizId: validated.quizId, voterId: session.user.id },
+            tx,
+          });
         } else {
           downvotesDelta = -1;
         }
@@ -75,9 +98,27 @@ export async function toggleQuizVote(data: z.infer<typeof ToggleQuizVoteSchema>)
         if (validated.voteType === VoteType.LIKE) {
           upvotesDelta = 1;
           downvotesDelta = -1;
+          // Changed from DISLIKE to LIKE → award points
+          await awardPoints({
+            userId: quiz.contributorId,
+            points: POINT_VALUES.QUIZ_UPVOTE,
+            reason: POINT_REASONS.QUIZ_UPVOTE_RECEIVED,
+            subjectId,
+            metadata: { quizId: validated.quizId, voterId: session.user.id },
+            tx,
+          });
         } else {
           upvotesDelta = -1;
           downvotesDelta = 1;
+          // Changed from LIKE to DISLIKE → revoke points
+          await revokePoints({
+            userId: quiz.contributorId,
+            points: POINT_VALUES.QUIZ_UPVOTE,
+            reason: POINT_REASONS.QUIZ_UPVOTE_REVOKED,
+            subjectId,
+            metadata: { quizId: validated.quizId, voterId: session.user.id },
+            tx,
+          });
         }
       }
     } else {
@@ -92,6 +133,15 @@ export async function toggleQuizVote(data: z.infer<typeof ToggleQuizVoteSchema>)
 
       if (validated.voteType === VoteType.LIKE) {
         upvotesDelta = 1;
+        // Award points for new LIKE
+        await awardPoints({
+          userId: quiz.contributorId,
+          points: POINT_VALUES.QUIZ_UPVOTE,
+          reason: POINT_REASONS.QUIZ_UPVOTE_RECEIVED,
+          subjectId,
+          metadata: { quizId: validated.quizId, voterId: session.user.id },
+          tx,
+        });
       } else {
         downvotesDelta = 1;
       }

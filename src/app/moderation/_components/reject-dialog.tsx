@@ -50,7 +50,18 @@ export default function RejectDialog({
       setReason("");
       onClose();
     } catch (error) {
-      toast.error("حدث خطأ");
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("already been processed")) {
+        toast.info(
+          contentType === "quiz"
+            ? "تمت معالجة هذا الاختبار مسبقاً"
+            : "تمت معالجة هذا الشرح مسبقاً"
+        );
+        onSuccess(); // Refresh to update the list
+        onClose();
+      } else {
+        toast.error("حدث خطأ");
+      }
     } finally {
       setIsLoading(false);
     }

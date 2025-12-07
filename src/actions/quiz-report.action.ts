@@ -10,13 +10,27 @@ import { z } from "zod";
 
 const ReportQuizSchema = z.object({
   quizId: z.number(),
-  reason: z.enum(["SPAM", "INAPPROPRIATE", "WRONG_INFO", "HARASSMENT", "COPYRIGHT", "OTHER"]),
+  reason: z.enum([
+    "SPAM",
+    "INAPPROPRIATE",
+    "WRONG_INFO",
+    "HARASSMENT",
+    "COPYRIGHT",
+    "OTHER",
+  ]),
   description: z.string().max(500).optional(),
 });
 
 const ReportQuizCommentSchema = z.object({
   commentId: z.number(),
-  reason: z.enum(["SPAM", "INAPPROPRIATE", "WRONG_INFO", "HARASSMENT", "COPYRIGHT", "OTHER"]),
+  reason: z.enum([
+    "SPAM",
+    "INAPPROPRIATE",
+    "WRONG_INFO",
+    "HARASSMENT",
+    "COPYRIGHT",
+    "OTHER",
+  ]),
   description: z.string().max(500).optional(),
 });
 
@@ -46,22 +60,29 @@ export async function reportQuiz(data: z.infer<typeof ReportQuizSchema>) {
   });
 
   if (existingReport) {
-    throw new Error("You have already reported this quiz");
+    return { success: false, error: "تم الإبلاغ مسبقاً" };
   }
 
-  await prisma.report.create({
-    data: {
-      reporterUserId: session.user.id,
-      reportedQuizId: validated.quizId,
-      reason: validated.reason as ReportReason,
-      description: validated.description,
-    },
-  });
+  try {
+    await prisma.report.create({
+      data: {
+        reporterUserId: session.user.id,
+        reportedQuizId: validated.quizId,
+        reason: validated.reason as ReportReason,
+        description: validated.description,
+      },
+    });
 
-  return { success: true };
+    return { success: true };
+  } catch (error) {
+    console.error("Error reporting quiz:", error);
+    return { success: false, error: "فشل في إرسال البلاغ" };
+  }
 }
 
-export async function reportQuizComment(data: z.infer<typeof ReportQuizCommentSchema>) {
+export async function reportQuizComment(
+  data: z.infer<typeof ReportQuizCommentSchema>
+) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
@@ -77,17 +98,22 @@ export async function reportQuizComment(data: z.infer<typeof ReportQuizCommentSc
   });
 
   if (existingReport) {
-    throw new Error("You have already reported this comment");
+    return { success: false, error: "تم الإبلاغ مسبقاً" };
   }
 
-  await prisma.report.create({
-    data: {
-      reporterUserId: session.user.id,
-      reportedQuizCommentId: validated.commentId,
-      reason: validated.reason as ReportReason,
-      description: validated.description,
-    },
-  });
+  try {
+    await prisma.report.create({
+      data: {
+        reporterUserId: session.user.id,
+        reportedQuizCommentId: validated.commentId,
+        reason: validated.reason as ReportReason,
+        description: validated.description,
+      },
+    });
 
-  return { success: true };
+    return { success: true };
+  } catch (error) {
+    console.error("Error reporting quiz comment:", error);
+    return { success: false, error: "فشل في إرسال البلاغ" };
+  }
 }

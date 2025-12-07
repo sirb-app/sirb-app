@@ -2,7 +2,14 @@
 
 import { VoteType } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
+import { awardPoints, revokePoints } from "@/lib/points";
+import {
+  POINT_REASONS,
+  POINT_THRESHOLDS,
+  POINT_VALUES,
+} from "@/lib/points-config";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
 
@@ -10,7 +17,10 @@ import { z } from "zod";
 
 const CreateQuizCommentSchema = z.object({
   quizId: z.number(),
-  text: z.string().min(1, "Comment cannot be empty").max(2000, "Comment too long"),
+  text: z
+    .string()
+    .min(1, "Comment cannot be empty")
+    .max(2000, "Comment too long"),
   parentCommentId: z.number().optional(),
 });
 
@@ -34,34 +44,69 @@ async function getSession() {
 
 // --- Quiz Comment Actions ---
 
-export async function createQuizComment(data: z.infer<typeof CreateQuizCommentSchema>) {
+export async function createQuizComment(
+  data: z.infer<typeof CreateQuizCommentSchema>
+) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
   const validated = CreateQuizCommentSchema.parse(data);
+  const trimmedText = validated.text.trim();
 
-  const comment = await prisma.quizComment.create({
-    data: {
-      text: validated.text,
-      userId: session.user.id,
-      quizId: validated.quizId,
-      parentCommentId: validated.parentCommentId,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          image: true,
+  const comment = await prisma.$transaction(async tx => {
+    const newComment = await tx.quizComment.create({
+      data: {
+        text: trimmedText,
+        userId: session.user.id,
+        quizId: validated.quizId,
+        parentCommentId: validated.parentCommentId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+        quiz: {
+          select: {
+            chapter: {
+              select: {
+                subjectId: true,
+              },
+            },
+          },
         },
       },
-    },
+    });
+
+    // Award points if comment meets quality threshold (≥20 characters)
+    if (trimmedText.length >= POINT_THRESHOLDS.COMMENT_MIN_LENGTH) {
+      await awardPoints({
+        userId: session.user.id,
+        points: POINT_VALUES.COMMENT_CREATED,
+        reason: POINT_REASONS.COMMENT_CREATED,
+        subjectId: newComment.quiz.chapter.subjectId,
+        metadata: { quizCommentId: newComment.id, quizId: validated.quizId },
+        tx,
+      });
+    }
+
+    return newComment;
   });
+
+  revalidatePath(
+    "/subjects/[subjectId]/chapters/[chapterId]/quizzes/[quizId]",
+    "page"
+  );
 
   return { success: true, comment };
 }
 
-export async function updateQuizComment(data: z.infer<typeof UpdateQuizCommentSchema>) {
+export async function updateQuizComment(
+  data: z.infer<typeof UpdateQuizCommentSchema>
+) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
@@ -84,6 +129,11 @@ export async function updateQuizComment(data: z.infer<typeof UpdateQuizCommentSc
       editedAt: new Date(),
     },
   });
+
+  revalidatePath(
+    "/subjects/[subjectId]/chapters/[chapterId]/quizzes/[quizId]",
+    "page"
+  );
 
   return { success: true };
 }
@@ -108,16 +158,51 @@ export async function deleteQuizComment(commentId: number) {
     data: { isDeleted: true },
   });
 
+  revalidatePath(
+    "/subjects/[subjectId]/chapters/[chapterId]/quizzes/[quizId]",
+    "page"
+  );
+
   return { success: true };
 }
 
-export async function toggleQuizCommentVote(data: z.infer<typeof ToggleQuizCommentVoteSchema>) {
+export async function toggleQuizCommentVote(
+  data: z.infer<typeof ToggleQuizCommentVoteSchema>
+) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
   const validated = ToggleQuizCommentVoteSchema.parse(data);
 
   await prisma.$transaction(async tx => {
+    // Get comment details (for author and subject)
+    const comment = await tx.quizComment.findUnique({
+      where: { id: validated.commentId, isDeleted: false },
+      select: {
+        userId: true,
+        upvotesCount: true,
+        downvotesCount: true,
+        quiz: {
+          select: {
+            chapter: {
+              select: {
+                subjectId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!comment) throw new Error("Comment not found");
+
+    // Prevent self-voting
+    if (comment.userId === session.user.id) {
+      throw new Error("Cannot vote on your own comment");
+    }
+
+    const subjectId = comment.quiz.chapter.subjectId;
+
     // Check for existing vote
     const existingVote = await tx.quizCommentVote.findUnique({
       where: {
@@ -127,16 +212,6 @@ export async function toggleQuizCommentVote(data: z.infer<typeof ToggleQuizComme
         },
       },
     });
-
-    const comment = await tx.quizComment.findUnique({
-      where: { id: validated.commentId },
-      select: {
-        upvotesCount: true,
-        downvotesCount: true,
-      },
-    });
-
-    if (!comment) throw new Error("Comment not found");
 
     let upvotesDelta = 0;
     let downvotesDelta = 0;
@@ -150,6 +225,18 @@ export async function toggleQuizCommentVote(data: z.infer<typeof ToggleQuizComme
 
         if (validated.voteType === VoteType.LIKE) {
           upvotesDelta = -1;
+          // Revoke points for removed LIKE
+          await revokePoints({
+            userId: comment.userId,
+            points: POINT_VALUES.COMMENT_UPVOTE,
+            reason: POINT_REASONS.COMMENT_UPVOTE_REVOKED,
+            subjectId,
+            metadata: {
+              quizCommentId: validated.commentId,
+              voterId: session.user.id,
+            },
+            tx,
+          });
         } else {
           downvotesDelta = -1;
         }
@@ -163,9 +250,33 @@ export async function toggleQuizCommentVote(data: z.infer<typeof ToggleQuizComme
         if (validated.voteType === VoteType.LIKE) {
           upvotesDelta = 1;
           downvotesDelta = -1;
+          // Changed from DISLIKE to LIKE → award points
+          await awardPoints({
+            userId: comment.userId,
+            points: POINT_VALUES.COMMENT_UPVOTE,
+            reason: POINT_REASONS.COMMENT_UPVOTE_RECEIVED,
+            subjectId,
+            metadata: {
+              quizCommentId: validated.commentId,
+              voterId: session.user.id,
+            },
+            tx,
+          });
         } else {
           upvotesDelta = -1;
           downvotesDelta = 1;
+          // Changed from LIKE to DISLIKE → revoke points
+          await revokePoints({
+            userId: comment.userId,
+            points: POINT_VALUES.COMMENT_UPVOTE,
+            reason: POINT_REASONS.COMMENT_UPVOTE_REVOKED,
+            subjectId,
+            metadata: {
+              quizCommentId: validated.commentId,
+              voterId: session.user.id,
+            },
+            tx,
+          });
         }
       }
     } else {
@@ -180,6 +291,18 @@ export async function toggleQuizCommentVote(data: z.infer<typeof ToggleQuizComme
 
       if (validated.voteType === VoteType.LIKE) {
         upvotesDelta = 1;
+        // Award points for new LIKE (no caps)
+        await awardPoints({
+          userId: comment.userId,
+          points: POINT_VALUES.COMMENT_UPVOTE,
+          reason: POINT_REASONS.COMMENT_UPVOTE_RECEIVED,
+          subjectId,
+          metadata: {
+            quizCommentId: validated.commentId,
+            voterId: session.user.id,
+          },
+          tx,
+        });
       } else {
         downvotesDelta = 1;
       }
