@@ -37,10 +37,13 @@ export const Navigation = () => {
               <NavigationDesktop />
 
               {/* Desktop Right Side */}
-              <NavigationDesktopAuth user={user} isPending={isPending} />
+              <NavigationDesktopAuth
+                user={user ?? null}
+                isPending={isPending}
+              />
 
               {/* Mobile Menu */}
-              <NavigationMobile user={user} isPending={isPending} />
+              <NavigationMobile user={user ?? null} isPending={isPending} />
             </div>
           </div>
         </div>

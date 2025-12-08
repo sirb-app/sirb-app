@@ -95,7 +95,7 @@ export default function QuizHeader({ quiz }: QuizHeaderProps) {
       setIsEditing(false);
       toast.success("تم تحديث التفاصيل");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("فشل التحديث");
     } finally {
       setIsLoading(false);
@@ -116,7 +116,7 @@ export default function QuizHeader({ quiz }: QuizHeaderProps) {
       router.push(
         `/subjects/${quiz.chapter.subjectId}/chapters/${quiz.chapter.id}`
       );
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الحذف");
       setIsLoading(false);
     }
@@ -240,7 +240,8 @@ export default function QuizHeader({ quiz }: QuizHeaderProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>حذف الاختبار نهائياً؟</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف هذا الاختبار وجميع أسئلته. لا يمكن التراجع عن هذا الإجراء.
+              سيتم حذف هذا الاختبار وجميع أسئلته. لا يمكن التراجع عن هذا
+              الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

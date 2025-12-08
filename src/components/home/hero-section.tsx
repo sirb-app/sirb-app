@@ -1,6 +1,7 @@
 import HomeSearch from "@/components/home-search";
 import { Logo } from "@/components/logo";
 import type { Prisma } from "@/generated/prisma";
+import Link from "next/link";
 
 type University = Prisma.UniversityGetPayload<{
   select: {
@@ -45,9 +46,9 @@ export function HeroSection({ universities }: HeroSectionProps) {
           {/* Helper Text */}
           <p className="text-muted-foreground text-sm">
             ابحث عن مقررك الدراسي أو{" "}
-            <a href="/subjects" className="text-primary hover:underline">
+            <Link href="/subjects" className="text-primary hover:underline">
               تصفح جميع المقررات
-            </a>
+            </Link>
           </p>
         </div>
       </div>

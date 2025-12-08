@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  deleteComment,
-  editComment,
-  voteComment,
-} from "@/actions/comment.action";
+  deleteQuizComment,
+  toggleQuizCommentVote,
+  updateQuizComment,
+} from "@/actions/quiz-comment.action";
 import ReportDialog from "@/components/report-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -29,10 +29,10 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import CommentForm from "./comment-form";
-import DeleteCommentDialog from "./delete-comment-dialog";
+import DeleteQuizCommentDialog from "./delete-quiz-comment-dialog";
+import QuizCommentForm from "./quiz-comment-form";
 
-type CommentItemProps = {
+type QuizCommentItemProps = {
   readonly comment: {
     id: number;
     text: string;
@@ -42,33 +42,31 @@ type CommentItemProps = {
     downvotesCount: number;
     netScore: number;
     isDeleted: boolean;
-    isPinned: boolean;
-    isAnnouncement: boolean;
     userId: string;
     user: {
       id: string;
       name: string;
       image: string | null;
     };
-    replies?: CommentItemProps["comment"][];
+    replies?: QuizCommentItemProps["comment"][];
   };
   readonly userVote?: "LIKE" | "DISLIKE" | null;
   readonly currentUserId?: string;
-  readonly canvasId: number;
+  readonly quizId: number;
   readonly contributorId: string;
   readonly level?: number;
   readonly isAuthenticated: boolean;
 };
 
-export default function CommentItem({
+export default function QuizCommentItem({
   comment,
   userVote = null,
   currentUserId,
-  canvasId,
+  quizId,
   contributorId,
   level = 0,
   isAuthenticated,
-}: CommentItemProps) {
+}: QuizCommentItemProps) {
   const [showReplies, setShowReplies] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -118,7 +116,7 @@ export default function CommentItem({
     setOptimisticScore(newScore);
 
     // Fire and forget - don't wait for server response
-    voteComment(comment.id, voteType)
+    toggleQuizCommentVote({ commentId: comment.id, voteType })
       .then(() => {
         router.refresh();
       })
@@ -138,7 +136,7 @@ export default function CommentItem({
 
     startTransition(async () => {
       try {
-        await editComment(comment.id, editText);
+        await updateQuizComment({ commentId: comment.id, text: editText });
         toast.success("تم تعديل التعليق");
         setIsEditing(false);
         router.refresh();
@@ -155,7 +153,7 @@ export default function CommentItem({
     setDeleteDialogOpen(false);
 
     try {
-      await deleteComment(comment.id);
+      await deleteQuizComment(comment.id);
       toast.success("تم حذف التعليق");
       router.refresh();
     } catch (error) {
@@ -208,18 +206,6 @@ export default function CommentItem({
               </span>
             )}
 
-            {comment.isPinned && (
-              <span className="bg-primary/15 border-primary/30 text-primary rounded border px-2 py-0.5 text-xs">
-                مثبت
-              </span>
-            )}
-
-            {comment.isAnnouncement && (
-              <span className="bg-primary/15 border-primary/30 text-primary rounded border px-2 py-0.5 text-xs">
-                إعلان
-              </span>
-            )}
-
             <span className="text-muted-foreground">•</span>
             <span className="text-muted-foreground text-xs">
               {timeAgo(comment.createdAt)}
@@ -245,7 +231,6 @@ export default function CommentItem({
                 <button
                   className={cn(
                     "text-muted-foreground hover:bg-muted hover:text-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded transition-colors",
-                    // Active state for dropdown
                     "data-[state=open]:bg-muted data-[state=open]:text-foreground"
                   )}
                 >
@@ -392,8 +377,8 @@ export default function CommentItem({
         {/* Reply Form */}
         {isReplying && (
           <div className="mt-3 mr-10">
-            <CommentForm
-              canvasId={canvasId}
+            <QuizCommentForm
+              quizId={quizId}
               parentCommentId={comment.id}
               onSuccess={() => setIsReplying(false)}
               onCancel={() => setIsReplying(false)}
@@ -421,12 +406,12 @@ export default function CommentItem({
           comment.replies.length > 0 && (
             <div className="mt-3 mr-10 space-y-3">
               {comment.replies.map(reply => (
-                <CommentItem
+                <QuizCommentItem
                   key={reply.id}
                   comment={reply}
                   userVote={null}
                   currentUserId={currentUserId}
-                  canvasId={canvasId}
+                  quizId={quizId}
                   contributorId={contributorId}
                   level={1}
                   isAuthenticated={isAuthenticated}
@@ -439,11 +424,11 @@ export default function CommentItem({
       <ReportDialog
         open={reportDialogOpen}
         onOpenChange={setReportDialogOpen}
-        type="comment"
+        type="quizComment"
         targetId={comment.id}
       />
 
-      <DeleteCommentDialog
+      <DeleteQuizCommentDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDelete}

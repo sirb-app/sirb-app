@@ -3,7 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Prisma } from "@/generated/prisma";
 import { Download } from "lucide-react";
 
-type File = Prisma.FileGetPayload<{}>;
+type File = Prisma.FileGetPayload<{
+  select: {
+    id: true;
+    url: true;
+    mimeType: true;
+    fileSize: true;
+    title: true;
+    description: true;
+  };
+}>;
 
 type CanvasFileViewerProps = {
   readonly file: File;

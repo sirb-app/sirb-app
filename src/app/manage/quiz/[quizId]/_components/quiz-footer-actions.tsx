@@ -33,8 +33,10 @@ export default function QuizFooterActions({
       await submitQuiz(quizId);
       toast.success("تم إرسال الاختبار للمراجعة");
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || "حدث خطأ أثناء الإرسال");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "حدث خطأ أثناء الإرسال"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +48,7 @@ export default function QuizFooterActions({
       await cancelSubmission(quizId);
       toast.success("تم إلغاء الطلب، يمكنك التعديل الآن");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الإلغاء");
     } finally {
       setIsLoading(false);

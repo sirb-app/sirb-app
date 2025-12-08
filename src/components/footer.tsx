@@ -1,16 +1,18 @@
 "use client";
 
 import { Logo } from "@/components/logo";
-import { Github, Linkedin, Twitter } from "lucide-react";
+import { teamMembers } from "@/lib/team-data";
+import { Github, Twitter } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SiLinkedin } from "react-icons/si";
 
 const footerLinks = {
   platform: {
     title: "المنصة",
     links: [
       { label: "المقررات", href: "/subjects" },
-      { label: "حول سرب", href: "/about" },
+      { label: "الفريق", href: "/team" },
     ],
   },
   account: {
@@ -28,19 +30,6 @@ const footerLinks = {
     ],
   },
 };
-
-const teamMembers = [
-  { name: "فيصل الخريف", linkedin: "https://www.linkedin.com/in/Fkhrayef/" },
-  { name: "محمد العصيمي", linkedin: "https://www.linkedin.com/in/mabosaimi/" },
-  {
-    name: "عبدالعزيز الفريان",
-    linkedin: "https://www.linkedin.com/in/aziizdev/",
-  },
-  {
-    name: "سلمان الشومر",
-    linkedin: "https://www.linkedin.com/in/salman-alshawmar-2084b7288/",
-  },
-];
 
 const socialLinks = [
   {
@@ -126,7 +115,7 @@ export function Footer() {
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
                   >
-                    <Linkedin className="h-3.5 w-3.5" />
+                    <SiLinkedin className="h-3.5 w-3.5" />
                     {member.name}
                   </a>
                 </li>

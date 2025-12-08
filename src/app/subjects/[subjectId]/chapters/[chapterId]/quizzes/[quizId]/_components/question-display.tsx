@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { TipTapViewer } from "@/components/ui/tiptap-viewer";
 import { QuestionType } from "@/generated/prisma";
 import { useEffect, useState } from "react";
 
@@ -97,7 +98,7 @@ export default function QuestionDisplay({
 
   return (
     <Card>
-      <CardContent className="p-6 space-y-6">
+      <CardContent className="space-y-6 p-6">
         {/* Question Header */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -107,16 +108,15 @@ export default function QuestionDisplay({
             {getQuestionTypeBadge()}
           </div>
 
-          <h2 className="text-xl font-bold leading-relaxed">
-            {question.questionText}
-          </h2>
+          <div className="text-xl leading-relaxed font-bold">
+            <TipTapViewer content={question.questionText} />
+          </div>
 
           {question.questionType === QuestionType.MCQ_MULTI && !isAnswered && (
             <p className="text-muted-foreground text-sm">
               اختر جميع الإجابات الصحيحة
             </p>
           )}
-
         </div>
 
         {/* Options */}
@@ -147,14 +147,19 @@ export default function QuestionDisplay({
                   if (isSelected) {
                     styling = "border-primary bg-primary/5";
                   } else {
-                    styling = "border-muted hover:border-primary/50 cursor-pointer";
+                    styling =
+                      "border-muted hover:border-primary/50 cursor-pointer";
                   }
                 }
 
                 return (
                   <div
                     key={option.id}
-                    onClick={() => !isAnswered && !isSubmitting && handleOptionSelect(option.id)}
+                    onClick={() =>
+                      !isAnswered &&
+                      !isSubmitting &&
+                      handleOptionSelect(option.id)
+                    }
                     className={`flex items-center space-x-3 space-x-reverse rounded-lg border-2 p-4 transition-all ${styling} ${!isAnswered && !isSubmitting ? "cursor-pointer" : ""}`}
                   >
                     <RadioGroupItem
@@ -164,7 +169,7 @@ export default function QuestionDisplay({
                     />
                     <Label
                       htmlFor={`option-${option.id}`}
-                      className="flex-1 text-base leading-relaxed cursor-pointer"
+                      className="flex-1 cursor-pointer text-base leading-relaxed"
                       dir="rtl"
                     >
                       {option.optionText}
@@ -195,7 +200,8 @@ export default function QuestionDisplay({
                   if (isSelected) {
                     styling = "border-primary bg-primary/5";
                   } else {
-                    styling = "border-muted hover:border-primary/50 cursor-pointer";
+                    styling =
+                      "border-muted hover:border-primary/50 cursor-pointer";
                   }
                 }
 
@@ -209,7 +215,11 @@ export default function QuestionDisplay({
                     <Checkbox
                       id={`option-${option.id}`}
                       checked={isSelected}
-                      onCheckedChange={() => !isAnswered && !isSubmitting && handleOptionSelect(option.id)}
+                      onCheckedChange={() =>
+                        !isAnswered &&
+                        !isSubmitting &&
+                        handleOptionSelect(option.id)
+                      }
                       disabled={isAnswered || isSubmitting}
                       className="shrink-0"
                     />
@@ -236,8 +246,10 @@ export default function QuestionDisplay({
         {/* Justification */}
         {isAnswered && question.justification && (
           <div className="bg-accent/15 border-accent/30 rounded-md border px-4 py-3 text-sm">
-            <p className="font-semibold mb-1">التوضيح:</p>
-            <p className="leading-relaxed">{question.justification}</p>
+            <p className="mb-1 font-semibold">التوضيح:</p>
+            <div className="leading-relaxed">
+              <TipTapViewer content={question.justification} />
+            </div>
           </div>
         )}
       </CardContent>

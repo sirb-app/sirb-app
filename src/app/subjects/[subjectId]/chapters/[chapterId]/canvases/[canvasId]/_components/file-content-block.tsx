@@ -65,7 +65,6 @@ export default function FileContentBlock({ file }: FileContentBlockProps) {
         <div className="flex-shrink-0">
           <FileDownloadButton
             fileId={file.id}
-            fileName={file.title}
             variant="ghost"
             size="icon"
             iconOnly

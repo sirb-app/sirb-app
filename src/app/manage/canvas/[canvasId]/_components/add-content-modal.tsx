@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { TipTapEditor } from "@/components/ui/tiptap-editor";
 import { cn } from "@/lib/utils";
 import {
   CheckSquare,
@@ -42,11 +42,25 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+type ContentBlockData = {
+  content?: string;
+  title?: string;
+  url?: string;
+  isOriginal?: boolean;
+  mimeType?: string;
+  fileSize?: bigint;
+  questionText?: string;
+  questionType?: string;
+  justification?: string | null;
+  options?: Array<{ optionText: string; isCorrect: boolean }>;
+  [key: string]: unknown;
+};
+
 type ContentBlock = {
   id: number;
   sequence: number;
   contentType: "TEXT" | "VIDEO" | "FILE" | "QUESTION";
-  data?: any;
+  data?: ContentBlockData | null;
 };
 
 type AddContentModalProps = {
@@ -186,7 +200,7 @@ export default function AddContentModal({
             ]);
           } else if (questionData.options) {
             setQuestionOptions(
-              questionData.options.map((opt: any) => ({
+              questionData.options.map(opt => ({
                 optionText: String(opt.optionText ?? ""),
                 isCorrect: Boolean(opt.isCorrect),
               }))
@@ -209,6 +223,7 @@ export default function AddContentModal({
         setContentType("TEXT");
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialData]);
 
   // Reset form fields when content type changes (only during creation, not editing)
@@ -246,29 +261,6 @@ export default function AddContentModal({
       setFileErrors({});
     }
   }, [contentType, initialData, isOpen]);
-
-  const resetForms = () => {
-    setTextContent("");
-    setVideoTitle("");
-    setVideoUrl("");
-    setVideoIsExternal(false);
-    setFileTitle("");
-    setFileIsExternal(false);
-    setSelectedFile(null);
-    setIsUploading(false);
-    setQuestionText("");
-    setQuestionJustification("");
-    setQuestionOptions([
-      { optionText: "", isCorrect: false },
-      { optionText: "", isCorrect: false },
-      { optionText: "", isCorrect: false },
-      { optionText: "", isCorrect: false },
-    ]);
-    setQuestionErrors({});
-    setTextError("");
-    setVideoErrors({});
-    setFileErrors({});
-  };
 
   const handleContentTypeChange = (type: ContentType) => {
     if (initialData) return; // Don't allow type change when editing
@@ -499,7 +491,14 @@ export default function AddContentModal({
             uploadedKey = await uploadFileToR2(selectedFile);
           }
 
-          const data: any = {
+          const data: {
+            canvasId: number;
+            title: string;
+            isOriginal: boolean;
+            r2Key?: string;
+            fileSize?: number;
+            mimeType?: string;
+          } = {
             canvasId,
             title: (fileTitle || "").trim(),
             isOriginal: !fileIsExternal,
@@ -528,11 +527,15 @@ export default function AddContentModal({
 
             toast.success("تم تحديث الملف");
           } else {
-            // Add new file
-            data.r2Key = uploadedKey!;
-            data.fileSize = selectedFile!.size;
-            data.mimeType = selectedFile!.type;
-            await addFileBlock(data);
+            // Add new file - create new object with required fields
+            await addFileBlock({
+              canvasId,
+              title: (fileTitle || "").trim(),
+              isOriginal: !fileIsExternal,
+              r2Key: uploadedKey!,
+              fileSize: selectedFile!.size,
+              mimeType: selectedFile!.type,
+            });
             toast.success("تم إضافة الملف بنجاح");
           }
         } catch (uploadError) {
@@ -599,33 +602,13 @@ export default function AddContentModal({
     }
   };
 
-  const isFormValid = () => {
-    if (contentType === "TEXT") return textContent.trim().length > 0;
-    if (contentType === "VIDEO")
-      return videoTitle.trim().length > 0 && videoUrl.trim().length > 0;
-    if (contentType === "FILE") {
-      const hasTitle = fileTitle.trim().length > 0;
-      const hasFile = initialData ? true : selectedFile !== null;
-      return hasTitle && hasFile;
-    }
-    if (
-      contentType === "MCQ_SINGLE" ||
-      contentType === "MCQ_MULTI" ||
-      contentType === "TRUE_FALSE"
-    ) {
-      const validationErrors = validateQuestionForm();
-      return Object.keys(validationErrors).length === 0;
-    }
-    return false;
-  };
-
   const TypeButton = ({
     type,
     icon: Icon,
     label,
   }: {
     type: ContentType;
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
   }) => (
     <button
@@ -658,18 +641,14 @@ export default function AddContentModal({
         return (
           <div className="animate-in fade-in zoom-in-95 space-y-4 pt-2 duration-200">
             <div className="space-y-2">
-              <Label htmlFor="content">المحتوى النصي</Label>
-              <Textarea
-                id="content"
-                value={textContent ?? ""}
-                onChange={e => {
-                  setTextContent(e.target.value || "");
+              <Label>المحتوى النصي</Label>
+              <TipTapEditor
+                content={textContent ?? ""}
+                onChange={value => {
+                  setTextContent(value || "");
                   setTextError("");
                 }}
                 placeholder="اكتب الشرح هنا..."
-                rows={8}
-                className="resize-none"
-                autoFocus
               />
               {textError && (
                 <p className="text-destructive text-sm">{textError}</p>
@@ -857,23 +836,19 @@ export default function AddContentModal({
           <div className="animate-in fade-in zoom-in-95 space-y-5 pt-2 duration-200">
             {/* Question Text */}
             <div className="space-y-2">
-              <Label htmlFor="q-text">
+              <Label>
                 نص السؤال <span className="text-destructive">*</span>
               </Label>
-              <Textarea
-                id="q-text"
-                value={questionText}
-                onChange={e => {
-                  setQuestionTextSafe(e.target.value);
+              <TipTapEditor
+                content={questionText}
+                onChange={value => {
+                  setQuestionTextSafe(value);
                   setQuestionErrors(prev => ({
                     ...prev,
                     questionText: undefined,
                   }));
                 }}
                 placeholder="اكتب السؤال هنا..."
-                rows={3}
-                className="resize-none"
-                autoFocus
               />
               {questionErrors.questionText && (
                 <p className="text-destructive text-sm">
@@ -947,14 +922,11 @@ export default function AddContentModal({
 
             {/* Justification */}
             <div className="space-y-2">
-              <Label htmlFor="q-justification">التوضيح (اختياري)</Label>
-              <Textarea
-                id="q-justification"
-                value={questionJustification}
-                onChange={e => setQuestionJustificationSafe(e.target.value)}
+              <Label>التوضيح (اختياري)</Label>
+              <TipTapEditor
+                content={questionJustification}
+                onChange={value => setQuestionJustificationSafe(value)}
                 placeholder="اكتب توضيحاً للإجابة الصحيحة..."
-                rows={3}
-                className="resize-none"
               />
             </div>
           </div>
@@ -964,23 +936,19 @@ export default function AddContentModal({
           <div className="animate-in fade-in zoom-in-95 space-y-5 pt-2 duration-200">
             {/* Question Text */}
             <div className="space-y-2">
-              <Label htmlFor="tf-text">
+              <Label>
                 نص السؤال <span className="text-destructive">*</span>
               </Label>
-              <Textarea
-                id="tf-text"
-                value={questionText}
-                onChange={e => {
-                  setQuestionTextSafe(e.target.value);
+              <TipTapEditor
+                content={questionText}
+                onChange={value => {
+                  setQuestionTextSafe(value);
                   setQuestionErrors(prev => ({
                     ...prev,
                     questionText: undefined,
                   }));
                 }}
                 placeholder="اكتب السؤال هنا..."
-                rows={3}
-                className="resize-none"
-                autoFocus
               />
               {questionErrors.questionText && (
                 <p className="text-destructive text-sm">
@@ -1033,14 +1001,11 @@ export default function AddContentModal({
 
             {/* Justification */}
             <div className="space-y-2">
-              <Label htmlFor="tf-justification">التوضيح (اختياري)</Label>
-              <Textarea
-                id="tf-justification"
-                value={questionJustification}
-                onChange={e => setQuestionJustificationSafe(e.target.value)}
+              <Label>التوضيح (اختياري)</Label>
+              <TipTapEditor
+                content={questionJustification}
+                onChange={value => setQuestionJustificationSafe(value)}
                 placeholder="اكتب توضيحاً للإجابة الصحيحة..."
-                rows={3}
-                className="resize-none"
               />
             </div>
           </div>

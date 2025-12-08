@@ -1,6 +1,6 @@
 "use client";
 
-import { voteCanvas } from "@/actions/canvas-vote.action";
+import { toggleQuizVote } from "@/actions/quiz-vote.action";
 import ReportDialog from "@/components/report-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -11,26 +11,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  Eye,
   Flag,
   Link,
   MoreVertical,
   ThumbsDown,
   ThumbsUp,
+  Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type CanvasContributorSectionProps = {
-  readonly canvas: {
+type QuizContributorSectionProps = {
+  readonly quiz: {
     id: number;
     contributorId: string;
     createdAt: Date;
     upvotesCount: number;
     downvotesCount: number;
     netScore: number;
-    viewCount: number;
+    attemptCount: number;
     contributor: {
       id: string;
       name: string;
@@ -41,19 +41,17 @@ type CanvasContributorSectionProps = {
   readonly isAuthenticated: boolean;
 };
 
-export default function CanvasContributorSection({
-  canvas,
+export default function QuizContributorSection({
+  quiz,
   userVote = null,
   isAuthenticated,
-}: CanvasContributorSectionProps) {
+}: QuizContributorSectionProps) {
   const [optimisticVote, setOptimisticVote] = useState<
     "LIKE" | "DISLIKE" | null
   >(userVote);
-  const [optimisticUpvotes, setOptimisticUpvotes] = useState(
-    canvas.upvotesCount
-  );
+  const [optimisticUpvotes, setOptimisticUpvotes] = useState(quiz.upvotesCount);
   const [optimisticDownvotes, setOptimisticDownvotes] = useState(
-    canvas.downvotesCount
+    quiz.downvotesCount
   );
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const router = useRouter();
@@ -104,7 +102,7 @@ export default function CanvasContributorSection({
     setOptimisticDownvotes(newDownvotes);
 
     // Fire and forget - don't wait for server response
-    voteCanvas(canvas.id, voteType)
+    toggleQuizVote({ quizId: quiz.id, voteType })
       .then(() => {
         router.refresh();
       })
@@ -147,8 +145,8 @@ export default function CanvasContributorSection({
     return `منذ ${days} يوم`;
   };
 
-  // Format view count
-  const formatViewCount = (count: number) => {
+  // Format count
+  const formatCount = (count: number) => {
     if (count < 1000) return count.toString();
     if (count < 1000000) return `${(count / 1000).toFixed(1)}k`;
     return `${(count / 1000000).toFixed(1)}M`;
@@ -160,27 +158,27 @@ export default function CanvasContributorSection({
         {/* Left: Contributor Info */}
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={canvas.contributor.image || undefined} />
+            <AvatarImage src={quiz.contributor.image || undefined} />
             <AvatarFallback>
-              {canvas.contributor.name.charAt(0).toUpperCase()}
+              {quiz.contributor.name.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
-            <div className="font-medium">{canvas.contributor.name}</div>
+            <div className="font-medium">{quiz.contributor.name}</div>
             <div className="text-muted-foreground text-sm">
-              {timeAgo(canvas.createdAt)}
+              {timeAgo(quiz.createdAt)}
             </div>
           </div>
         </div>
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {/* View Count */}
+          {/* Attempt Count */}
           <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
             <span className="font-medium">
-              {formatViewCount(canvas.viewCount)}
+              {formatCount(quiz.attemptCount)}
             </span>
-            <Eye className="h-4 w-4" />
+            <Users className="h-4 w-4" />
           </div>
 
           {/* Divider */}
@@ -206,7 +204,7 @@ export default function CanvasContributorSection({
               />
               {optimisticUpvotes > 0 && (
                 <span className="text-sm font-medium">
-                  {formatViewCount(optimisticUpvotes)}
+                  {formatCount(optimisticUpvotes)}
                 </span>
               )}
             </button>
@@ -229,7 +227,7 @@ export default function CanvasContributorSection({
               />
               {optimisticDownvotes > 0 && (
                 <span className="text-sm font-medium">
-                  {formatViewCount(optimisticDownvotes)}
+                  {formatCount(optimisticDownvotes)}
                 </span>
               )}
             </button>
@@ -248,7 +246,7 @@ export default function CanvasContributorSection({
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={handleShare}>
                 <Link className="ml-2 h-4 w-4" />
-                نسخ رابط الدرس
+                نسخ رابط الاختبار
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleReport}>
                 <Flag className="ml-2 h-4 w-4" />
@@ -262,8 +260,8 @@ export default function CanvasContributorSection({
       <ReportDialog
         open={reportDialogOpen}
         onOpenChange={setReportDialogOpen}
-        type="canvas"
-        targetId={canvas.id}
+        type="quiz"
+        targetId={quiz.id}
       />
     </>
   );

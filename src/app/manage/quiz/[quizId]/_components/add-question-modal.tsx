@@ -2,7 +2,6 @@
 
 import { addQuestion, updateQuestion } from "@/actions/quiz-question.action";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
+import { TipTapEditor } from "@/components/ui/tiptap-editor";
 import { QuestionType } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { CheckSquare, Circle, HelpCircle } from "lucide-react";
@@ -234,8 +232,8 @@ export default function AddQuestionModal({
       router.refresh();
       onClose();
       resetForm();
-    } catch (error: any) {
-      toast.error(error.message || "حدث خطأ");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "حدث خطأ");
     } finally {
       setIsLoading(false);
     }
@@ -247,7 +245,7 @@ export default function AddQuestionModal({
     label,
   }: {
     type: QuestionType;
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
   }) => (
     <button
@@ -398,44 +396,38 @@ export default function AddQuestionModal({
         <div className="space-y-4 border-t pt-4">
           {/* Question Text */}
           <div className="space-y-2">
-            <Label htmlFor="question">
+            <Label>
               نص السؤال <span className="text-destructive">*</span>
             </Label>
-            <Textarea
-              id="question"
-              value={questionText}
-              onChange={e => {
-                setQuestionText(e.target.value);
+            <TipTapEditor
+              content={questionText}
+              onChange={value => {
+                setQuestionText(value);
                 setErrors(prev => ({ ...prev, questionText: undefined }));
               }}
               placeholder="اكتب السؤال هنا..."
-              rows={3}
-              className="resize-none"
             />
             {errors.questionText && (
-              <p className="text-sm text-destructive">{errors.questionText}</p>
+              <p className="text-destructive text-sm">{errors.questionText}</p>
             )}
           </div>
 
           {/* Options */}
           {renderOptions()}
           {errors.options && (
-            <p className="text-sm text-destructive">{errors.options}</p>
+            <p className="text-destructive text-sm">{errors.options}</p>
           )}
           {errors.correctAnswer && (
-            <p className="text-sm text-destructive">{errors.correctAnswer}</p>
+            <p className="text-destructive text-sm">{errors.correctAnswer}</p>
           )}
 
           {/* Justification */}
           <div className="space-y-2">
-            <Label htmlFor="justification">التوضيح (اختياري)</Label>
-            <Textarea
-              id="justification"
-              value={justification}
-              onChange={e => setJustification(e.target.value)}
+            <Label>التوضيح (اختياري)</Label>
+            <TipTapEditor
+              content={justification}
+              onChange={value => setJustification(value)}
               placeholder="اكتب توضيحاً للإجابة الصحيحة..."
-              rows={3}
-              className="resize-none"
             />
           </div>
         </div>

@@ -1,12 +1,16 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { getQuizComments } from "@/actions/quiz-comment.action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, X, RotateCcw, Home } from "lucide-react";
+import { TipTapViewer } from "@/components/ui/tiptap-viewer";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { Check, Home, RotateCcw, X } from "lucide-react";
+import { headers } from "next/headers";
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import QuizComments from "../_components/quiz-comments";
+import QuizContributorSection from "../_components/quiz-contributor-section";
 
 type PageProps = {
   params: Promise<{
@@ -19,7 +23,11 @@ type PageProps = {
   }>;
 };
 
-async function getQuizSummaryData(attemptId: number, userId: string) {
+async function getQuizSummaryData(
+  attemptId: number,
+  userId: string,
+  quizId: number
+) {
   const attempt = await prisma.quizAttempt.findUnique({
     where: { id: attemptId },
     include: {
@@ -40,6 +48,13 @@ async function getQuizSummaryData(attemptId: number, userId: string) {
               subjectId: true,
             },
           },
+          contributor: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
         },
       },
       answers: {
@@ -58,7 +73,20 @@ async function getQuizSummaryData(attemptId: number, userId: string) {
     return null;
   }
 
-  return attempt;
+  // Get user's vote on this quiz
+  const userVote = await prisma.quizVote.findUnique({
+    where: {
+      userId_quizId: {
+        userId,
+        quizId,
+      },
+    },
+    select: {
+      voteType: true,
+    },
+  });
+
+  return { attempt, userVote: userVote?.voteType || null };
 }
 
 export default async function QuizSummaryPage({
@@ -77,21 +105,24 @@ export default async function QuizSummaryPage({
   }
 
   if (!attemptId) {
-    redirect(
-      `/subjects/${subjectId}/chapters/${chapterId}/quizzes/${quizId}`
-    );
+    redirect(`/subjects/${subjectId}/chapters/${chapterId}/quizzes/${quizId}`);
   }
 
-  const attempt = await getQuizSummaryData(
+  const data = await getQuizSummaryData(
     parseInt(attemptId),
-    session.user.id
+    session.user.id,
+    parseInt(quizId)
   );
 
-  if (!attempt) {
+  if (!data) {
     notFound();
   }
 
+  const { attempt, userVote } = data;
   const { quiz, score, totalQuestions, answers } = attempt;
+
+  // Fetch comments for the quiz
+  const comments = await getQuizComments(parseInt(quizId));
 
   // Validate route parameters match database relationships
   const quizIdNum = parseInt(quizId);
@@ -109,29 +140,26 @@ export default async function QuizSummaryPage({
 
   // Create answer map for quick lookup - transform selectedOptions to selectedOptionIds
   const answerMap = new Map(
-    answers.map(a => [
-      a.questionId,
-      a.selectedOptions.map(so => so.optionId)
-    ])
+    answers.map(a => [a.questionId, a.selectedOptions.map(so => so.optionId)])
   );
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="space-y-6">
         {/* Score Card */}
-        <Card className="border-2 border-primary">
+        <Card className="border-primary border-2">
           <CardContent className="p-6">
-            <div className="text-center space-y-4">
+            <div className="space-y-4 text-center">
               <h1 className="text-3xl font-bold">{quiz.title}</h1>
 
-              <div className="bg-muted/50 rounded-lg p-6">
-                <div className="text-6xl font-bold mb-2">{percentage}%</div>
+              <div className="bg-muted/50 dark:bg-muted/20 rounded-lg p-6">
+                <div className="mb-2 text-6xl font-bold">{percentage}%</div>
                 <div className="text-muted-foreground text-lg">
                   {score} من {totalQuestions} إجابة صحيحة
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <div className="flex flex-col justify-center gap-3 sm:flex-row">
                 <Button asChild>
                   <Link
                     href={`/subjects/${subjectId}/chapters/${chapterId}/quizzes/${quizId}`}
@@ -167,11 +195,11 @@ export default async function QuizSummaryPage({
 
             return (
               <Card key={question.id}>
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="space-y-4 p-6">
                   {/* Question Header */}
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="mb-2 flex items-center gap-2">
                         <span className="text-muted-foreground text-sm font-medium">
                           السؤال {index + 1}
                         </span>
@@ -187,9 +215,9 @@ export default async function QuizSummaryPage({
                           </Badge>
                         )}
                       </div>
-                      <h3 className="text-lg font-bold leading-relaxed">
-                        {question.questionText}
-                      </h3>
+                      <div className="text-lg leading-relaxed font-bold">
+                        <TipTapViewer content={question.questionText} />
+                      </div>
                     </div>
                   </div>
 
@@ -212,10 +240,10 @@ export default async function QuizSummaryPage({
                         >
                           <div className="flex items-center gap-2">
                             {isCorrectOption && (
-                              <Check className="h-4 w-4 text-success shrink-0" />
+                              <Check className="text-success h-4 w-4 shrink-0" />
                             )}
                             {!isCorrectOption && isUserSelection && (
-                              <X className="h-4 w-4 text-destructive shrink-0" />
+                              <X className="text-destructive h-4 w-4 shrink-0" />
                             )}
                             <span className="text-sm leading-relaxed">
                               {option.optionText}
@@ -230,12 +258,12 @@ export default async function QuizSummaryPage({
                   {question.justification && (
                     <div className="bg-accent/15 border-accent/30 rounded-lg border p-4">
                       <div className="flex items-start gap-2">
-                        <span className="font-semibold text-sm shrink-0">
+                        <span className="shrink-0 text-sm font-semibold">
                           التوضيح:
                         </span>
-                        <p className="text-sm leading-relaxed">
-                          {question.justification}
-                        </p>
+                        <div className="text-sm leading-relaxed">
+                          <TipTapViewer content={question.justification} />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -246,7 +274,7 @@ export default async function QuizSummaryPage({
         </div>
 
         {/* Bottom Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center border-t pt-6">
+        <div className="flex flex-col justify-center gap-3 border-t pt-6 sm:flex-row">
           <Button asChild size="lg">
             <Link
               href={`/subjects/${subjectId}/chapters/${chapterId}/quizzes/${quizId}`}
@@ -262,6 +290,44 @@ export default async function QuizSummaryPage({
             </Link>
           </Button>
         </div>
+
+        {/* Quiz Contributor Section - Voting, Share, Report */}
+        <QuizContributorSection
+          quiz={{
+            id: quiz.id,
+            contributorId: quiz.contributor.id,
+            createdAt: quiz.createdAt,
+            upvotesCount: quiz.upvotesCount,
+            downvotesCount: quiz.downvotesCount,
+            netScore: quiz.netScore,
+            attemptCount: quiz.attemptCount,
+            contributor: {
+              id: quiz.contributor.id,
+              name: quiz.contributor.name || "مستخدم",
+              image: quiz.contributor.image,
+            },
+          }}
+          userVote={userVote}
+          isAuthenticated={!!session}
+        />
+
+        {/* Quiz Comments Section */}
+        <QuizComments
+          quizId={quiz.id}
+          contributorId={quiz.contributor.id}
+          initialComments={comments}
+          currentUser={
+            session?.user
+              ? {
+                  id: session.user.id,
+                  name: session.user.name || "مستخدم",
+                  image: session.user.image || null,
+                }
+              : null
+          }
+          currentUserId={session?.user?.id}
+          isAuthenticated={!!session}
+        />
       </div>
     </div>
   );

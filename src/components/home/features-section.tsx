@@ -11,7 +11,7 @@ import {
 
 export function FeaturesSection() {
   return (
-    <section aria-labelledby="features-heading" className="py-16 md:py-24">
+    <section aria-labelledby="features-heading" className="py-12 md:py-16">
       <div className="mx-auto max-w-6xl px-4 md:px-8 lg:px-16">
         {/* Section Header */}
         <div className="mb-12 text-center">

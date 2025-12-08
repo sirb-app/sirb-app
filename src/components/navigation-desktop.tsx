@@ -21,11 +21,18 @@ import { SignOutButton } from "./sign-out-button";
 const routes = [
   { label: "الرئيسية", path: "/", icon: BookOpen },
   { label: "المقررات", path: "/subjects", icon: BookOpen },
-  { label: "من نحن", path: "/about", icon: Users },
+  { label: "من نحن", path: "/team", icon: Users },
 ];
 
+type User = {
+  id: string;
+  name: string;
+  image?: string | null;
+  role?: string;
+} | null;
+
 type NavigationDesktopAuthProps = {
-  user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  user: User;
   isPending: boolean;
 };
 

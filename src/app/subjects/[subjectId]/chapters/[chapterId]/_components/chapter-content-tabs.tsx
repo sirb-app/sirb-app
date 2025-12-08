@@ -42,7 +42,14 @@ type Quiz = {
     name: string | null;
   };
   questions: { id: number }[];
-  attempts: { score: number; totalQuestions: number; completedAt: Date }[] | false;
+  attempts:
+    | {
+        score: number;
+        totalQuestions: number;
+        completedAt: Date | null;
+        [key: string]: unknown;
+      }[]
+    | false;
 };
 
 type ChapterContentTabsProps = {
@@ -83,13 +90,9 @@ export default function ChapterContentTabs({
 
   return (
     <Tabs defaultValue="canvases" className="w-full" dir="rtl">
-      <TabsList className="w-full grid grid-cols-2 border-b">
-        <TabsTrigger value="canvases">
-          الشروحات ({canvases.length})
-        </TabsTrigger>
-        <TabsTrigger value="quizzes">
-          الاختبارات ({quizzes.length})
-        </TabsTrigger>
+      <TabsList className="grid w-full grid-cols-2 border-b">
+        <TabsTrigger value="canvases">الشروحات ({canvases.length})</TabsTrigger>
+        <TabsTrigger value="quizzes">الاختبارات ({quizzes.length})</TabsTrigger>
       </TabsList>
 
       {/* Canvases Tab */}

@@ -10,11 +10,25 @@ import { toast } from "sonner";
 import AddContentModal from "./add-content-modal";
 import ContentBlockCard from "./content-block-card";
 
+type ContentBlockData = {
+  content?: string;
+  title?: string;
+  url?: string;
+  isOriginal?: boolean;
+  mimeType?: string;
+  fileSize?: bigint;
+  questionText?: string;
+  questionType?: string;
+  justification?: string | null;
+  options?: Array<{ optionText: string; isCorrect: boolean }>;
+  [key: string]: unknown;
+};
+
 type ContentBlock = {
   id: number;
   sequence: number;
   contentType: "TEXT" | "VIDEO" | "FILE" | "QUESTION";
-  data?: any;
+  data?: ContentBlockData | null;
 };
 
 type ContentBlockListProps = {
@@ -69,7 +83,7 @@ export default function ContentBlockList({
       toast.success("تم حفظ الترتيب");
       setHasOrderChanges(false);
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("فشل حفظ الترتيب");
     } finally {
       setIsReordering(false);

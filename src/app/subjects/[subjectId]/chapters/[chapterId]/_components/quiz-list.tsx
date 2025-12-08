@@ -29,7 +29,14 @@ type Quiz = {
     name: string | null;
   };
   questions: { id: number }[];
-  attempts: { score: number; totalQuestions: number; completedAt: Date }[] | false;
+  attempts:
+    | {
+        score: number;
+        totalQuestions: number;
+        completedAt: Date | null;
+        [key: string]: unknown;
+      }[]
+    | false;
 };
 
 type QuizListProps = {
@@ -47,7 +54,7 @@ export default function QuizList({
 }: QuizListProps) {
   const router = useRouter();
 
-  const handleQuizClick = (e: React.MouseEvent, quizId: number) => {
+  const handleQuizClick = (e: React.MouseEvent) => {
     if (!isAuthenticated) {
       e.preventDefault();
       toast.info("يجب تسجيل الدخول لعرض المحتوى", {
@@ -105,7 +112,7 @@ type QuizCardProps = {
   readonly chapterId: number;
   readonly subjectId: number;
   readonly isAuthenticated: boolean;
-  readonly onQuizClick: (e: React.MouseEvent, quizId: number) => void;
+  readonly onQuizClick: (e: React.MouseEvent) => void;
 };
 
 function QuizCard({
@@ -128,7 +135,7 @@ function QuizCard({
     <div className="group relative">
       <Link
         href={`/subjects/${subjectId}/chapters/${chapterId}/quizzes/${quiz.id}`}
-        onClick={e => !isAuthenticated && onQuizClick(e, quiz.id)}
+        onClick={e => !isAuthenticated && onQuizClick(e)}
         className={cn("block", !isAuthenticated && "pointer-events-none")}
       >
         <Card
@@ -143,7 +150,9 @@ function QuizCard({
               <div
                 className={cn(
                   "from-primary/20 to-secondary/20 flex h-full w-full items-center justify-center bg-gradient-to-br transition-all",
-                  scorePercentage !== null && scorePercentage >= 100 && "opacity-50 saturate-0"
+                  scorePercentage !== null &&
+                    scorePercentage >= 100 &&
+                    "opacity-50 saturate-0"
                 )}
               >
                 {isAuthenticated ? (
@@ -187,7 +196,9 @@ function QuizCard({
                 className={cn(
                   "line-clamp-2 leading-tight font-semibold transition-colors",
                   isAuthenticated && "group-hover:text-primary",
-                  scorePercentage !== null && scorePercentage >= 100 && "text-muted-foreground"
+                  scorePercentage !== null &&
+                    scorePercentage >= 100 &&
+                    "text-muted-foreground"
                 )}
               >
                 {quiz.title}
@@ -197,7 +208,9 @@ function QuizCard({
                 <p
                   className={cn(
                     "text-muted-foreground mt-2 line-clamp-2 flex-1 text-sm leading-relaxed",
-                    scorePercentage !== null && scorePercentage >= 100 && "opacity-70"
+                    scorePercentage !== null &&
+                      scorePercentage >= 100 &&
+                      "opacity-70"
                   )}
                 >
                   {quiz.description}
@@ -219,7 +232,9 @@ function QuizCard({
               <div
                 className={cn(
                   "text-muted-foreground mt-3 flex items-center gap-1.5 text-xs",
-                  scorePercentage !== null && scorePercentage >= 100 && "opacity-70"
+                  scorePercentage !== null &&
+                    scorePercentage >= 100 &&
+                    "opacity-70"
                 )}
               >
                 <User className="h-3 w-3" />

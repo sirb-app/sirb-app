@@ -1,7 +1,10 @@
+import { getQuizComments } from "@/actions/quiz-comment.action";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import QuizComments from "./_components/quiz-comments";
+import QuizContributorSection from "./_components/quiz-contributor-section";
 import QuizInterface from "./_components/quiz-interface";
 
 type PageProps = {
@@ -41,6 +44,7 @@ async function getQuizData(quizId: number, userId: string) {
         select: {
           id: true,
           name: true,
+          image: true,
         },
       },
     },
@@ -95,7 +99,20 @@ async function getQuizData(quizId: number, userId: string) {
     },
   });
 
-  return { quiz, attempt, bestAttempt };
+  // Get user's vote on this quiz
+  const userVote = await prisma.quizVote.findUnique({
+    where: {
+      userId_quizId: {
+        userId,
+        quizId,
+      },
+    },
+    select: {
+      voteType: true,
+    },
+  });
+
+  return { quiz, attempt, bestAttempt, userVote: userVote?.voteType || null };
 }
 
 export default async function QuizPage({ params, searchParams }: PageProps) {
@@ -116,13 +133,19 @@ export default async function QuizPage({ params, searchParams }: PageProps) {
     notFound();
   }
 
-  const { quiz, attempt, bestAttempt } = data;
+  const { quiz, attempt, bestAttempt, userVote } = data;
+
+  // Fetch comments for the quiz
+  const comments = await getQuizComments(parseInt(quizId));
 
   // Validate route parameters match database relationships
   const chapterIdNum = parseInt(chapterId);
   const subjectIdNum = parseInt(subjectId);
 
-  if (quiz.chapter.id !== chapterIdNum || quiz.chapter.subjectId !== subjectIdNum) {
+  if (
+    quiz.chapter.id !== chapterIdNum ||
+    quiz.chapter.subjectId !== subjectIdNum
+  ) {
     notFound(); // Quiz doesn't belong to this chapter/subject
   }
 
@@ -146,6 +169,22 @@ export default async function QuizPage({ params, searchParams }: PageProps) {
       }
     : null;
 
+  // Prepare quiz data for contributor section
+  const quizForContributor = {
+    id: quiz.id,
+    contributorId: quiz.contributor.id,
+    createdAt: quiz.createdAt,
+    upvotesCount: quiz.upvotesCount,
+    downvotesCount: quiz.downvotesCount,
+    netScore: quiz.netScore,
+    attemptCount: quiz.attemptCount,
+    contributor: {
+      id: quiz.contributor.id,
+      name: quiz.contributor.name || "مستخدم",
+      image: quiz.contributor.image,
+    },
+  };
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <QuizInterface
@@ -156,6 +195,35 @@ export default async function QuizPage({ params, searchParams }: PageProps) {
         subjectId={parseInt(subjectId)}
         chapterId={parseInt(chapterId)}
       />
+
+      {/* Quiz Contributor Section - Voting, Share, Report */}
+      <div className="mt-8">
+        <QuizContributorSection
+          quiz={quizForContributor}
+          userVote={userVote}
+          isAuthenticated={!!session}
+        />
+      </div>
+
+      {/* Quiz Comments Section */}
+      <div className="mt-8">
+        <QuizComments
+          quizId={quiz.id}
+          contributorId={quiz.contributor.id}
+          initialComments={comments}
+          currentUser={
+            session?.user
+              ? {
+                  id: session.user.id,
+                  name: session.user.name || "مستخدم",
+                  image: session.user.image || null,
+                }
+              : null
+          }
+          currentUserId={session?.user?.id}
+          isAuthenticated={!!session}
+        />
+      </div>
     </div>
   );
 }

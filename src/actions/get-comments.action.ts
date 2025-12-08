@@ -72,7 +72,15 @@ export async function getComments(
   }
 
   try {
-    const whereClause: any = {
+    const whereClause: {
+      canvasId: number;
+      parentCommentId: null;
+      OR: Array<{
+        isDeleted: boolean;
+        replies?: { some: { isDeleted: boolean } };
+      }>;
+      id?: { lt: number };
+    } = {
       canvasId: canvasId,
       parentCommentId: null,
       OR: [
@@ -92,7 +100,11 @@ export async function getComments(
       whereClause.id = { lt: cursor };
     }
 
-    const orderBy: any[] = [];
+    const orderBy: Array<{
+      netScore?: "desc";
+      createdAt?: "desc";
+      id?: "desc";
+    }> = [];
     if (sortBy === "best") {
       orderBy.push({ netScore: "desc" as const });
     } else {
