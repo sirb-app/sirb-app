@@ -1,12 +1,29 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { updateUser } from "@/lib/auth-client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ImageIcon, Loader2, User } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const UpdateUserSchema = z.object({
+  name: z.string().min(1, "الاسم مطلوب"),
+  image: z.url("يرجى إدخال رابط صورة صالح").optional().or(z.literal("")),
+});
+
+type UpdateUserFormData = z.infer<typeof UpdateUserSchema>;
 
 type UpdateUserFormProps = {
   name: string;
@@ -14,56 +31,91 @@ type UpdateUserFormProps = {
 };
 
 export const UpdateUserForm = ({ name, image }: UpdateUserFormProps) => {
-  const [isPending, setIsPending] = useState(false);
   const router = useRouter();
 
-  async function handleSubmit(evt: React.FormEvent<HTMLFormElement>) {
-    evt.preventDefault();
-    const formData = new FormData(evt.target as HTMLFormElement);
-    const name = String(formData.get("name"));
-    const image = String(formData.get("image"));
+  const form = useForm<UpdateUserFormData>({
+    resolver: zodResolver(UpdateUserSchema),
+    defaultValues: {
+      name: name,
+      image: image,
+    },
+  });
 
-    if (!name && !image) {
-      return toast.error("Please enter a name or image");
-    }
-
+  async function handleSubmit(data: UpdateUserFormData) {
     await updateUser({
-      ...(name && { name }),
-      image,
+      name: data.name,
+      image: data.image || "",
       fetchOptions: {
-        onRequest: () => {
-          setIsPending(true);
-        },
-        onResponse: () => {
-          setIsPending(false);
+        onSuccess: () => {
+          toast.success("تم تحديث الملف الشخصي بنجاح");
+          router.refresh();
         },
         onError: ctx => {
-          toast.error(ctx.error.message);
-        },
-        onSuccess: () => {
-          toast.success("User updated successfully");
-          (evt.target as HTMLFormElement).reset();
-          router.refresh();
+          toast.error(ctx.error.message || "فشل تحديث الملف الشخصي");
         },
       },
     });
   }
 
   return (
-    <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" name="name" defaultValue={name} />
-      </div>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="w-full space-y-4"
+      >
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>الاسم</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <User className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
+                  <Input placeholder="أدخل اسمك" className="pr-10" {...field} />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="image">Image</Label>
-        <Input id="image" name="image" defaultValue={image} />
-      </div>
+        <FormField
+          control={form.control}
+          name="image"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>رابط الصورة</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <ImageIcon className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    placeholder="https://example.com/image.jpg"
+                    className="pr-10"
+                    {...field}
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Button type="submit" disabled={isPending}>
-        Update User
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? (
+            <>
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              جاري التحديث...
+            </>
+          ) : (
+            "تحديث الملف الشخصي"
+          )}
+        </Button>
+      </form>
+    </Form>
   );
 };

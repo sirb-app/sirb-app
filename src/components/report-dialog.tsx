@@ -80,21 +80,21 @@ export default function ReportDialog({
     setIsSubmitting(true);
 
     try {
-      if (type === "canvas") {
-        await reportCanvas(targetId, data.reason, data.description);
-      } else {
-        await reportComment(targetId, data.reason, data.description);
-      }
+      const result =
+        type === "canvas"
+          ? await reportCanvas(targetId, data.reason, data.description)
+          : await reportComment(targetId, data.reason, data.description);
 
-      toast.success("تم إرسال البلاغ");
-      onOpenChange(false);
-      form.reset();
-    } catch (error) {
-      if (error instanceof Error && error.message === "تم الإبلاغ مسبقاً") {
-        toast.error("تم الإبلاغ مسبقاً");
+      if (result.success) {
+        toast.success("تم إرسال البلاغ");
+        onOpenChange(false);
+        form.reset();
       } else {
-        toast.error("فشل إرسال البلاغ");
+        toast.error(result.error || "فشل إرسال البلاغ");
       }
+    } catch (error) {
+      // Handle unexpected errors (e.g., network issues, auth errors)
+      toast.error("فشل إرسال البلاغ");
       console.error("Report error:", error);
     } finally {
       setIsSubmitting(false);

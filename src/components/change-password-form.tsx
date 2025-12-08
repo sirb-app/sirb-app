@@ -12,21 +12,22 @@ import {
 import { Input } from "@/components/ui/input";
 import { changePassword } from "@/lib/auth-client";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
 const ChangePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, "Current password is required"),
+    currentPassword: z.string().min(1, "كلمة المرور الحالية مطلوبة"),
     newPassword: z
       .string()
-      .min(8, "New password must be at least 8 characters"),
+      .min(8, "يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل"),
     confirmPassword: z.string(),
   })
   .refine(data => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"], // Error shows on confirmPassword field
+    message: "كلمات المرور غير متطابقة",
+    path: ["confirmPassword"],
   });
 
 type ChangePasswordFormData = z.infer<typeof ChangePasswordSchema>;
@@ -42,7 +43,6 @@ export const ChangePasswordForm = () => {
   });
 
   async function handleSubmit(data: ChangePasswordFormData) {
-    // Only send the fields that the API needs
     await changePassword(
       {
         currentPassword: data.currentPassword,
@@ -50,7 +50,7 @@ export const ChangePasswordForm = () => {
       },
       {
         onSuccess: () => {
-          toast.success("Password changed successfully");
+          toast.success("تم تغيير كلمة المرور بنجاح");
           form.reset();
         },
         onError: ctx => {
@@ -64,16 +64,24 @@ export const ChangePasswordForm = () => {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleSubmit)}
-        className="w-full max-w-sm space-y-4"
+        className="w-full space-y-4"
       >
         <FormField
           control={form.control}
           name="currentPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Current Password</FormLabel>
+              <FormLabel>كلمة المرور الحالية</FormLabel>
               <FormControl>
-                <Input type="password" {...field} />
+                <div className="relative">
+                  <Lock className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    className="pr-10"
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -85,9 +93,17 @@ export const ChangePasswordForm = () => {
           name="newPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>New Password</FormLabel>
+              <FormLabel>كلمة المرور الجديدة</FormLabel>
               <FormControl>
-                <Input type="password" {...field} />
+                <div className="relative">
+                  <Lock className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    className="pr-10"
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -99,9 +115,17 @@ export const ChangePasswordForm = () => {
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Confirm New Password</FormLabel>
+              <FormLabel>تأكيد كلمة المرور الجديدة</FormLabel>
               <FormControl>
-                <Input type="password" {...field} />
+                <div className="relative">
+                  <Lock className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    className="pr-10"
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -113,7 +137,14 @@ export const ChangePasswordForm = () => {
           className="w-full"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? "Changing..." : "Change Password"}
+          {form.formState.isSubmitting ? (
+            <>
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              جاري التغيير...
+            </>
+          ) : (
+            "تغيير كلمة المرور"
+          )}
         </Button>
       </form>
     </Form>

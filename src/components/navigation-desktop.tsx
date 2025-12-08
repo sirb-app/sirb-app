@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { BookOpen, ChevronDown, LogOut, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ModeToggle } from "./mode-toggle";
 import { SignOutButton } from "./sign-out-button";
 
@@ -54,11 +55,16 @@ export const NavigationDesktopAuth = ({
   isPending,
 }: NavigationDesktopAuthProps) => {
   const hasModerationAccess = useModerationAccess(user);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="hidden items-center gap-3 md:flex">
       <ModeToggle />
-      {isPending && !user ? (
+      {!mounted || isPending ? (
         <>
           <Skeleton className="h-8 w-16" />
           <Skeleton className="h-8 w-20" />

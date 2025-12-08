@@ -21,9 +21,7 @@ type SubjectInfoCardProps = {
       id: string;
       name: string;
       image: string | null;
-      _count: {
-        canvases: number;
-      };
+      points: number;
     } | null;
     isEnrolled: boolean;
     chapters: Array<{
