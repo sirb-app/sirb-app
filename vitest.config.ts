@@ -10,15 +10,44 @@ const dirname =
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
 
-// More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(dirname, "./src"),
+    },
+  },
   test: {
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      // ✅ Only include your actual source files
+      include: [
+        "src/lib/utils.ts",
+        "src/lib/quiz-validation.ts",
+        "src/lib/points-config.ts",
+        "src/lib/consts.ts",
+      ],
+      // ✅ Exclude everything else
+      exclude: [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.d.ts",
+        ".next/**",
+        "node_modules/**",
+      ],
+    },
     projects: [
       {
         extends: true,
+        test: {
+          name: "unit",
+          include: ["src/**/*.test.ts"],
+          environment: "node",
+        },
+      },
+      {
+        extends: true,
         plugins: [
-          // The plugin will run tests for the stories defined in your Storybook config
-          // See options at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon#storybooktest
           storybookTest({ configDir: path.join(dirname, ".storybook") }),
         ],
         test: {
