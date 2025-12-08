@@ -21,22 +21,7 @@ export async function POST(
   return proxyRequest(request, await params);
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return proxyRequest(request, await params);
-}
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return proxyRequest(request, await params);
-}
-
 async function proxyRequest(request: Request, params: { path: string[] }) {
-  // Get the current session
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -55,34 +40,28 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
 
   const path = params.path.join("/");
   const url = new URL(request.url);
-  const targetUrl = `${FASTAPI_BASE_URL}/api/v1/chat/${path}${url.search}`;
+  const targetUrl = `${FASTAPI_BASE_URL}/api/v1/adaptive/${path}${url.search}`;
 
-  // Prepare headers for the backend
   const backendHeaders: HeadersInit = {
     "X-API-Key": INTERNAL_API_KEY || "",
     "X-User-ID": session.user.id,
   };
 
-  // Forward content-type if present
   const contentType = request.headers.get("content-type");
   if (contentType) {
     backendHeaders["Content-Type"] = contentType;
   }
 
-  // Longer timeout for streaming endpoints
-  const isStreamEndpoint = path.includes("stream");
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), isStreamEndpoint ? 120000 : 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  // Prepare request options
   const fetchOptions: RequestInit = {
     method: request.method,
     headers: backendHeaders,
     signal: controller.signal,
   };
 
-  // Forward body for POST/PATCH (use arrayBuffer for binary safety)
-  if (request.method === "POST" || request.method === "PATCH") {
+  if (request.method === "POST") {
     const buffer = await request.arrayBuffer();
     fetchOptions.body = buffer;
   }
@@ -90,19 +69,6 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
   try {
     const response = await fetch(targetUrl, fetchOptions);
     clearTimeout(timeoutId);
-
-    const responseContentType = response.headers.get("content-type") || "";
-    if (responseContentType.includes("text/event-stream")) {
-      return new Response(response.body, {
-        status: response.status,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
-    }
-
     const responseText = await response.text();
 
     try {
@@ -120,7 +86,7 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
       return NextResponse.json({ error: "Request timeout" }, { status: 504 });
     }
     return NextResponse.json(
-      { error: "Failed to connect to chat service" },
+      { error: "Failed to connect to adaptive learning service" },
       { status: 502 }
     );
   }

@@ -1,3 +1,4 @@
+import { getStudyPlans } from "@/actions/study-plan.action";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -100,10 +101,8 @@ export default async function Page({ params }: PageProps) {
     headers: await headers(),
   });
 
-  const subject = await getSubjectData(
-    subjectId,
-    session?.user.id ?? null
-  );
+  const subject = await getSubjectData(subjectId, session?.user.id ?? null);
+  const sessions = await getStudyPlans(parseInt(subjectId));
 
   return (
     <div className="container mx-auto max-w-7xl px-3 py-8 md:px-8 lg:px-16">
@@ -111,6 +110,7 @@ export default async function Page({ params }: PageProps) {
         <SubjectInfoCard
           subject={subject}
           isAuthenticated={!!session}
+          sessions={sessions}
         />
       </section>
 

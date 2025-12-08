@@ -23,6 +23,7 @@ import { parseSSEStream } from "@/lib/chat-api";
 interface ChatContextValue {
   subjectId: number;
   chapterIds?: number[];
+  studyPlanId?: string;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -140,13 +141,17 @@ function convertMessagesToRepository(
 
 function createThreadListAdapter(
   subjectId: number,
-  chapterIds?: number[]
+  chapterIds?: number[],
+  studyPlanId?: string
 ): RemoteThreadListAdapter {
   return {
     async list() {
       const params = new URLSearchParams();
       params.set("subject_id", String(subjectId));
       params.set("include_archived", "false");
+      if (studyPlanId) {
+        params.set("study_plan_id", studyPlanId);
+      }
 
       const response = await fetch(`/api/chat/threads?${params}`);
       if (!response.ok) {
@@ -171,6 +176,7 @@ function createThreadListAdapter(
         body: JSON.stringify({
           subject_id: subjectId,
           chapter_ids: chapterIds,
+          study_plan_id: studyPlanId,
         }),
       });
 
@@ -314,21 +320,23 @@ interface ChatRuntimeProviderProps {
   children: ReactNode;
   subjectId: number;
   chapterIds?: number[];
+  studyPlanId?: string;
 }
 
 export function ChatRuntimeProvider({
   children,
   subjectId,
   chapterIds,
+  studyPlanId,
 }: ChatRuntimeProviderProps) {
   const contextValue = useMemo(
-    () => ({ subjectId, chapterIds }),
-    [subjectId, chapterIds]
+    () => ({ subjectId, chapterIds, studyPlanId }),
+    [subjectId, chapterIds, studyPlanId]
   );
 
   const threadListAdapter = useMemo(
-    () => createThreadListAdapter(subjectId, chapterIds),
-    [subjectId, chapterIds]
+    () => createThreadListAdapter(subjectId, chapterIds, studyPlanId),
+    [subjectId, chapterIds, studyPlanId]
   );
 
   const runtime = useRemoteThreadListRuntime({
