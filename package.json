@@ -8,6 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
+    "test": "vitest run --project=unit",
+    "test:watch": "vitest --project=unit",
+    "test:coverage": "vitest run --project=unit --coverage",
+    "test:storybook": "vitest run --project=storybook",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "db:seed": "tsx prisma/seed.ts"
