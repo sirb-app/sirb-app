@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "./logo";
 import { NavigationDesktop, NavigationDesktopAuth } from "./navigation-desktop";
 import { NavigationMobile } from "./navigation-mobile";
 
@@ -31,9 +31,7 @@ export const Navigation = () => {
           <div className="bg-card rounded-lg border px-4 py-3 shadow-md md:px-6 md:py-4">
             <div className="flex flex-row-reverse items-center justify-between md:flex-row">
               {/* Logo */}
-              <Link href="/" className="text-foreground text-xl font-bold">
-                سرب
-              </Link>
+              <Logo size="md" asLink />
 
               {/* Desktop Navigation */}
               <NavigationDesktop />

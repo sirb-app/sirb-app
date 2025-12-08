@@ -72,23 +72,23 @@
 }
 
 .dark {
-  --background: oklch(0 0 0);
+  --background: oklch(0.15 0.01 270);
   --foreground: oklch(1 0 0);
-  --card: oklch(0.2455 0.0217 257.2823);
+  --card: oklch(0.2 0.015 270);
   --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.2455 0.0217 257.2823);
+  --popover: oklch(0.2 0.015 270);
   --popover-foreground: oklch(1 0 0);
   --primary: oklch(0.6801 0.1583 276.9349);
   --primary-foreground: oklch(0 0 0);
   --secondary: oklch(0.7845 0.1325 181.912);
   --secondary-foreground: oklch(0 0 0);
-  --muted: oklch(0.3211 0 0);
+  --muted: oklch(0.25 0.008 270);
   --muted-foreground: oklch(0.8452 0 0);
   --accent: oklch(0.879 0.1534 91.6054);
   --accent-foreground: oklch(0 0 0);
   --destructive: oklch(0.7106 0.1661 22.2162);
   --destructive-foreground: oklch(0 0 0);
-  --border: oklch(0.4459 0 0);
+  --border: oklch(0.35 0.01 270);
   --input: oklch(1 0 0);
   --ring: oklch(0.6801 0.1583 276.9349);
   --chart-1: oklch(0.6801 0.1583 276.9349);
@@ -98,7 +98,7 @@
   --chart-5: oklch(0.8003 0.1821 151.711);
   --success: oklch(0.6873 0.1632 152.8341);
   --success-foreground: oklch(0 0 0);
-  --sidebar: oklch(0 0 0);
+  --sidebar: oklch(0.15 0.01 270);
   --sidebar-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0.6801 0.1583 276.9349);
   --sidebar-primary-foreground: oklch(0 0 0);
@@ -206,4 +206,30 @@
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
   }
+}
+
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.15;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+}
+
+.dark .bg-grid-pattern {
+  opacity: 0.4;
+}
+
+.bg-dots-pattern {
+  background-image: radial-gradient(circle, var(--color-border) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.15;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+}
+
+.dark .bg-dots-pattern {
+  opacity: 0.2;
 }

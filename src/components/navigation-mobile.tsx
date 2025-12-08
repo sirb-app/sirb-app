@@ -80,17 +80,20 @@ export const NavigationMobile = ({
             </h3>
             {routes.map(route => {
               const Icon = route.icon;
+              const isActive =
+                route.path === "/"
+                  ? activePathname === "/"
+                  : activePathname?.startsWith(route.path);
               return (
                 <Link
                   key={route.path}
                   href={route.path}
                   onClick={() => setIsSheetOpen(false)}
                   className={cn(
-                    "text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                    {
-                      "border-primary bg-primary/10 text-primary border-r-2":
-                        route.path === activePathname,
-                    }
+                    "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />
