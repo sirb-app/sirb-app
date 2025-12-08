@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { resetPassword } from "@/lib/auth-client";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -19,11 +20,11 @@ import { z } from "zod";
 
 const ResetPasswordSchema = z
   .object({
-    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    newPassword: z.string().min(8, "يجب أن تكون كلمة المرور 8 أحرف على الأقل"),
     confirmPassword: z.string(),
   })
   .refine(data => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "كلمات المرور غير متطابقة",
     path: ["confirmPassword"],
   });
 
@@ -53,7 +54,7 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
           toast.error(ctx.error.message);
         },
         onSuccess: () => {
-          toast.success("Password reset successfully.");
+          toast.success("تم إعادة تعيين كلمة المرور بنجاح");
           router.push("/auth/login");
         },
       },
@@ -64,16 +65,24 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleSubmit)}
-        className="w-full max-w-sm space-y-4"
+        className="w-full space-y-4"
       >
         <FormField
           control={form.control}
           name="newPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>New Password</FormLabel>
+              <FormLabel>كلمة المرور الجديدة</FormLabel>
               <FormControl>
-                <Input type="password" {...field} />
+                <div className="relative">
+                  <Lock className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    className="pr-10"
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -85,9 +94,17 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Confirm Password</FormLabel>
+              <FormLabel>تأكيد كلمة المرور</FormLabel>
               <FormControl>
-                <Input type="password" {...field} />
+                <div className="relative">
+                  <Lock className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    className="pr-10"
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -99,7 +116,14 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
           className="w-full"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? "Resetting..." : "Reset Password"}
+          {form.formState.isSubmitting ? (
+            <>
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              جاري إعادة التعيين...
+            </>
+          ) : (
+            "إعادة تعيين كلمة المرور"
+          )}
         </Button>
       </form>
     </Form>

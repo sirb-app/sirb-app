@@ -25,13 +25,11 @@ import { ContentStatus } from "@/generated/prisma";
 import {
   AlertCircle,
   Check,
-  Eye,
   MoreVertical,
   Pencil,
   Trash2,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -63,13 +61,13 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
         return <Badge variant="secondary">مسودة</Badge>;
       case "PENDING":
         return (
-          <Badge className="border-yellow-200 bg-yellow-500/15 text-yellow-600 hover:bg-yellow-500/25">
+          <Badge className="border-accent/30 bg-accent/20 hover:bg-accent/30">
             قيد المراجعة
           </Badge>
         );
       case "APPROVED":
         return (
-          <Badge className="border-green-200 bg-green-500/15 text-green-600 hover:bg-green-500/25">
+          <Badge className="border-success/30 bg-success/20 hover:bg-success/30 text-success">
             منشور
           </Badge>
         );
@@ -92,7 +90,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
       setIsEditing(false);
       toast.success("تم تحديث التفاصيل");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("فشل التحديث");
     } finally {
       setIsLoading(false);
@@ -113,20 +111,19 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
       router.push(
         `/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}`
       );
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الحذف");
       setIsLoading(false);
     }
   };
 
-  const previewUrl = `/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}/canvases/${canvas.id}`;
   const isEditable = canvas.status !== "PENDING";
 
   return (
-    <div className="space-y-4 border-b pb-6">
-      <div className="flex flex-col gap-6">
+    <div className="space-y-3 border-b pb-4 sm:space-y-4 sm:pb-6">
+      <div className="flex flex-col gap-4 sm:gap-6">
         {/* Top Bar: Title/Badge & Actions */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
           {/* Title Section */}
           <div className="flex-1 space-y-2">
             {isEditing ? (
@@ -186,7 +183,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                           <span>تعديل التفاصيل</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-destructive focus:text-destructive focus:bg-destructive/10 flex-row-reverse"
+                          className="text-destructive focus:text-destructive focus:bg-destructive/15 flex-row-reverse"
                           onClick={() => setIsDeleteDialogOpen(true)}
                         >
                           <Trash2 className="text-destructive ml-2 h-4 w-4" />
@@ -196,12 +193,14 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                     </DropdownMenu>
                   )}
 
-                  <h1 className="text-2xl font-bold">{canvas.title}</h1>
+                  <h1 className="text-xl font-bold sm:text-2xl">
+                    {canvas.title}
+                  </h1>
 
                   {getStatusBadge()}
                 </div>
                 {canvas.description && (
-                  <p className="text-muted-foreground mt-1 pr-11">
+                  <p className="text-muted-foreground mt-1 text-sm sm:pr-11 sm:text-base">
                     {canvas.description}
                   </p>
                 )}
@@ -209,7 +208,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
             )}
 
             {canvas.status === "REJECTED" && canvas.rejectionReason && (
-              <div className="bg-destructive/10 text-destructive mt-2 flex items-start gap-2 rounded-md p-3 text-sm">
+              <div className="bg-destructive/15 border-destructive/30 text-destructive mt-2 flex items-start gap-2 rounded-md border p-3 text-sm">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
                   <span className="font-semibold">سبب الرفض: </span>
@@ -217,16 +216,6 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Preview Action Only */}
-          <div className="flex shrink-0 items-center gap-2">
-            <Button variant="outline" asChild>
-              <Link href={previewUrl} target="_blank">
-                <Eye className="mr-2 h-4 w-4" />
-                معاينة
-              </Link>
-            </Button>
           </div>
         </div>
       </div>

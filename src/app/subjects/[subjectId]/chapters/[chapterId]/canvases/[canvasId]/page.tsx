@@ -55,14 +55,37 @@ async function getCanvasData(
           contentType: true,
           textContent: true,
           video: {
-            include: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              youtubeVideoId: true,
+              duration: true,
+              isOriginal: true,
               progress: {
                 where: { userId },
                 select: { lastPosition: true },
               },
             },
           },
-          file: true,
+          file: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              url: true,
+              mimeType: true,
+              fileSize: true,
+              isOriginal: true,
+            },
+          },
+          canvasQuestion: {
+            include: {
+              options: {
+                orderBy: { sequence: "asc" },
+              },
+            },
+          },
         },
       },
       votes: {
@@ -184,10 +207,10 @@ export default async function Page({ params }: PageProps) {
                 id: canvas.id,
                 contributorId: canvas.contributorId,
                 createdAt: canvas.createdAt,
-                upvotesCount: (canvas as any).upvotesCount,
-                downvotesCount: (canvas as any).downvotesCount,
-                netScore: (canvas as any).netScore,
-                viewCount: (canvas as any).viewCount,
+                upvotesCount: canvas.upvotesCount,
+                downvotesCount: canvas.downvotesCount,
+                netScore: canvas.netScore,
+                viewCount: canvas.viewCount,
                 contributor: canvas.contributor,
               }}
               userVote={canvas.userVote}

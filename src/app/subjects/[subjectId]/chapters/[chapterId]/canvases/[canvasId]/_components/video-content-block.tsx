@@ -1,6 +1,7 @@
 "use client";
 
 import { saveVideoProgress } from "@/actions/save-video-progress.action";
+import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
 
@@ -11,6 +12,7 @@ type VideoContentBlockProps = {
     description: string | null;
     youtubeVideoId: string;
     duration: number;
+    isOriginal: boolean;
     progress: Array<{ lastPosition: number }>;
   };
 };
@@ -87,21 +89,32 @@ export default function VideoContentBlock({ video }: VideoContentBlockProps) {
   }, [currentTime, saveProgress]);
 
   return (
-    <div className="space-y-4">
-      {video.description && (
-        <div className="text-muted-foreground text-sm">{video.description}</div>
+    <div className="space-y-3">
+      {video.title && (
+        <div className="text-muted-foreground text-sm">{video.title}</div>
       )}
 
       {/* Video player - responsive following react-player v3 docs */}
-      <ReactPlayer
-        ref={playerRef}
-        src={`https://www.youtube.com/watch?v=${video.youtubeVideoId}`}
-        style={{ width: "100%", height: "auto", aspectRatio: "16/9" }}
-        controls
-        onLoadedMetadata={handleLoadedMetadata}
-        onTimeUpdate={handleTimeUpdate}
-        onPause={handlePause}
-      />
+      <div className="relative">
+        <ReactPlayer
+          ref={playerRef}
+          src={`https://www.youtube.com/watch?v=${video.youtubeVideoId}`}
+          style={{ width: "100%", height: "auto", aspectRatio: "16/9" }}
+          controls
+          onLoadedMetadata={handleLoadedMetadata}
+          onTimeUpdate={handleTimeUpdate}
+          onPause={handlePause}
+        />
+      </div>
+
+      {/* Source Attribution - Subtle informational style */}
+      {/* Show badge when isOriginal is false (meaning isExternal is true) */}
+      {video.isOriginal === false && (
+        <div className="text-muted-foreground flex items-center gap-1.5 text-xs sm:text-sm">
+          <ExternalLink className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+          <span className="leading-relaxed">محتوى منقول من مصدر خارجي</span>
+        </div>
+      )}
     </div>
   );
 }

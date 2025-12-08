@@ -1,6 +1,6 @@
 "use client";
 
-import { rejectCanvas } from "@/actions/moderation.action";
+import { rejectCanvas, rejectQuiz } from "@/actions/moderation.action";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,31 +17,51 @@ import { toast } from "sonner";
 type RejectDialogProps = {
   isOpen: boolean;
   onClose: () => void;
-  canvasId: number | null;
+  contentId: number | null;
+  contentType: "canvas" | "quiz" | null;
   onSuccess: () => void;
 };
 
 export default function RejectDialog({
   isOpen,
   onClose,
-  canvasId,
+  contentId,
+  contentType,
   onSuccess,
 }: RejectDialogProps) {
   const [reason, setReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!canvasId || !reason.trim()) return;
+    if (!contentId || !reason.trim() || !contentType) return;
 
     try {
       setIsLoading(true);
-      await rejectCanvas({ canvasId, reason });
-      toast.success("تم رفض المحتوى");
+
+      if (contentType === "canvas") {
+        await rejectCanvas({ canvasId: contentId, reason });
+        toast.success("تم رفض الشرح");
+      } else if (contentType === "quiz") {
+        await rejectQuiz({ quizId: contentId, reason });
+        toast.success("تم رفض الاختبار");
+      }
+
       onSuccess();
       setReason("");
       onClose();
     } catch (error) {
-      toast.error("حدث خطأ");
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("already been processed")) {
+        toast.info(
+          contentType === "quiz"
+            ? "تمت معالجة هذا الاختبار مسبقاً"
+            : "تمت معالجة هذا الشرح مسبقاً"
+        );
+        onSuccess(); // Refresh to update the list
+        onClose();
+      } else {
+        toast.error("حدث خطأ");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -51,9 +71,11 @@ export default function RejectDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="space-y-4">
         <DialogHeader>
-          <DialogTitle>رفض المحتوى</DialogTitle>
+          <DialogTitle>
+            {contentType === "quiz" ? "رفض الاختبار" : "رفض الشرح"}
+          </DialogTitle>
           <DialogDescription>
-            يرجى كتابة سبب الرفض ليتمكن المساهم من تعديل المحتوى.
+            يرجى كتابة سبب الرفض ليتمكن المساهم من التعديل.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">

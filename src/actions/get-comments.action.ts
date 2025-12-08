@@ -72,7 +72,19 @@ export async function getComments(
   }
 
   try {
+<<<<<<< HEAD
     const whereClause: Prisma.CommentWhereInput = {
+=======
+    const whereClause: {
+      canvasId: number;
+      parentCommentId: null;
+      OR: Array<{
+        isDeleted: boolean;
+        replies?: { some: { isDeleted: boolean } };
+      }>;
+      id?: { lt: number };
+    } = {
+>>>>>>> 17f1a3bce64b4a60c8b65e88954dc3dba8d6dc22
       canvasId: canvasId,
       parentCommentId: null,
       OR: [
@@ -92,7 +104,15 @@ export async function getComments(
       whereClause.id = { lt: cursor };
     }
 
+<<<<<<< HEAD
     const orderBy: Prisma.CommentOrderByWithRelationInput[] = [];
+=======
+    const orderBy: Array<{
+      netScore?: "desc";
+      createdAt?: "desc";
+      id?: "desc";
+    }> = [];
+>>>>>>> 17f1a3bce64b4a60c8b65e88954dc3dba8d6dc22
     if (sortBy === "best") {
       orderBy.push({ netScore: "desc" as const });
     } else {

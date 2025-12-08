@@ -94,6 +94,12 @@ export default function CommentItem({
       return;
     }
 
+    // Prevent self-voting
+    if (isOwner) {
+      toast.info("لا يمكنك التصويت على تعليقك");
+      return;
+    }
+
     const previousVote = optimisticVote;
     const previousScore = optimisticScore;
 
@@ -116,12 +122,11 @@ export default function CommentItem({
       .then(() => {
         router.refresh();
       })
-      .catch(error => {
+      .catch(() => {
         // Revert optimistic update
         setOptimisticVote(previousVote);
         setOptimisticScore(previousScore);
         toast.error("فشل التصويت");
-        console.error("Vote error:", error);
       });
   };
 
@@ -198,19 +203,19 @@ export default function CommentItem({
             <span className="font-medium">{comment.user.name}</span>
 
             {isContributor && (
-              <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs">
+              <span className="bg-primary/15 border-primary/30 text-primary rounded border px-2 py-0.5 text-xs">
                 المساهم
               </span>
             )}
 
             {comment.isPinned && (
-              <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs">
+              <span className="bg-primary/15 border-primary/30 text-primary rounded border px-2 py-0.5 text-xs">
                 مثبت
               </span>
             )}
 
             {comment.isAnnouncement && (
-              <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs">
+              <span className="bg-primary/15 border-primary/30 text-primary rounded border px-2 py-0.5 text-xs">
                 إعلان
               </span>
             )}

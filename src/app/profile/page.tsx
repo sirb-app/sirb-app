@@ -1,12 +1,16 @@
 import { ChangePasswordForm } from "@/components/change-password-form";
 import { SignOutButton } from "@/components/sign-out-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { UpdateUserForm } from "@/components/update-user-form";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { auth } from "@/lib/auth";
-import { ArrowLeftIcon } from "lucide-react";
+import { Lock, LogOut, Shield } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { EditableAvatar } from "./_components/editable-avatar";
+import { EditableNameField } from "./_components/editable-name-field";
 
 export default async function Page() {
   const headersList = await headers();
@@ -17,77 +21,66 @@ export default async function Page() {
 
   if (!session) redirect("/auth/login");
 
-  const FULL_POST_ACCESS = await auth.api.userHasPermission({
-    headers: headersList,
-    body: {
-      permissions: {
-        posts: ["update", "delete"],
-      },
-    },
-  });
-
   return (
-    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
-      <div className="space-y-4">
-        <Button size="icon" asChild>
-          <Link href="/">
-            <ArrowLeftIcon />
-          </Link>
-        </Button>
-        <h1 className="text-3xl font-bold">Profile</h1>
+    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-8 md:px-8 md:py-12">
+      {/* Single Unified Card */}
+      <Card>
+        <CardContent className="space-y-6 p-8 md:p-10">
+          {/* Avatar & Name Section */}
+          <div className="flex flex-col items-center gap-4 text-center">
+            <EditableAvatar
+              currentImage={session.user.image || null}
+              userName={session.user.name}
+              publicUrlBase={process.env.CLOUDFLARE_R2_PUBLIC_URL!}
+            />
 
-        <div className="flex items-center gap-2">
-          {session.user.role === "ADMIN" && (
-            <Button size="sm" asChild>
-              <Link href="/admin/dashboard">Admin Dashboard</Link>
-            </Button>
-          )}
+            <div className="space-y-2">
+              <EditableNameField initialName={session.user.name} />
 
-          <SignOutButton />
-        </div>
-      </div>
-      <h2 className="text-2xl font-bold">Permissions</h2>
+              <p className="text-muted-foreground text-sm">
+                {session.user.email}
+              </p>
 
-      <div className="space-x-4">
-        <Button size="sm">MANAGE OWN POSTS</Button>
-        <Button size="sm" disabled={!FULL_POST_ACCESS.success}>
-          MANAGE ALL POSTS
-        </Button>
-      </div>
+              {session.user.role === "ADMIN" && (
+                <Badge variant="default" className="gap-2">
+                  <Shield className="h-3 w-3" />
+                  مشرف
+                </Badge>
+              )}
+            </div>
+          </div>
 
-      {session.user.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={session.user.image}
-          alt="User Image"
-          className="border-primary size-24 rounded-md border object-cover"
-        />
-      ) : (
-        <div className="border-primary bg-primary text-primary-foreground flex size-24 items-center justify-center rounded-md border">
-          <span className="text-lg font-bold uppercase">
-            {session.user.name.slice(0, 2)}
-          </span>
-        </div>
-      )}
+          <Separator />
 
-      <pre className="overflow-clip text-sm">
-        {JSON.stringify(session, null, 2)}
-      </pre>
+          {/* Change Password Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Lock className="text-muted-foreground h-5 w-5" />
+              <h3 className="text-lg font-semibold">تغيير كلمة المرور</h3>
+            </div>
+            <ChangePasswordForm />
+          </div>
 
-      <div className="border-primary space-y-4 rounded-b-md border border-t-8 p-4">
-        <h2 className="text-2xl font-bold">Update User</h2>
+          <Separator />
 
-        <UpdateUserForm
-          name={session.user.name}
-          image={session.user.image ?? ""}
-        />
-      </div>
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {session.user.role === "ADMIN" && (
+              <Button asChild className="w-full">
+                <Link href="/admin/dashboard">
+                  <Shield className="ml-2 h-4 w-4" />
+                  لوحة الإشراف
+                </Link>
+              </Button>
+            )}
 
-      <div className="border-destructive space-y-4 rounded-b-md border border-t-8 p-4">
-        <h2 className="text-2xl font-bold">Change Password</h2>
-
-        <ChangePasswordForm />
-      </div>
+            <SignOutButton variant="destructive" className="w-full">
+              <LogOut className="ml-2 h-4 w-4" />
+              تسجيل الخروج
+            </SignOutButton>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

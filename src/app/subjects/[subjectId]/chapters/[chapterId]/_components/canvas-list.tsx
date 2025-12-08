@@ -10,7 +10,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import type { Prisma } from "@/generated/prisma";
 import { cn, stripTitlePrefix } from "@/lib/utils";
 import { BookOpen, Check, Lock, User } from "lucide-react";
 import Image from "next/image";
@@ -19,27 +18,19 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-type CanvasWithContributor = Prisma.CanvasGetPayload<{
-  select: {
-    id: true;
-    title: true;
-    description: true;
-    imageUrl: true;
-    sequence: true;
-    createdAt: true;
-    contributor: {
-      select: {
-        id: true;
-        name: true;
-      };
-    };
-    userProgress: {
-      select: {
-        completedAt: true;
-      };
-    };
+type CanvasWithContributor = {
+  id: number;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  sequence: number;
+  createdAt: Date;
+  contributor: {
+    id: string;
+    name: string | null;
   };
-}>;
+  userProgress: { completedAt: Date | null }[] | false;
+};
 
 type CanvasListProps = {
   readonly canvases: CanvasWithContributor[];
@@ -56,7 +47,7 @@ export default function CanvasList({
 }: CanvasListProps) {
   const router = useRouter();
 
-  const handleCanvasClick = (e: React.MouseEvent, canvasId: number) => {
+  const handleCanvasClick = (e: React.MouseEvent) => {
     if (!isAuthenticated) {
       e.preventDefault();
       toast.info("يجب تسجيل الدخول لعرض المحتوى", {
@@ -115,7 +106,7 @@ type CanvasCardProps = {
   readonly chapterId: number;
   readonly subjectId: number;
   readonly isAuthenticated: boolean;
-  readonly onCanvasClick: (e: React.MouseEvent, canvasId: number) => void;
+  readonly onCanvasClick: (e: React.MouseEvent) => void;
 };
 
 function CanvasCard({
@@ -131,7 +122,9 @@ function CanvasCard({
   // Determine if canvas is completed
   // Using !! to convert to boolean - handles both null and undefined correctly
   const isCompleted =
-    isAuthenticated && !!canvas.userProgress?.[0]?.completedAt;
+    isAuthenticated &&
+    canvas.userProgress !== false &&
+    !!canvas.userProgress?.[0]?.completedAt;
 
   // Optimistic UI state
   const [optimisticCompleted, setOptimisticCompleted] = useState(isCompleted);
@@ -164,12 +157,12 @@ function CanvasCard({
     <div className="group relative">
       <Link
         href={`/subjects/${subjectId}/chapters/${chapterId}/canvases/${canvas.id}`}
-        onClick={e => !isAuthenticated && onCanvasClick(e, canvas.id)}
+        onClick={e => !isAuthenticated && onCanvasClick(e)}
         className={cn("block", !isAuthenticated && "pointer-events-none")}
       >
         <Card
           className={cn(
-            "hover:border-primary/50 h-full gap-0 p-0 transition-all hover:shadow-md",
+            "hover:border-primary/50 flex h-full flex-col gap-0 p-0 transition-all hover:shadow-md",
             !isAuthenticated && "opacity-75"
           )}
         >
@@ -263,7 +256,7 @@ function CanvasCard({
                 )}
               >
                 <User className="h-3 w-3" />
-                <span>{canvas.contributor.name}</span>
+                <span>{canvas.contributor.name || "مساهم"}</span>
               </div>
             </div>
           </CardContent>

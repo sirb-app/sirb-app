@@ -2,8 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import AddCanvasButton from "./_components/add-canvas-button";
-import CanvasList from "./_components/canvas-list";
+import ChapterContentTabs from "./_components/chapter-content-tabs";
 import ChapterInfo from "./_components/chapter-info";
 
 type PageProps = {
@@ -31,7 +30,7 @@ async function getChapterData(
       canvases: {
         where: {
           status: "APPROVED",
-          isDeleted: false, // Exclude soft-deleted canvases
+          isDeleted: false,
         },
         orderBy: { sequence: "asc" },
         select: {
@@ -40,6 +39,7 @@ async function getChapterData(
           description: true,
           imageUrl: true,
           sequence: true,
+          netScore: true,
           createdAt: true,
           contributor: {
             select: {
@@ -51,6 +51,45 @@ async function getChapterData(
             ? {
                 where: { userId },
                 select: {
+                  completedAt: true,
+                },
+              }
+            : false,
+        },
+      },
+      quizzes: {
+        where: {
+          status: "APPROVED",
+          isDeleted: false,
+        },
+        orderBy: { sequence: "asc" },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          sequence: true,
+          netScore: true,
+          attemptCount: true,
+          createdAt: true,
+          contributor: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          questions: {
+            select: {
+              id: true,
+            },
+          },
+          attempts: userId
+            ? {
+                where: { userId },
+                orderBy: { score: "desc" },
+                take: 1,
+                select: {
+                  score: true,
+                  totalQuestions: true,
                   completedAt: true,
                 },
               }
@@ -87,34 +126,14 @@ export default async function Page({ params }: PageProps) {
         <ChapterInfo chapter={chapter} subjectId={parseInt(subjectId)} />
       </section>
 
-      {/* Header & Add Button */}
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold">الشروحات</h2>
-        {isAuthenticated && chapter.canvases.length > 0 && (
-          <AddCanvasButton chapterId={chapter.id} hasCanvases={true} />
-        )}
-      </div>
-
-      {/* Canvas Grid Below */}
-      <section aria-label="قائمة المحتويات">
-        {chapter.canvases.length > 0 ? (
-          <CanvasList
-            canvases={chapter.canvases}
-            chapterId={chapter.id}
-            subjectId={parseInt(subjectId)}
-            isAuthenticated={isAuthenticated}
-          />
-        ) : isAuthenticated ? (
-          <AddCanvasButton chapterId={chapter.id} hasCanvases={false} />
-        ) : (
-          <CanvasList
-            canvases={[]}
-            chapterId={chapter.id}
-            subjectId={parseInt(subjectId)}
-            isAuthenticated={isAuthenticated}
-          />
-        )}
-      </section>
+      {/* Content Tabs (Canvases & Quizzes) */}
+      <ChapterContentTabs
+        canvases={chapter.canvases}
+        quizzes={chapter.quizzes}
+        chapterId={chapter.id}
+        subjectId={parseInt(subjectId)}
+        isAuthenticated={isAuthenticated}
+      />
     </div>
   );
 }

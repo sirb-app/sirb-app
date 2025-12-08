@@ -130,7 +130,7 @@ export default function CanvasContributorSection({
     try {
       await navigator.clipboard.writeText(window.location.href);
       toast.success("تم نسخ الرابط");
-    } catch (error) {
+    } catch {
       toast.error("فشل نسخ الرابط");
     }
   };
@@ -193,7 +193,7 @@ export default function CanvasContributorSection({
               className={cn(
                 "hover:bg-muted flex items-center gap-1.5 rounded-full px-3 py-2 transition-colors",
                 optimisticVote === "LIKE"
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary/15 border-primary/30 text-primary border"
                   : "text-muted-foreground"
               )}
               aria-label="أعجبني"
@@ -216,7 +216,7 @@ export default function CanvasContributorSection({
               className={cn(
                 "hover:bg-muted flex items-center gap-1.5 rounded-full px-3 py-2 transition-colors",
                 optimisticVote === "DISLIKE"
-                  ? "bg-destructive/10 text-destructive"
+                  ? "bg-destructive/15 border-destructive/30 text-destructive border"
                   : "text-muted-foreground"
               )}
               aria-label="لم يعجبني"

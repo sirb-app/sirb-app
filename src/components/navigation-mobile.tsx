@@ -9,23 +9,43 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useModerationAccess } from "@/hooks/use-moderation-access";
 import { cn } from "@/lib/utils";
-import { BookOpen, LogIn, LogOut, Menu, UserPlus, Users } from "lucide-react";
+import {
+  BookOpen,
+  LogIn,
+  LogOut,
+  Menu,
+  Shield,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ModeToggle } from "./mode-toggle";
 import { SignOutButton } from "./sign-out-button";
 
 const routes = [
   { label: "الرئيسية", path: "/", icon: BookOpen },
   { label: "المقررات", path: "/subjects", icon: BookOpen },
-  { label: "من نحن", path: "/about", icon: Users },
+  { label: "من نحن", path: "/team", icon: Users },
 ];
 
+type User = {
+  id: string;
+  name: string;
+  image?: string | null;
+  role?: string;
+} | null;
+
 type NavigationMobileProps = {
+<<<<<<< HEAD
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any;
+=======
+  user: User;
+>>>>>>> 17f1a3bce64b4a60c8b65e88954dc3dba8d6dc22
   isPending: boolean;
 };
 
@@ -34,12 +54,18 @@ export const NavigationMobile = ({
   isPending,
 }: NavigationMobileProps) => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const activePathname = usePathname();
+  const hasModerationAccess = useModerationAccess(user);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
       <SheetTrigger asChild className="md:hidden">
-        {isPending && !user ? (
+        {!mounted || isPending ? (
           <Button variant="ghost" size="sm" disabled>
             <Skeleton className="h-5 w-5" />
           </Button>
@@ -66,17 +92,20 @@ export const NavigationMobile = ({
             </h3>
             {routes.map(route => {
               const Icon = route.icon;
+              const isActive =
+                route.path === "/"
+                  ? activePathname === "/"
+                  : activePathname?.startsWith(route.path);
               return (
                 <Link
                   key={route.path}
                   href={route.path}
                   onClick={() => setIsSheetOpen(false)}
                   className={cn(
-                    "text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                    {
-                      "border-primary bg-primary/10 text-primary border-r-2":
-                        route.path === activePathname,
-                    }
+                    "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -91,7 +120,7 @@ export const NavigationMobile = ({
               الحساب
             </h3>
             <div className="flex flex-col gap-2 px-3">
-              {isPending && !user ? (
+              {!mounted || isPending ? (
                 <>
                   <div className="text-muted-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">
                     <Skeleton className="h-4 w-4" />
@@ -112,6 +141,16 @@ export const NavigationMobile = ({
                     <BookOpen className="h-4 w-4" />
                     <span>مقرراتي</span>
                   </Link>
+                  {hasModerationAccess && (
+                    <Link
+                      href="/moderation"
+                      onClick={() => setIsSheetOpen(false)}
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+                    >
+                      <Shield className="h-4 w-4" />
+                      <span>الإشراف</span>
+                    </Link>
+                  )}
                   <Link
                     href="/profile"
                     onClick={() => setIsSheetOpen(false)}

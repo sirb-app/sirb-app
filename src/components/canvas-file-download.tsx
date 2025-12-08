@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 interface FileDownloadButtonProps {
   fileId: number;
-  fileName: string;
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
@@ -16,7 +15,6 @@ interface FileDownloadButtonProps {
 
 export function FileDownloadButton({
   fileId,
-  fileName,
   variant = "outline",
   size = "default",
   className,

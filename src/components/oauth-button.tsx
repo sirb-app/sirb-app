@@ -2,18 +2,16 @@
 
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth-client";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { SiGithub, SiGoogle } from "react-icons/si";
 import { toast } from "sonner";
 
-type SignInOauthButtonProps = {
+type OAuthButtonProps = {
   provider: "google" | "github";
-  signUp?: boolean;
 };
 
-export const SignInOauthButton = ({
-  provider,
-  signUp,
-}: SignInOauthButtonProps) => {
+export const OAuthButton = ({ provider }: OAuthButtonProps) => {
   const [isPending, setIsPending] = useState(false);
 
   async function handleClick() {
@@ -35,12 +33,23 @@ export const SignInOauthButton = ({
     });
   }
 
-  const action = signUp ? "Up" : "In";
   const providerName = provider === "google" ? "Google" : "GitHub";
 
   return (
-    <Button onClick={handleClick} disabled={isPending}>
-      Sign {action} with {providerName}
+    <Button
+      variant="outline"
+      className="w-full gap-2"
+      onClick={handleClick}
+      disabled={isPending}
+    >
+      {isPending ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : provider === "google" ? (
+        <SiGoogle className="h-4 w-4" />
+      ) : (
+        <SiGithub className="h-4 w-4" />
+      )}
+      <span>{providerName}</span>
     </Button>
   );
 };

@@ -46,14 +46,14 @@ function getStatusBadge(status: ContentStatus) {
       );
     case "PENDING":
       return (
-        <Badge className="border-yellow-200 bg-yellow-500/15 text-yellow-600 hover:bg-yellow-500/25 gap-1">
+        <Badge className="border-accent/30 bg-accent/20 hover:bg-accent/30 text-foreground gap-1">
           <Clock className="h-3 w-3" />
           قيد المراجعة
         </Badge>
       );
     case "APPROVED":
       return (
-        <Badge className="border-green-200 bg-green-500/15 text-green-600 hover:bg-green-500/25 gap-1">
+        <Badge className="border-success/30 bg-success/20 hover:bg-success/30 text-success gap-1">
           <Check className="h-3 w-3" />
           منشور
         </Badge>
@@ -77,7 +77,7 @@ export default function CanvasContributionCard({
         <div className="space-y-3">
           {/* Header: Title + Badge */}
           <div className="flex items-start justify-between gap-2">
-            <h4 className="line-clamp-2 flex-1 font-semibold leading-tight">
+            <h4 className="line-clamp-2 flex-1 leading-tight font-semibold">
               {canvas.title}
             </h4>
             {getStatusBadge(canvas.status)}
@@ -101,7 +101,7 @@ export default function CanvasContributionCard({
 
           {/* Rejection Reason (if applicable) */}
           {canvas.status === "REJECTED" && canvas.rejectionReason && (
-            <div className="bg-destructive/10 text-destructive rounded-md p-2.5 text-xs">
+            <div className="bg-destructive/15 border-destructive/30 text-destructive rounded-md border p-2.5 text-xs">
               <p className="mb-1 font-semibold">سبب الرفض:</p>
               <p className="line-clamp-2">{canvas.rejectionReason}</p>
             </div>

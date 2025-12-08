@@ -1,5 +1,6 @@
 "use client";
 
+import { reportQuiz, reportQuizComment } from "@/actions/quiz-report.action";
 import { reportCanvas, reportComment } from "@/actions/report.action";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,7 +57,7 @@ type ReportFormData = z.infer<typeof reportSchema>;
 type ReportDialogProps = {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly type: "canvas" | "comment";
+  readonly type: "canvas" | "comment" | "quiz" | "quizComment";
   readonly targetId: number;
 };
 
@@ -80,21 +81,35 @@ export default function ReportDialog({
     setIsSubmitting(true);
 
     try {
+      let result;
       if (type === "canvas") {
-        await reportCanvas(targetId, data.reason, data.description);
+        result = await reportCanvas(targetId, data.reason, data.description);
+      } else if (type === "comment") {
+        result = await reportComment(targetId, data.reason, data.description);
+      } else if (type === "quiz") {
+        result = await reportQuiz({
+          quizId: targetId,
+          reason: data.reason,
+          description: data.description,
+        });
       } else {
-        await reportComment(targetId, data.reason, data.description);
+        result = await reportQuizComment({
+          commentId: targetId,
+          reason: data.reason,
+          description: data.description,
+        });
       }
 
-      toast.success("تم إرسال البلاغ");
-      onOpenChange(false);
-      form.reset();
-    } catch (error) {
-      if (error instanceof Error && error.message === "تم الإبلاغ مسبقاً") {
-        toast.error("تم الإبلاغ مسبقاً");
+      if (result.success) {
+        toast.success("تم إرسال البلاغ");
+        onOpenChange(false);
+        form.reset();
       } else {
-        toast.error("فشل إرسال البلاغ");
+        toast.error(result.error || "فشل إرسال البلاغ");
       }
+    } catch (error) {
+      // Handle unexpected errors (e.g., network issues, auth errors)
+      toast.error("فشل إرسال البلاغ");
       console.error("Report error:", error);
     } finally {
       setIsSubmitting(false);
@@ -117,7 +132,11 @@ export default function ReportDialog({
       >
         <DialogHeader className="!text-right">
           <DialogTitle>
-            {type === "canvas" ? "الإبلاغ عن المحتوى" : "الإبلاغ عن التعليق"}
+            {type === "canvas"
+              ? "الإبلاغ عن المحتوى"
+              : type === "quiz"
+                ? "الإبلاغ عن الاختبار"
+                : "الإبلاغ عن التعليق"}
           </DialogTitle>
           <DialogDescription>
             يرجى تحديد سبب الإبلاغ وإضافة أي تفاصيل إضافية

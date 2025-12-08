@@ -1,5 +1,5 @@
 import { FileDownloadButton } from "@/components/canvas-file-download";
-import { File } from "lucide-react";
+import { ExternalLink, File } from "lucide-react";
 
 type FileContentBlockProps = {
   readonly file: {
@@ -9,6 +9,7 @@ type FileContentBlockProps = {
     url: string;
     mimeType: string;
     fileSize: bigint;
+    isOriginal: boolean;
   };
 };
 
@@ -24,8 +25,10 @@ function formatFileSize(bytes: bigint): string {
 function getFileTypeLabel(mimeType: string): string {
   const typeMap: Record<string, string> = {
     "application/pdf": "PDF",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "مستند Word",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "عرض تقديمي",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      "مستند Word",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      "عرض تقديمي",
     "text/plain": "ملف نصي",
     "image/png": "صورة PNG",
     "image/jpeg": "صورة JPEG",
@@ -37,19 +40,19 @@ function getFileTypeLabel(mimeType: string): string {
 export default function FileContentBlock({ file }: FileContentBlockProps) {
   return (
     <div className="bg-card block rounded-lg border p-4 sm:p-6">
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+      <div className="flex items-start gap-3 sm:items-center sm:gap-4">
         {/* File Icon */}
-        <div className="bg-primary/10 flex-shrink-0 rounded-lg p-3">
-          <File className="text-primary h-6 w-6" />
+        <div className="bg-primary/15 border-primary/30 flex-shrink-0 rounded-lg border p-2.5 sm:p-3">
+          <File className="text-primary h-5 w-5 sm:h-6 sm:w-6" />
         </div>
 
         {/* File Info */}
         <div className="min-w-0 flex-1">
-          <h3 className="text-foreground break-words text-base font-semibold sm:text-lg">
+          <h3 className="text-foreground text-base font-semibold break-words sm:text-lg">
             {file.title}
           </h3>
           {file.description && (
-            <p className="text-muted-foreground mt-1 break-words text-sm">
+            <p className="text-muted-foreground mt-1 text-sm break-words">
               {file.description}
             </p>
           )}
@@ -62,14 +65,22 @@ export default function FileContentBlock({ file }: FileContentBlockProps) {
         <div className="flex-shrink-0">
           <FileDownloadButton
             fileId={file.id}
-            fileName={file.title}
             variant="ghost"
             size="icon"
             iconOnly
-            className="hover:bg-muted/50 h-10 w-10"
+            className="hover:bg-muted/50 h-9 w-9 sm:h-10 sm:w-10"
           />
         </div>
       </div>
+
+      {/* Source Attribution - Subtle informational style */}
+      {/* Show badge when isOriginal is false (meaning isExternal is true) */}
+      {file.isOriginal === false && (
+        <div className="text-muted-foreground mt-3 flex items-center gap-1.5 border-t pt-3 text-xs sm:mt-4 sm:pt-4 sm:text-sm">
+          <ExternalLink className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+          <span className="leading-relaxed">محتوى منقول من مصدر خارجي</span>
+        </div>
+      )}
     </div>
   );
 }

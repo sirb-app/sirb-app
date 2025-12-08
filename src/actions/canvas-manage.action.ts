@@ -1,6 +1,6 @@
 "use server";
 
-import { ContentStatus, UserRole } from "@/generated/prisma";
+import { ContentStatus, QuestionType, UserRole } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -67,6 +67,95 @@ const UpdateFileBlockSchema = z.object({
   mimeType: z.string().optional(),
   isOriginal: z.boolean().optional(),
 });
+
+const AddCanvasQuestionBlockSchema = z
+  .object({
+    canvasId: z.number(),
+    questionText: z.string().min(5, "Question must be at least 5 characters"),
+    questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
+    justification: z.string().optional(),
+    options: z.array(
+      z.object({
+        optionText: z.string().min(1, "Option text cannot be empty"),
+        isCorrect: z.boolean(),
+      })
+    ),
+  })
+  .refine(
+    data => {
+      // TRUE_FALSE must have exactly 2 options
+      if (data.questionType === "TRUE_FALSE") {
+        return data.options.length === 2;
+      }
+      // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
+      return data.options.length === 4;
+    },
+    {
+      message:
+        "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
+    }
+  )
+  .refine(
+    data => {
+      const correctCount = data.options.filter(o => o.isCorrect).length;
+
+      if (
+        data.questionType === "MCQ_SINGLE" ||
+        data.questionType === "TRUE_FALSE"
+      ) {
+        return correctCount === 1;
+      }
+      return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
+    },
+    {
+      message: "Invalid correct answer configuration for question type",
+    }
+  );
+
+const UpdateCanvasQuestionBlockSchema = z
+  .object({
+    blockId: z.number(),
+    canvasId: z.number(),
+    questionText: z.string().min(5, "Question must be at least 5 characters"),
+    questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
+    justification: z.string().optional(),
+    options: z.array(
+      z.object({
+        optionText: z.string().min(1, "Option text cannot be empty"),
+        isCorrect: z.boolean(),
+      })
+    ),
+  })
+  .refine(
+    data => {
+      // TRUE_FALSE must have exactly 2 options
+      if (data.questionType === "TRUE_FALSE") {
+        return data.options.length === 2;
+      }
+      // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
+      return data.options.length === 4;
+    },
+    {
+      message:
+        "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
+    }
+  )
+  .refine(
+    data => {
+      const correctCount = data.options.filter(o => o.isCorrect).length;
+
+      if (
+        data.questionType === "MCQ_SINGLE" ||
+        data.questionType === "TRUE_FALSE"
+      ) {
+        return correctCount === 1;
+      }
+      return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
+    },
+    {
+      message: "Invalid correct answer configuration for question type",
+    }
+  );
 
 const ReorderBlocksSchema = z.object({
   canvasId: z.number(),
@@ -449,13 +538,22 @@ export async function updateFileBlock(
   const oldKey = validated.r2Key ? block.file.url : null;
 
   // Update file with new data
-  const updateData: any = {};
+  const updateData: {
+    title?: string;
+    description?: string | null;
+    url?: string;
+    fileSize?: bigint;
+    mimeType?: string;
+    isOriginal?: boolean;
+  } = {};
   if (validated.title) updateData.title = validated.title;
-  if (validated.description !== undefined) updateData.description = validated.description;
+  if (validated.description !== undefined)
+    updateData.description = validated.description;
   if (validated.r2Key) updateData.url = validated.r2Key; // Store new R2 key
   if (validated.fileSize) updateData.fileSize = BigInt(validated.fileSize);
   if (validated.mimeType) updateData.mimeType = validated.mimeType;
-  if (validated.isOriginal !== undefined) updateData.isOriginal = validated.isOriginal;
+  if (validated.isOriginal !== undefined)
+    updateData.isOriginal = validated.isOriginal;
 
   await prisma.file.update({
     where: { contentBlockId: validated.blockId },
@@ -467,6 +565,130 @@ export async function updateFileBlock(
     success: true,
     oldKey,
   };
+}
+
+export async function addCanvasQuestionBlock(
+  data: z.infer<typeof AddCanvasQuestionBlockSchema>
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = AddCanvasQuestionBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  return await prisma.$transaction(async tx => {
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
+
+    // Create ContentBlock first
+    const block = await tx.contentBlock.create({
+      data: {
+        canvasId: validated.canvasId,
+        sequence,
+        contentType: "QUESTION",
+      },
+    });
+
+    // Special handling for TRUE_FALSE - auto-set Arabic labels
+    let options = validated.options;
+    if (validated.questionType === "TRUE_FALSE") {
+      const correctAnswerIndex = validated.options.findIndex(o => o.isCorrect);
+      options = [
+        { optionText: "صح", isCorrect: correctAnswerIndex === 0 },
+        { optionText: "خطأ", isCorrect: correctAnswerIndex === 1 },
+        { optionText: "", isCorrect: false }, // Placeholder (not displayed)
+        { optionText: "", isCorrect: false }, // Placeholder (not displayed)
+      ];
+    }
+
+    // Create CanvasQuestion
+    const question = await tx.canvasQuestion.create({
+      data: {
+        questionText: validated.questionText,
+        questionType: validated.questionType as QuestionType,
+        justification: validated.justification,
+        contentBlockId: block.id,
+      },
+    });
+
+    // Create Options
+    await tx.canvasQuestionOption.createMany({
+      data: options.map((option, index) => ({
+        optionText: option.optionText,
+        isCorrect: option.isCorrect,
+        sequence: index + 1,
+        questionId: question.id,
+      })),
+    });
+
+    return block;
+  });
+}
+
+export async function updateCanvasQuestionBlock(
+  data: z.infer<typeof UpdateCanvasQuestionBlockSchema>
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = UpdateCanvasQuestionBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  return await prisma.$transaction(async tx => {
+    const block = await tx.contentBlock.findUnique({
+      where: { id: validated.blockId },
+      include: { canvasQuestion: true },
+    });
+
+    if (
+      !block ||
+      block.canvasId !== validated.canvasId ||
+      block.contentType !== "QUESTION" ||
+      !block.canvasQuestion
+    ) {
+      throw new Error("Block not found or invalid type");
+    }
+
+    const questionId = block.canvasQuestion.id;
+
+    // Update question text and justification
+    await tx.canvasQuestion.update({
+      where: { id: questionId },
+      data: {
+        questionText: validated.questionText,
+        questionType: validated.questionType as QuestionType,
+        justification: validated.justification,
+      },
+    });
+
+    // Replace all options (simpler than updating each)
+    await tx.canvasQuestionOption.deleteMany({
+      where: { questionId },
+    });
+
+    // Special handling for TRUE_FALSE
+    let options = validated.options;
+    if (validated.questionType === "TRUE_FALSE") {
+      const correctAnswerIndex = validated.options.findIndex(o => o.isCorrect);
+      options = [
+        { optionText: "صح", isCorrect: correctAnswerIndex === 0 },
+        { optionText: "خطأ", isCorrect: correctAnswerIndex === 1 },
+        { optionText: "", isCorrect: false },
+        { optionText: "", isCorrect: false },
+      ];
+    }
+
+    await tx.canvasQuestionOption.createMany({
+      data: options.map((option, index) => ({
+        optionText: option.optionText,
+        isCorrect: option.isCorrect,
+        sequence: index + 1,
+        questionId,
+      })),
+    });
+
+    return { success: true };
+  });
 }
 
 export async function deleteContentBlock(blockId: number, canvasId: number) {
@@ -521,6 +743,22 @@ export async function reorderBlocks(data: z.infer<typeof ReorderBlocksSchema>) {
   await checkCanvasOwnership(validated.canvasId, session.user.id);
 
   await prisma.$transaction(async tx => {
+    // Verify all blocks belong to this canvas before reordering
+    const blockIds = validated.updates.map(u => u.blockId);
+    const blocks = await tx.contentBlock.findMany({
+      where: { id: { in: blockIds } },
+      select: { id: true, canvasId: true },
+    });
+
+    if (blocks.length !== blockIds.length) {
+      throw new Error("One or more blocks not found");
+    }
+
+    const invalidBlock = blocks.find(b => b.canvasId !== validated.canvasId);
+    if (invalidBlock) {
+      throw new Error("One or more blocks do not belong to this canvas");
+    }
+
     // Two-phase update to avoid unique constraint violations:
     // Phase 1: Move all blocks to temporary negative sequences
     for (let i = 0; i < validated.updates.length; i++) {

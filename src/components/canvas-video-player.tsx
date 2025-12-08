@@ -13,13 +13,9 @@ type VideoWithProgress = Prisma.VideoGetPayload<{
 
 type CanvasVideoPlayerProps = {
   readonly video: VideoWithProgress;
-  readonly userId: string;
 };
 
-export default function CanvasVideoPlayer({
-  video,
-  userId,
-}: CanvasVideoPlayerProps) {
+export default function CanvasVideoPlayer({ video }: CanvasVideoPlayerProps) {
   // Get last position from progress or default to 0
   const lastPosition = video.progress[0]?.lastPosition || 0;
   const startTime = Math.floor(lastPosition);

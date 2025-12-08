@@ -1,3 +1,5 @@
+import { TipTapViewer } from "@/components/ui/tiptap-viewer";
+
 type TextContentBlockProps = {
   readonly content: string;
 };
@@ -5,9 +7,7 @@ type TextContentBlockProps = {
 export default function TextContentBlock({ content }: TextContentBlockProps) {
   return (
     <div className="bg-card rounded-lg border p-6">
-      <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-        {content}
-      </p>
+      <TipTapViewer content={content} />
     </div>
   );
 }

@@ -1,25 +1,27 @@
 import { ForgotPasswordForm } from "@/components/forgot-password-form";
-import { Button } from "@/components/ui/button";
-import { ArrowLeftIcon } from "lucide-react";
-import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function Page() {
   return (
-    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
-      <div className="space-y-4">
-        <Button size="icon" asChild>
-          <Link href="/auth/login">
-            <ArrowLeftIcon />
-          </Link>
-        </Button>
-
-        <h1 className="text-3xl font-bold">Forgot Password</h1>
-
-        <p className="text-muted-foreground">
-          Please enter your email address to receive a password reset link.
-        </p>
-
-        <ForgotPasswordForm />
+    <div className="bg-muted/40 flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">نسيت كلمة المرور</CardTitle>
+            <CardDescription>
+              أدخل بريدك الإلكتروني لتلقي رابط إعادة تعيين كلمة المرور
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ForgotPasswordForm />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
