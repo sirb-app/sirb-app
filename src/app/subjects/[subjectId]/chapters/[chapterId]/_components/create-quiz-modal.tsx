@@ -9,12 +9,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const createQuizSchema = z.object({
+  title: z
+    .string()
+    .min(3, "عنوان الاختبار يجب أن يكون 3 أحرف على الأقل")
+    .max(100, "عنوان الاختبار طويل جداً (الحد الأقصى 100 حرف)"),
+  description: z
+    .string()
+    .max(500, "الوصف طويل جداً (الحد الأقصى 500 حرف)")
+    .optional(),
+});
+
+type CreateQuizFormData = z.infer<typeof createQuizSchema>;
 
 type CreateQuizModalProps = {
   isOpen: boolean;
@@ -28,80 +50,104 @@ export default function CreateQuizModal({
   chapterId,
 }: CreateQuizModalProps) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
 
-  const handleCreate = async () => {
-    if (!title.trim()) return;
+  const form = useForm<CreateQuizFormData>({
+    resolver: zodResolver(createQuizSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+    },
+  });
 
+  const isLoading = form.formState.isSubmitting;
+
+  const onSubmit = async (data: CreateQuizFormData) => {
     try {
-      setIsLoading(true);
       const result = await createQuiz({
-        title,
-        description,
+        title: data.title,
+        description: data.description,
         chapterId,
       });
 
       if (result.success) {
         toast.success("تم إنشاء الاختبار");
+        form.reset();
         router.push(`/manage/quiz/${result.quizId}`);
       }
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء إنشاء الاختبار");
-      console.error(error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
+  const handleClose = () => {
+    form.reset();
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="space-y-4 sm:max-w-[500px]">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>إضافة اختبار جديد</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">
-              عنوان الاختبار <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="مثال: اختبار الفصل الأول"
-              autoFocus
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    عنوان الاختبار <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="مثال: اختبار الفصل الأول"
+                      autoFocus
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">وصف مختصر (اختياري)</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="اكتب نبذة عن محتوى الاختبار..."
-              rows={4}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>وصف مختصر (اختياري)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="اكتب نبذة عن محتوى الاختبار..."
+                      rows={4}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-        </div>
-        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={isLoading}
-            className="w-full sm:w-auto"
-          >
-            إلغاء
-          </Button>
-          <Button
-            onClick={handleCreate}
-            disabled={isLoading || !title.trim()}
-            className="w-full sm:w-auto"
-          >
-            {isLoading ? "جاري الإنشاء..." : "إنشاء"}
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading ? "جاري الإنشاء..." : "إنشاء"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

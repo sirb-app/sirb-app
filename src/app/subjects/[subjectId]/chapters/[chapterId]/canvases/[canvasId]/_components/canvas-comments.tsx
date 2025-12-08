@@ -1,7 +1,7 @@
 "use client";
 
-import CommentForm from "./comment-form";
-import CommentItem from "./comment-item";
+import { getComments } from "@/actions/get-comments.action";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -9,11 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { MessageSquare, Loader2 } from "lucide-react";
-import { useEffect, useState, useRef, useCallback } from "react";
-import { getComments } from "@/actions/get-comments.action";
-import { useRouter } from "next/navigation";
+import { Loader2, MessageSquare } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import CommentForm from "./comment-form";
+import CommentItem from "./comment-item";
 
 type Comment = {
   id: number;
@@ -60,11 +59,12 @@ export default function CanvasComments({
   currentUserId,
   isAuthenticated,
 }: CanvasCommentsProps) {
-  const router = useRouter();
   const [sortBy, setSortBy] = useState<"best" | "newest">("best");
   const [optimisticComments, setOptimisticComments] = useState<Comment[]>([]);
   const [allComments, setAllComments] = useState<Comment[]>(initialComments);
-  const [nextCursor, setNextCursor] = useState<number | null>(initialNextCursor);
+  const [nextCursor, setNextCursor] = useState<number | null>(
+    initialNextCursor
+  );
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isResettingRef = useRef(false);
@@ -114,13 +114,13 @@ export default function CanvasComments({
     setIsLoadingMore(true);
     try {
       const data = await getComments(canvasId, nextCursor, sortBy);
-      
-      setAllComments((prev) => {
+
+      setAllComments(prev => {
         const existingIds = new Set(prev.map(c => c.id));
         const newComments = data.comments.filter(c => !existingIds.has(c.id));
         return [...prev, ...newComments];
       });
-      
+
       setNextCursor(data.nextCursor);
       setHasMore(data.hasMore);
     } catch (error) {
@@ -132,7 +132,7 @@ export default function CanvasComments({
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => {
+      entries => {
         if (entries[0]?.isIntersecting && hasMore && !isLoadingMore) {
           loadMore();
         }
@@ -156,7 +156,7 @@ export default function CanvasComments({
     if (!currentUser) return;
 
     const tempId = -Date.now() - Math.random();
-    
+
     const newComment: Comment = {
       id: tempId,
       text,
@@ -177,12 +177,12 @@ export default function CanvasComments({
       replies: [],
     };
 
-    setOptimisticComments((prev) => [newComment, ...prev]);
+    setOptimisticComments(prev => [newComment, ...prev]);
   };
 
   const displayComments = [
     ...optimisticComments.map(c => ({ ...c, isOptimistic: true })),
-    ...allComments.map(c => ({ ...c, isOptimistic: false }))
+    ...allComments.map(c => ({ ...c, isOptimistic: false })),
   ];
 
   return (
@@ -195,7 +195,10 @@ export default function CanvasComments({
           </h2>
         </div>
 
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+        <Select
+          value={sortBy}
+          onValueChange={v => setSortBy(v as "best" | "newest")}
+        >
           <SelectTrigger className="w-[140px]">
             <SelectValue />
           </SelectTrigger>
@@ -222,9 +225,13 @@ export default function CanvasComments({
       ) : (
         <>
           <div className="space-y-2">
-            {displayComments.map((comment) => (
+            {displayComments.map(comment => (
               <CommentItem
-                key={comment.isOptimistic ? `optimistic-${comment.id}` : `real-${comment.id}`}
+                key={
+                  comment.isOptimistic
+                    ? `optimistic-${comment.id}`
+                    : `real-${comment.id}`
+                }
                 comment={comment}
                 currentUserId={currentUser?.id || currentUserId}
                 canvasId={canvasId}
@@ -264,4 +271,3 @@ export default function CanvasComments({
     </div>
   );
 }
-

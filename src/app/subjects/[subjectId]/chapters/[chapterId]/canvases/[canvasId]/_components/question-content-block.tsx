@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
+import { TipTapViewer } from "@/components/ui/tiptap-viewer";
 import { Check, X } from "lucide-react";
 import { useState } from "react";
 
@@ -50,9 +50,9 @@ export default function QuestionContentBlock({
       setIsSubmitted(true);
     } else {
       // For multi-choice, toggle selection
-      setSelectedOptionIds((prev) =>
+      setSelectedOptionIds(prev =>
         prev.includes(optionId)
-          ? prev.filter((id) => id !== optionId)
+          ? prev.filter(id => id !== optionId)
           : [...prev, optionId]
       );
     }
@@ -91,24 +91,24 @@ export default function QuestionContentBlock({
     if (!isSubmitted) return null;
 
     if (option.isCorrect) {
-      return <Check className="h-5 w-5 text-success" />;
+      return <Check className="text-success h-5 w-5" />;
     }
 
     if (selectedOptionIds.includes(option.id)) {
-      return <X className="h-5 w-5 text-destructive" />;
+      return <X className="text-destructive h-5 w-5" />;
     }
 
     return null;
   };
 
   return (
-    <div className="bg-card rounded-lg border p-6 space-y-6">
+    <div className="bg-card space-y-6 rounded-lg border p-6">
       {/* Question Text */}
       <div className="space-y-2">
-        <h3 className="text-lg font-semibold leading-relaxed">
-          {question.questionText}
-        </h3>
-        <p className="text-sm text-muted-foreground">
+        <div className="text-lg leading-relaxed font-semibold">
+          <TipTapViewer content={question.questionText} />
+        </div>
+        <p className="text-muted-foreground text-sm">
           {question.questionType === "MCQ_MULTI"
             ? "(يمكنك اختيار أكثر من إجابة)"
             : "(اختر إجابة واحدة)"}
@@ -119,36 +119,36 @@ export default function QuestionContentBlock({
       {isSingleChoice ? (
         <RadioGroup
           value={selectedOptionIds[0]?.toString() || ""}
-          onValueChange={(value) => handleOptionSelect(Number(value))}
+          onValueChange={value => handleOptionSelect(Number(value))}
           disabled={isSubmitted}
           className="space-y-3"
         >
-          {displayOptions.map((option) => (
+          {displayOptions.map(option => (
             <div
               key={option.id}
               onClick={() => !isSubmitted && handleOptionSelect(option.id)}
               className={`flex items-center space-x-3 space-x-reverse rounded-lg border-2 p-4 transition-all ${getOptionStyling(option)} ${!isSubmitted ? "cursor-pointer" : ""}`}
             >
-                <RadioGroupItem
-                  value={option.id.toString()}
-                  id={`option-${option.id}`}
-                  disabled={isSubmitted}
-                  className="shrink-0"
-                />
-                <Label
-                  htmlFor={`option-${option.id}`}
+              <RadioGroupItem
+                value={option.id.toString()}
+                id={`option-${option.id}`}
+                disabled={isSubmitted}
+                className="shrink-0"
+              />
+              <Label
+                htmlFor={`option-${option.id}`}
                 className="flex-1 cursor-pointer text-base leading-relaxed"
                 dir="rtl"
-                >
-                  {option.optionText}
-                </Label>
-                {getOptionIcon(option)}
+              >
+                {option.optionText}
+              </Label>
+              {getOptionIcon(option)}
             </div>
           ))}
         </RadioGroup>
       ) : (
         <div className="space-y-3">
-          {displayOptions.map((option) => (
+          {displayOptions.map(option => (
             <Label
               key={option.id}
               htmlFor={`option-${option.id}`}
@@ -156,18 +156,20 @@ export default function QuestionContentBlock({
               dir="rtl"
               onClick={() => !isSubmitted && handleOptionSelect(option.id)}
             >
-                <Checkbox
-                  id={`option-${option.id}`}
-                  checked={selectedOptionIds.includes(option.id)}
-                onCheckedChange={() => !isSubmitted && handleOptionSelect(option.id)}
-                  disabled={isSubmitted}
-                  className="shrink-0"
-                />
+              <Checkbox
+                id={`option-${option.id}`}
+                checked={selectedOptionIds.includes(option.id)}
+                onCheckedChange={() =>
+                  !isSubmitted && handleOptionSelect(option.id)
+                }
+                disabled={isSubmitted}
+                className="shrink-0"
+              />
               <span className="flex-1 text-base leading-relaxed">
-                  {option.optionText}
+                {option.optionText}
               </span>
               {getOptionIcon(option)}
-                </Label>
+            </Label>
           ))}
         </div>
       )}
@@ -185,11 +187,11 @@ export default function QuestionContentBlock({
 
       {/* Justification (shown after submission) */}
       {isSubmitted && question.justification && (
-        <div className="bg-accent/15 border-accent/30 rounded-md border px-4 py-3 space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <p className="font-semibold text-sm">التوضيح:</p>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-            {question.justification}
-          </p>
+        <div className="bg-accent/15 border-accent/30 animate-in fade-in slide-in-from-bottom-2 space-y-1 rounded-md border px-4 py-3 duration-300">
+          <p className="text-sm font-semibold">التوضيح:</p>
+          <div className="text-sm leading-relaxed">
+            <TipTapViewer content={question.justification} />
+          </div>
         </div>
       )}
     </div>

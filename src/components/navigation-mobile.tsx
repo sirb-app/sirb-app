@@ -29,11 +29,18 @@ import { SignOutButton } from "./sign-out-button";
 const routes = [
   { label: "الرئيسية", path: "/", icon: BookOpen },
   { label: "المقررات", path: "/subjects", icon: BookOpen },
-  { label: "من نحن", path: "/about", icon: Users },
+  { label: "من نحن", path: "/team", icon: Users },
 ];
 
+type User = {
+  id: string;
+  name: string;
+  image?: string | null;
+  role?: string;
+} | null;
+
 type NavigationMobileProps = {
-  user: any;
+  user: User;
   isPending: boolean;
 };
 
@@ -80,17 +87,20 @@ export const NavigationMobile = ({
             </h3>
             {routes.map(route => {
               const Icon = route.icon;
+              const isActive =
+                route.path === "/"
+                  ? activePathname === "/"
+                  : activePathname?.startsWith(route.path);
               return (
                 <Link
                   key={route.path}
                   href={route.path}
                   onClick={() => setIsSheetOpen(false)}
                   className={cn(
-                    "text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                    {
-                      "border-primary bg-primary/10 text-primary border-r-2":
-                        route.path === activePathname,
-                    }
+                    "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />

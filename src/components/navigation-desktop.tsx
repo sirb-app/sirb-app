@@ -21,16 +21,28 @@ import { SignOutButton } from "./sign-out-button";
 const routes = [
   { label: "الرئيسية", path: "/", icon: BookOpen },
   { label: "المقررات", path: "/subjects", icon: BookOpen },
-  { label: "من نحن", path: "/about", icon: Users },
+  { label: "من نحن", path: "/team", icon: Users },
 ];
 
+type User = {
+  id: string;
+  name: string;
+  image?: string | null;
+  role?: string;
+} | null;
+
 type NavigationDesktopAuthProps = {
-  user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  user: User;
   isPending: boolean;
 };
 
 export const NavigationDesktop = () => {
   const activePathname = usePathname();
+
+  const isActive = (path: string) => {
+    if (path === "/") return activePathname === "/";
+    return activePathname?.startsWith(path);
+  };
 
   return (
     <div className="hidden items-center gap-6 md:flex">
@@ -39,11 +51,16 @@ export const NavigationDesktop = () => {
           key={route.path}
           href={route.path}
           className={cn(
-            "text-muted-foreground hover:text-foreground text-sm font-medium transition-colors",
-            { "text-foreground": route.path === activePathname }
+            "relative py-1 text-sm font-medium transition-colors",
+            isActive(route.path)
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground"
           )}
         >
           {route.label}
+          {isActive(route.path) && (
+            <span className="bg-primary absolute right-0 -bottom-1 left-0 h-0.5 rounded-full" />
+          )}
         </Link>
       ))}
     </div>

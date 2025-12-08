@@ -28,7 +28,7 @@ export default function CanvasFooterActions({
       await submitCanvas(canvasId);
       toast.success("تم إرسال الشرح للمراجعة");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الإرسال");
     } finally {
       setIsLoading(false);
@@ -41,7 +41,7 @@ export default function CanvasFooterActions({
       await cancelSubmission(canvasId);
       toast.success("تم إلغاء الطلب، يمكنك التعديل الآن");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الإلغاء");
     } finally {
       setIsLoading(false);

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { TipTapViewer } from "@/components/ui/tiptap-viewer";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown,
@@ -37,11 +38,25 @@ function formatFileSize(bytes: bigint): string {
   return `${(size / (1024 * 1024)).toFixed(2)} ميجابايت`;
 }
 
+type ContentBlockData = {
+  content?: string;
+  title?: string;
+  url?: string;
+  isOriginal?: boolean;
+  mimeType?: string;
+  fileSize?: bigint;
+  questionText?: string;
+  questionType?: string;
+  justification?: string | null;
+  options?: Array<{ optionText: string; isCorrect: boolean }>;
+  [key: string]: unknown;
+};
+
 type ContentBlock = {
   id: number;
   sequence: number;
   contentType: "TEXT" | "VIDEO" | "FILE" | "QUESTION";
-  data?: any;
+  data?: ContentBlockData | null;
 };
 
 type ContentBlockCardProps = {
@@ -84,7 +99,7 @@ export default function ContentBlockCard({
 
       toast.success("تم حذف المحتوى");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الحذف");
     } finally {
       setIsDeleting(false);
@@ -136,7 +151,12 @@ export default function ContentBlockCard({
   const getContentPreview = () => {
     if (!block.data) return "محمل...";
     if (block.contentType === "TEXT") {
-      return block.data.content;
+      return (
+        <TipTapViewer
+          content={block.data.content || ""}
+          className="line-clamp-2 text-sm [&>*]:my-0"
+        />
+      );
     }
     if (block.contentType === "FILE") {
       const extension = block.data.mimeType
@@ -164,11 +184,16 @@ export default function ContentBlockCard({
         MCQ_MULTI: "خيارات متعددة",
         TRUE_FALSE: "صح أم خطأ",
       };
-      const typeLabel = questionTypeLabels[block.data.questionType] || "سؤال";
+      const typeLabel = block.data.questionType
+        ? questionTypeLabels[block.data.questionType]
+        : "سؤال";
       return (
         <div>
           <div className="text-foreground text-base font-medium">
-            {block.data.questionText}
+            <TipTapViewer
+              content={block.data.questionText || ""}
+              className="line-clamp-2 [&>*]:my-0"
+            />
           </div>
           <div className="text-muted-foreground mt-1 text-xs">{typeLabel}</div>
         </div>
@@ -222,14 +247,15 @@ export default function ContentBlockCard({
 
           {/* Content Info - Hidden on mobile, shown on desktop */}
           <div className="hidden min-w-0 flex-1 sm:mr-2 sm:block sm:border-r sm:pr-4">
-            {block.contentType === "FILE" ? (
+            {block.contentType === "FILE" ||
+            block.contentType === "TEXT" ||
+            block.contentType === "QUESTION" ? (
               getContentPreview()
             ) : (
               <div
                 className={cn(
                   "text-muted-foreground line-clamp-2 text-sm",
-                  block.contentType !== "TEXT" &&
-                    "text-foreground text-sm font-medium sm:text-base"
+                  "text-foreground text-sm font-medium sm:text-base"
                 )}
               >
                 {getContentPreview()}

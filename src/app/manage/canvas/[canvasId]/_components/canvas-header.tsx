@@ -90,7 +90,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
       setIsEditing(false);
       toast.success("تم تحديث التفاصيل");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("فشل التحديث");
     } finally {
       setIsLoading(false);
@@ -111,7 +111,7 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
       router.push(
         `/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}`
       );
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الحذف");
       setIsLoading(false);
     }

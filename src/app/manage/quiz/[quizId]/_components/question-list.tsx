@@ -80,7 +80,7 @@ export default function QuestionList({
       toast.success("تم حفظ الترتيب");
       setHasOrderChanges(false);
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("فشل حفظ الترتيب");
     } finally {
       setIsReordering(false);

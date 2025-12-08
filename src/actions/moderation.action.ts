@@ -261,7 +261,14 @@ export async function approveCanvas(canvasId: number) {
       select: {
         contributorId: true,
         chapter: { select: { subjectId: true } },
-        contentBlocks: { select: { id: true, contentType: true } },
+        contentBlocks: {
+          select: {
+            id: true,
+            contentType: true,
+            video: { select: { isOriginal: true } },
+            file: { select: { isOriginal: true } },
+          },
+        },
       },
     });
 
@@ -281,6 +288,10 @@ export async function approveCanvas(canvasId: number) {
 
     // Award content block bonuses
     for (const block of fullCanvas.contentBlocks) {
+      // Skip points for external VIDEO/FILE content (only award for original content)
+      if (block.contentType === "VIDEO" && !block.video?.isOriginal) continue;
+      if (block.contentType === "FILE" && !block.file?.isOriginal) continue;
+
       const blockPoints =
         POINT_VALUES.CONTENT_BLOCKS[
           block.contentType as keyof typeof POINT_VALUES.CONTENT_BLOCKS

@@ -94,6 +94,12 @@ export default function CommentItem({
       return;
     }
 
+    // Prevent self-voting
+    if (isOwner) {
+      toast.info("لا يمكنك التصويت على تعليقك");
+      return;
+    }
+
     const previousVote = optimisticVote;
     const previousScore = optimisticScore;
 
@@ -116,12 +122,11 @@ export default function CommentItem({
       .then(() => {
         router.refresh();
       })
-      .catch(error => {
+      .catch(() => {
         // Revert optimistic update
         setOptimisticVote(previousVote);
         setOptimisticScore(previousScore);
         toast.error("فشل التصويت");
-        console.error("Vote error:", error);
       });
   };
 

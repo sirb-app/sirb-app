@@ -251,7 +251,7 @@ export default function ModerationDashboard({
       );
       setReportDialogState({ isOpen: false, reportId: null, resolution: null });
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء معالجة البلاغ");
     } finally {
       setIsResolvingReport(false);

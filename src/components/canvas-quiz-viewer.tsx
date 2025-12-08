@@ -2,7 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Prisma } from "@/generated/prisma";
 import { FileQuestion } from "lucide-react";
 
-type Quiz = Prisma.QuizGetPayload<{}>;
+type Quiz = Prisma.QuizGetPayload<{
+  select: {
+    id: true;
+    title: true;
+    description: true;
+    instructions: true;
+  };
+}>;
 
 type CanvasQuizViewerProps = {
   readonly quiz: Quiz;

@@ -62,7 +62,6 @@ export default function CanvasSidebar({
             <ChapterItem
               key={chapter.id}
               chapter={chapter}
-              currentChapterId={currentChapterId}
               currentCanvasId={currentCanvasId}
               subjectId={subject.id}
               onCanvasClick={() => setMobileOpen(false)}
@@ -102,7 +101,6 @@ export default function CanvasSidebar({
 
 type ChapterItemProps = {
   readonly chapter: SubjectWithChapters["chapters"][number];
-  readonly currentChapterId: number;
   readonly currentCanvasId: number;
   readonly subjectId: number;
   readonly onCanvasClick: () => void;
@@ -110,7 +108,6 @@ type ChapterItemProps = {
 
 function ChapterItem({
   chapter,
-  currentChapterId,
   currentCanvasId,
   subjectId,
   onCanvasClick,
@@ -143,7 +140,7 @@ function ChapterItem({
                 onClick={onCanvasClick}
                 className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
                   isCurrentCanvas
-                    ? "bg-primary/15 border-primary/30 border text-primary font-medium"
+                    ? "bg-primary/15 border-primary/30 text-primary border font-medium"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >

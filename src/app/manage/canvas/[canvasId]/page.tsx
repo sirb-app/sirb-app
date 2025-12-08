@@ -104,7 +104,16 @@ export default async function CanvasManagePage({ params }: PageProps) {
 
       <div className="mt-4 sm:mt-6 md:mt-8">
         <ContentBlockList
-          initialBlocks={canvas.contentBlocks as any}
+          initialBlocks={canvas.contentBlocks.map(block => ({
+            id: block.id,
+            sequence: block.sequence,
+            contentType: block.contentType as
+              | "TEXT"
+              | "VIDEO"
+              | "FILE"
+              | "QUESTION",
+            data: block.data,
+          }))}
           canvasId={canvas.id}
           previewUrl={`/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}/canvases/${canvas.id}`}
           isReadOnly={isReadOnly}
