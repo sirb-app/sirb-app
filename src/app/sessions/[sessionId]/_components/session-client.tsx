@@ -18,6 +18,7 @@ import { QuizPanel } from "./quiz-panel";
 export type SessionData = {
   id: string;
   title: string;
+  placementCompleted: boolean;
   subject: {
     id: number;
     name: string;
@@ -110,7 +111,7 @@ export function SessionClient({ session }: SessionClientProps) {
 
       <div className="flex-1 overflow-hidden">
         {view === "chat" && <ChatPanel session={session} />}
-        {view === "quiz" && <QuizPanel session={session} />}
+        {view === "quiz" && <QuizPanel session={session} placementCompleted={session.placementCompleted} />}
         {view === "flashcards" && <FlashcardsPanel session={session} />}
       </div>
     </div>

@@ -225,8 +225,8 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
   // Question screen
   if (status === "question" && currentQuestion) {
     return (
-      <div className="flex min-h-screen flex-col" dir="rtl">
-        <header className="border-b p-4">
+      <div className="flex h-screen flex-col overflow-hidden" dir="rtl">
+        <header className="border-b p-4 shrink-0">
           <div className="container mx-auto max-w-3xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">{subject.name}</span>
@@ -238,7 +238,7 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
           </div>
         </header>
 
-        <main className="flex-1 p-4">
+        <main className="flex-1 overflow-auto p-4">
           <div className="container mx-auto max-w-3xl space-y-6">
             <Card>
               <CardContent className="p-6">
@@ -250,7 +250,7 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
                   {currentQuestion.options.map((option, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 rounded-lg border p-4 cursor-pointer hover:bg-accent"
+                      className="flex items-center gap-3 rounded-lg border p-4 cursor-pointer hover:bg-muted"
                       onClick={() => setSelectedAnswer(option)}
                     >
                       <RadioGroupItem value={option} id={`option-${index}`} />
@@ -278,7 +278,7 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
                         key={level.value}
                         onClick={() => setConfidence(level.value)}
                         className={`rounded-lg border-2 p-3 text-sm transition-colors ${level.color} ${
-                          confidence === level.value ? "bg-accent border-primary" : ""
+                          confidence === level.value ? "bg-primary/10 border-primary" : ""
                         }`}
                       >
                         {level.label}

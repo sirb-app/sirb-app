@@ -838,10 +838,39 @@ model StudyPlan {
   subject         Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   masteryRecords  TopicMastery[]
   adaptiveQuizzes AdaptiveQuiz[]
+  flashcards      Flashcard[]
 
   @@index([userId, subjectId])
   @@index([status])
   @@map("study_plans")
+}
+
+model Flashcard {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  // Content
+  front String // Question/term (Markdown)
+  back  String // Answer/definition (Markdown)
+
+  // Relationships
+  studyPlanId   String
+  topicSlug     String // References topics.slug
+  sourceChunkId String? // Optional traceability to chunk
+
+  // FSRS scheduling (per-card)
+  stability      Float     @default(1.0)
+  difficulty     Float     @default(5.0)
+  dueAt          DateTime?
+  lastReviewedAt DateTime?
+  reviewCount    Int       @default(0)
+
+  studyPlan StudyPlan @relation(fields: [studyPlanId], references: [id], onDelete: Cascade)
+
+  @@index([studyPlanId])
+  @@index([studyPlanId, dueAt]) // For due card queries
+  @@index([topicSlug])
+  @@map("flashcards")
 }
 
 model TopicMastery {
@@ -919,6 +948,10 @@ model AdaptiveQuizQuestion {
   isCorrect   Boolean
   timeTakenMs Int // Response time in milliseconds
   confidence  ConfidenceLevel? // User-reported confidence (for placement tests)
+
+  // Retry system fields
+  attemptCount Int     @default(1) // Number of attempts (for diminishing returns)
+  hintUsed     Boolean @default(false) // Whether hint was viewed (reduces score weight)
 
   topicSlug String // References FastAPI topics.slug
   quizId    String

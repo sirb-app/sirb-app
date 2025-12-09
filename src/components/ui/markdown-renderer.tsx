@@ -16,14 +16,15 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   return (
-    <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
+    <div className={cn("prose prose-sm dark:prose-invert max-w-none overflow-hidden break-words", className)}>
       <Markdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
           p: ({ children }) => <p dir="auto" className="mb-2 last:mb-0">{children}</p>,
-          ul: ({ children }) => <ul dir="auto" className="my-2 ms-4 list-disc">{children}</ul>,
-          ol: ({ children }) => <ol dir="auto" className="my-2 ms-4 list-decimal">{children}</ol>,
+          ul: ({ children }) => <ul dir="auto" className="my-2 ps-5 list-disc">{children}</ul>,
+          ol: ({ children }) => <ol dir="auto" className="my-2 ps-5 list-decimal">{children}</ol>,
+          li: ({ children }) => <li className="ps-1">{children}</li>,
           code: ({ className, children, ...props }) => {
             const isInline = !className;
             return isInline ? (

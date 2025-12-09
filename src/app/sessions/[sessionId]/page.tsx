@@ -65,6 +65,7 @@ async function getStudyPlanSession(studyPlanId: string, userId: string) {
   return {
     id: studyPlan.id,
     title: studyPlan.title,
+    placementCompleted: studyPlan.placementCompleted,
     subject: {
       id: studyPlan.subject.id,
       name: studyPlan.subject.name,

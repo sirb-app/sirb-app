@@ -134,17 +134,19 @@ export function AdaptiveLearningSection({
 
       if (!result.success) {
         console.error(result.error);
+        setIsSubmitting(false);
         return;
       }
 
-      setOpen(false);
-
+      // Keep dialog open (isSubmitting=true shows loading state) until navigation happens
       if (result.startAssessment) {
         router.push(`/sessions/${result.studyPlanId}/assessment`);
       } else {
         router.push(`/sessions/${result.studyPlanId}`);
       }
-    } finally {
+      // Note: Don't call setOpen(false) or setIsSubmitting(false) here
+      // The page will navigate away, so these states don't need to be reset
+    } catch {
       setIsSubmitting(false);
     }
   };
