@@ -23,14 +23,12 @@ const COMPRESSION_OPTIONS = {
 } as const;
 
 type EditableAvatarProps = {
-  userId: string;
   currentImage: string | null;
   userName: string;
   publicUrlBase: string;
 };
 
 export function EditableAvatar({
-  userId,
   currentImage,
   userName,
   publicUrlBase,
@@ -79,7 +77,6 @@ export function EditableAvatar({
 
     let uploadedKey: string | null = null;
     let localPreview: string | null = null;
-    let updateSucceeded = false;
 
     try {
       // Compress image
@@ -124,8 +121,6 @@ export function EditableAvatar({
         image: publicUrl,
         fetchOptions: {
           onSuccess: async () => {
-            updateSucceeded = true;
-
             // Cleanup local preview
             if (localPreview) {
               URL.revokeObjectURL(localPreview);

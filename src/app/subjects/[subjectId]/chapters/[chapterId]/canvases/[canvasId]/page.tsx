@@ -207,10 +207,10 @@ export default async function Page({ params }: PageProps) {
                 id: canvas.id,
                 contributorId: canvas.contributorId,
                 createdAt: canvas.createdAt,
-                upvotesCount: (canvas as any).upvotesCount,
-                downvotesCount: (canvas as any).downvotesCount,
-                netScore: (canvas as any).netScore,
-                viewCount: (canvas as any).viewCount,
+                upvotesCount: canvas.upvotesCount,
+                downvotesCount: canvas.downvotesCount,
+                netScore: canvas.netScore,
+                viewCount: canvas.viewCount,
                 contributor: canvas.contributor,
               }}
               userVote={canvas.userVote}

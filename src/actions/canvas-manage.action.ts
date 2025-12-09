@@ -68,80 +68,94 @@ const UpdateFileBlockSchema = z.object({
   isOriginal: z.boolean().optional(),
 });
 
-const AddCanvasQuestionBlockSchema = z.object({
-  canvasId: z.number(),
-  questionText: z.string().min(5, "Question must be at least 5 characters"),
-  questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
-  justification: z.string().optional(),
-  options: z.array(
-    z.object({
-      optionText: z.string().min(1, "Option text cannot be empty"),
-      isCorrect: z.boolean(),
-    })
-  ),
-}).refine(
-  (data) => {
-    // TRUE_FALSE must have exactly 2 options
-    if (data.questionType === "TRUE_FALSE") {
-      return data.options.length === 2;
+const AddCanvasQuestionBlockSchema = z
+  .object({
+    canvasId: z.number(),
+    questionText: z.string().min(5, "Question must be at least 5 characters"),
+    questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
+    justification: z.string().optional(),
+    options: z.array(
+      z.object({
+        optionText: z.string().min(1, "Option text cannot be empty"),
+        isCorrect: z.boolean(),
+      })
+    ),
+  })
+  .refine(
+    data => {
+      // TRUE_FALSE must have exactly 2 options
+      if (data.questionType === "TRUE_FALSE") {
+        return data.options.length === 2;
+      }
+      // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
+      return data.options.length === 4;
+    },
+    {
+      message:
+        "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
     }
-    // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
-    return data.options.length === 4;
-  },
-  {
-    message: "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
-  }
-).refine(
-  (data) => {
-    const correctCount = data.options.filter((o) => o.isCorrect).length;
+  )
+  .refine(
+    data => {
+      const correctCount = data.options.filter(o => o.isCorrect).length;
 
-    if (data.questionType === "MCQ_SINGLE" || data.questionType === "TRUE_FALSE") {
-      return correctCount === 1;
+      if (
+        data.questionType === "MCQ_SINGLE" ||
+        data.questionType === "TRUE_FALSE"
+      ) {
+        return correctCount === 1;
+      }
+      return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
+    },
+    {
+      message: "Invalid correct answer configuration for question type",
     }
-    return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
-  },
-  {
-    message: "Invalid correct answer configuration for question type",
-  }
-);
+  );
 
-const UpdateCanvasQuestionBlockSchema = z.object({
-  blockId: z.number(),
-  canvasId: z.number(),
-  questionText: z.string().min(5, "Question must be at least 5 characters"),
-  questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
-  justification: z.string().optional(),
-  options: z.array(
-    z.object({
-      optionText: z.string().min(1, "Option text cannot be empty"),
-      isCorrect: z.boolean(),
-    })
-  ),
-}).refine(
-  (data) => {
-    // TRUE_FALSE must have exactly 2 options
-    if (data.questionType === "TRUE_FALSE") {
-      return data.options.length === 2;
+const UpdateCanvasQuestionBlockSchema = z
+  .object({
+    blockId: z.number(),
+    canvasId: z.number(),
+    questionText: z.string().min(5, "Question must be at least 5 characters"),
+    questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
+    justification: z.string().optional(),
+    options: z.array(
+      z.object({
+        optionText: z.string().min(1, "Option text cannot be empty"),
+        isCorrect: z.boolean(),
+      })
+    ),
+  })
+  .refine(
+    data => {
+      // TRUE_FALSE must have exactly 2 options
+      if (data.questionType === "TRUE_FALSE") {
+        return data.options.length === 2;
+      }
+      // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
+      return data.options.length === 4;
+    },
+    {
+      message:
+        "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
     }
-    // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
-    return data.options.length === 4;
-  },
-  {
-    message: "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
-  }
-).refine(
-  (data) => {
-    const correctCount = data.options.filter((o) => o.isCorrect).length;
+  )
+  .refine(
+    data => {
+      const correctCount = data.options.filter(o => o.isCorrect).length;
 
-    if (data.questionType === "MCQ_SINGLE" || data.questionType === "TRUE_FALSE") {
-      return correctCount === 1;
+      if (
+        data.questionType === "MCQ_SINGLE" ||
+        data.questionType === "TRUE_FALSE"
+      ) {
+        return correctCount === 1;
+      }
+      return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
+    },
+    {
+      message: "Invalid correct answer configuration for question type",
     }
-    return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
-  },
-  {
-    message: "Invalid correct answer configuration for question type",
-  }
-);
+  );
 
 const ReorderBlocksSchema = z.object({
   canvasId: z.number(),
@@ -524,13 +538,22 @@ export async function updateFileBlock(
   const oldKey = validated.r2Key ? block.file.url : null;
 
   // Update file with new data
-  const updateData: any = {};
+  const updateData: {
+    title?: string;
+    description?: string | null;
+    url?: string;
+    fileSize?: bigint;
+    mimeType?: string;
+    isOriginal?: boolean;
+  } = {};
   if (validated.title) updateData.title = validated.title;
-  if (validated.description !== undefined) updateData.description = validated.description;
+  if (validated.description !== undefined)
+    updateData.description = validated.description;
   if (validated.r2Key) updateData.url = validated.r2Key; // Store new R2 key
   if (validated.fileSize) updateData.fileSize = BigInt(validated.fileSize);
   if (validated.mimeType) updateData.mimeType = validated.mimeType;
-  if (validated.isOriginal !== undefined) updateData.isOriginal = validated.isOriginal;
+  if (validated.isOriginal !== undefined)
+    updateData.isOriginal = validated.isOriginal;
 
   await prisma.file.update({
     where: { contentBlockId: validated.blockId },
@@ -553,7 +576,7 @@ export async function addCanvasQuestionBlock(
   const validated = AddCanvasQuestionBlockSchema.parse(data);
   await checkCanvasOwnership(validated.canvasId, session.user.id);
 
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async tx => {
     // Get sequence INSIDE transaction for proper isolation
     const sequence = await getNextBlockSequence(validated.canvasId, tx);
 
@@ -569,7 +592,7 @@ export async function addCanvasQuestionBlock(
     // Special handling for TRUE_FALSE - auto-set Arabic labels
     let options = validated.options;
     if (validated.questionType === "TRUE_FALSE") {
-      const correctAnswerIndex = validated.options.findIndex((o) => o.isCorrect);
+      const correctAnswerIndex = validated.options.findIndex(o => o.isCorrect);
       options = [
         { optionText: "صح", isCorrect: correctAnswerIndex === 0 },
         { optionText: "خطأ", isCorrect: correctAnswerIndex === 1 },
@@ -611,7 +634,7 @@ export async function updateCanvasQuestionBlock(
   const validated = UpdateCanvasQuestionBlockSchema.parse(data);
   await checkCanvasOwnership(validated.canvasId, session.user.id);
 
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async tx => {
     const block = await tx.contentBlock.findUnique({
       where: { id: validated.blockId },
       include: { canvasQuestion: true },
@@ -646,7 +669,7 @@ export async function updateCanvasQuestionBlock(
     // Special handling for TRUE_FALSE
     let options = validated.options;
     if (validated.questionType === "TRUE_FALSE") {
-      const correctAnswerIndex = validated.options.findIndex((o) => o.isCorrect);
+      const correctAnswerIndex = validated.options.findIndex(o => o.isCorrect);
       options = [
         { optionText: "صح", isCorrect: correctAnswerIndex === 0 },
         { optionText: "خطأ", isCorrect: correctAnswerIndex === 1 },

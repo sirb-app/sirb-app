@@ -29,7 +29,6 @@ export default async function Page() {
           {/* Avatar & Name Section */}
           <div className="flex flex-col items-center gap-4 text-center">
             <EditableAvatar
-              userId={session.user.id}
               currentImage={session.user.image || null}
               userName={session.user.name}
               publicUrlBase={process.env.CLOUDFLARE_R2_PUBLIC_URL!}

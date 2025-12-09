@@ -31,9 +31,15 @@ const avatarUploadSchema = z.object({
   filename: z.string().min(1).max(255),
   contentType: z
     .string()
-    .refine(type => ALLOWED_IMAGE_TYPES.includes(type as any), {
-      message: "Only image files are allowed for avatars",
-    }),
+    .refine(
+      type =>
+        ALLOWED_IMAGE_TYPES.includes(
+          type as (typeof ALLOWED_IMAGE_TYPES)[number]
+        ),
+      {
+        message: "Only image files are allowed for avatars",
+      }
+    ),
   size: z.number().max(MAX_AVATAR_SIZE, "Avatar size must be less than 2MB"),
 });
 
@@ -127,7 +133,7 @@ export async function POST(request: Request) {
     let ext: string;
     try {
       ext = getFileExtension(filename, contentType);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid file extension" },
         { status: 400 }

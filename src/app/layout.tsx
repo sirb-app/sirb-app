@@ -1,3 +1,4 @@
+import { Footer } from "@/components/footer";
 import { Navigation } from "@/components/navigation";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -15,6 +16,9 @@ const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
 export const metadata: Metadata = {
   title: "سرب - تطبيق تعليمي",
   description: "تطبيق سرب التعليمي - منصة تعليمية متطورة",
+  appleWebApp: {
+    title: "Sirb",
+  },
 };
 
 export default function RootLayout({
@@ -35,8 +39,9 @@ export default function RootLayout({
         >
           <TooltipProvider>
             <Navigation />
-            <main className="pt-6">{children}</main>
-            <Toaster position="bottom-right" richColors />
+            <main className="min-h-screen pt-6">{children}</main>
+            <Footer />
+          <Toaster position="bottom-right" richColors />
           </TooltipProvider>
         </ThemeProvider>
       </body>

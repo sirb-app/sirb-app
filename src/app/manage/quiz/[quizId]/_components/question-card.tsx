@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { TipTapViewer } from "@/components/ui/tiptap-viewer";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown,
@@ -76,7 +77,7 @@ export default function QuestionCard({
       await deleteQuestion(question.id, quizId);
       toast.success("تم حذف السؤال");
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("حدث خطأ أثناء الحذف");
     } finally {
       setIsDeleting(false);
@@ -88,7 +89,9 @@ export default function QuestionCard({
       case "MCQ_SINGLE":
         return <Badge variant="secondary">اختيار من متعدد (إجابة واحدة)</Badge>;
       case "MCQ_MULTI":
-        return <Badge variant="secondary">اختيار من متعدد (أكثر من إجابة)</Badge>;
+        return (
+          <Badge variant="secondary">اختيار من متعدد (أكثر من إجابة)</Badge>
+        );
       case "TRUE_FALSE":
         return <Badge variant="secondary">صح/خطأ</Badge>;
     }
@@ -134,23 +137,26 @@ export default function QuestionCard({
         </div>
 
         {/* Question Content */}
-        <div className="min-w-0 flex-1 space-y-3 border-b pb-4 sm:mr-2 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-6">
+        <div className="min-w-0 flex-1 space-y-3 border-b pb-4 sm:mr-2 sm:border-r sm:border-b-0 sm:pr-6 sm:pb-0">
           <div className="flex flex-wrap items-start gap-2">
-            <p className="text-foreground flex-1 text-base font-medium">
-              {question.questionText}
-            </p>
+            <div className="text-foreground flex-1 text-base font-medium">
+              <TipTapViewer
+                content={question.questionText}
+                className="[&>*]:my-0"
+              />
+            </div>
             {getQuestionTypeBadge()}
           </div>
 
           {/* Options */}
           <div className="space-y-2">
-            {question.options.map((option, index) => (
+            {question.options.map(option => (
               <div
                 key={option.id}
                 className={cn(
                   "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
                   option.isCorrect
-                    ? "bg-success/15 text-success border border-success/30"
+                    ? "bg-success/15 text-success border-success/30 border"
                     : "bg-muted/50"
                 )}
               >
@@ -169,7 +175,10 @@ export default function QuestionCard({
             <div className="bg-accent/15 border-accent/30 rounded-md border p-3 text-sm">
               <span className="text-foreground font-semibold">التوضيح: </span>
               <span className="text-muted-foreground">
-                {question.justification}
+                <TipTapViewer
+                  content={question.justification}
+                  className="inline [&>*]:my-0 [&>*]:inline"
+                />
               </span>
             </div>
           )}
