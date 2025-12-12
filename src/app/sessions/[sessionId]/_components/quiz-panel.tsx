@@ -83,13 +83,10 @@ type TopicFilter = "all" | "recommended" | "new" | "mastered" | "needs_work";
 
 interface QuizPanelProps {
   session: SessionData;
-  placementCompleted?: boolean;
 }
 
-export function QuizPanel({
-  session,
-  placementCompleted = true,
-}: QuizPanelProps) {
+export function QuizPanel({ session }: QuizPanelProps) {
+  const placementCompleted = session.placementCompleted;
   const [practiceState, setPracticeState] = useState<PracticeState | null>(
     null
   );
@@ -117,13 +114,21 @@ export function QuizPanel({
     async function fetchState() {
       try {
         const response = await fetch(`/api/adaptive/practice/${session.id}`);
-        if (response.ok) {
-          const data: PracticeState = await response.json();
-          setPracticeState(data);
-          setSelectedTopics(new Set(data.topics.map(t => t.slug)));
-          if (data.questions.length > 0) {
-            setCurrentIndex(data.questions.length - 1);
-          }
+        if (!response.ok) {
+          const err = await response
+            .json()
+            .catch(() => ({ detail: "فشل في تحميل البيانات" }));
+          throw new Error(
+            (err && typeof err.detail === "string" && err.detail) ||
+              "فشل في تحميل البيانات"
+          );
+        }
+
+        const data: PracticeState = await response.json();
+        setPracticeState(data);
+        setSelectedTopics(new Set(data.topics.map(t => t.slug)));
+        if (data.questions.length > 0) {
+          setCurrentIndex(data.questions.length - 1);
         }
       } catch {
         setError("فشل في تحميل البيانات");
@@ -158,9 +163,10 @@ export function QuizPanel({
       const data = await response.json();
       setPracticeState(prev => {
         if (!prev) return prev;
-        return { ...prev, questions: [...prev.questions, data.question] };
+        const nextQuestions = [...prev.questions, data.question];
+        setCurrentIndex(nextQuestions.length - 1);
+        return { ...prev, questions: nextQuestions };
       });
-      setCurrentIndex(practiceState?.questions.length ?? 0);
       setShowHint(false);
       setShowAnswer(false);
       setJustAnswered(false);
@@ -171,7 +177,7 @@ export function QuizPanel({
     } finally {
       setIsGenerating(false);
     }
-  }, [session.id, selectedTopics, practiceState?.questions.length]);
+  }, [session.id, selectedTopics, questionType]);
 
   const handleOptionClick = async (
     option: string,
@@ -215,16 +221,26 @@ export function QuizPanel({
 
     // Fire API in background for mastery update
     const timeTaken = Date.now() - questionStartTime;
-    fetch(`/api/adaptive/practice/${currentQuestion.id}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_answer: option,
-        confidence: "CONFIDENT",
-        time_ms: timeTaken,
-        hint_used: showHint || currentQuestion.hint_used,
-      }),
-    }).catch(() => console.error("Failed to update mastery"));
+    try {
+      const res = await fetch(
+        `/api/adaptive/practice/${currentQuestion.id}/submit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_answer: option,
+            confidence: "CONFIDENT",
+            time_ms: timeTaken,
+            hint_used: showHint || currentQuestion.hint_used,
+          }),
+        }
+      );
+      if (!res.ok) {
+        setError("تعذر حفظ إجابتك على الخادم. قد لا يتم احتساب التقدم.");
+      }
+    } catch {
+      setError("تعذر حفظ إجابتك على الخادم. قد لا يتم احتساب التقدم.");
+    }
   };
 
   const goToQuestion = (index: number) => {

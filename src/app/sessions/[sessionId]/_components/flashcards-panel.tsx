@@ -229,6 +229,8 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
   const [editBack, setEditBack] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const card = cards[idx];
+
   const handleDialogOpenChange = (open: boolean) => {
     setDialogOpen(open);
   };
@@ -364,7 +366,7 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
           front: manualFront.trim(),
           back: manualBack.trim(),
           topic_slug:
-            manualTopic && manualTopic !== "none" ? manualTopic : "manual",
+            manualTopic && manualTopic !== "none" ? manualTopic : "general",
         }),
       });
 
@@ -511,8 +513,6 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
       setSavingEdit(false);
     }
   };
-
-  const card = cards[idx];
 
   useEffect(() => {
     setCardChatOpen(false);

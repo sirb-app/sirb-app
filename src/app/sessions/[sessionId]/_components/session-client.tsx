@@ -80,12 +80,16 @@ export function SessionClient({ session }: SessionClientProps) {
             </div>
           </div>
 
-          <nav className="flex gap-1">
+          <nav className="flex gap-1" role="tablist" aria-label="أقسام الجلسة">
             <Button
               variant={view === "chat" ? "default" : "ghost"}
               size="sm"
               onClick={() => setView("chat")}
               className="gap-2"
+              role="tab"
+              id="tab-chat"
+              aria-selected={view === "chat"}
+              aria-controls="panel-chat"
             >
               <MessageSquare className="size-4" />
               <span className="hidden sm:inline">المحادثة</span>
@@ -95,6 +99,10 @@ export function SessionClient({ session }: SessionClientProps) {
               size="sm"
               onClick={() => setView("quiz")}
               className="gap-2"
+              role="tab"
+              id="tab-quiz"
+              aria-selected={view === "quiz"}
+              aria-controls="panel-quiz"
             >
               <BookOpenText className="size-4" />
               <span className="hidden sm:inline">الاختبارات</span>
@@ -104,6 +112,10 @@ export function SessionClient({ session }: SessionClientProps) {
               size="sm"
               onClick={() => setView("flashcards")}
               className="gap-2"
+              role="tab"
+              id="tab-flashcards"
+              aria-selected={view === "flashcards"}
+              aria-controls="panel-flashcards"
             >
               <CreditCard className="size-4" />
               <span className="hidden sm:inline">البطاقات</span>
@@ -113,14 +125,36 @@ export function SessionClient({ session }: SessionClientProps) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {view === "chat" && <ChatPanel session={session} />}
-        {view === "quiz" && (
-          <QuizPanel
-            session={session}
-            placementCompleted={session.placementCompleted}
-          />
+        {view === "chat" && (
+          <div
+            role="tabpanel"
+            id="panel-chat"
+            aria-labelledby="tab-chat"
+            className="h-full"
+          >
+            <ChatPanel session={session} />
+          </div>
         )}
-        {view === "flashcards" && <FlashcardsPanel session={session} />}
+        {view === "quiz" && (
+          <div
+            role="tabpanel"
+            id="panel-quiz"
+            aria-labelledby="tab-quiz"
+            className="h-full"
+          >
+            <QuizPanel session={session} />
+          </div>
+        )}
+        {view === "flashcards" && (
+          <div
+            role="tabpanel"
+            id="panel-flashcards"
+            aria-labelledby="tab-flashcards"
+            className="h-full"
+          >
+            <FlashcardsPanel session={session} />
+          </div>
+        )}
       </div>
     </div>
   );

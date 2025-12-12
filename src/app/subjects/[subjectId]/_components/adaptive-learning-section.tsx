@@ -1,11 +1,24 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Clock, Loader2, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Clock,
+  Loader2,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { createStudyPlan, deleteStudyPlan, updateStudyPlanTitle } from "@/actions/study-plan.action";
+import {
+  createStudyPlan,
+  deleteStudyPlan,
+  updateStudyPlanTitle,
+} from "@/actions/study-plan.action";
 
 import {
   AlertDialog,
@@ -77,6 +90,11 @@ export function AdaptiveLearningSection({
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
+  const cancelEditRef = useRef(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
+    null
+  );
 
   const formatRelativeTime = (date: Date) => {
     const now = new Date();
@@ -121,8 +139,26 @@ export function AdaptiveLearningSection({
 
   const router = useRouter();
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+
+    // Clear stale UI state between dialog sessions.
+    setErrorMessage(null);
+    if (!nextOpen) {
+      setShowCreateForm(false);
+      setSelectedChapterIds([]);
+      setSessionTitle("");
+      setIsSubmitting(false);
+      setEditingSessionId(null);
+      setEditingTitle("");
+      setDeletingSessionId(null);
+      cancelEditRef.current = false;
+    }
+  };
+
   const handleStart = async () => {
     if (!hasSelection || !isAuthenticated || !isEnrolled) return;
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
       const result = await createStudyPlan({
@@ -133,7 +169,7 @@ export function AdaptiveLearningSection({
       });
 
       if (!result.success) {
-        console.error(result.error);
+        setErrorMessage(result.error);
         setIsSubmitting(false);
         return;
       }
@@ -147,17 +183,18 @@ export function AdaptiveLearningSection({
       // Note: Don't call setOpen(false) or setIsSubmitting(false) here
       // The page will navigate away, so these states don't need to be reset
     } catch {
+      setErrorMessage("حدث خطأ أثناء إنشاء الجلسة");
       setIsSubmitting(false);
     }
   };
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button
             disabled={!isAuthenticated || !isEnrolled}
-            className="bg-gradient-to-l from-primary to-primary/80 text-primary-foreground hover:from-primary/90 hover:to-primary/70"
+            className="from-primary to-primary/80 text-primary-foreground hover:from-primary/90 hover:to-primary/70 bg-gradient-to-l"
           >
             <Sparkles className="me-2 size-4" />
             جلسات التعلم الذكي
@@ -172,12 +209,21 @@ export function AdaptiveLearningSection({
             </DialogDescription>
           </DialogHeader>
 
+          {errorMessage && (
+            <div className="text-destructive border-destructive/30 bg-destructive/10 rounded-md border px-3 py-2 text-sm">
+              {errorMessage}
+            </div>
+          )}
+
           {!showCreateForm ? (
             <div className="space-y-4">
               {/* Create New Session Card */}
               <Card
-                className="hover:border-primary hover:bg-accent cursor-pointer border-2 border-dashed transition-colors"
-                onClick={() => setShowCreateForm(true)}
+                className="hover:border-primary hover:bg-muted/50 cursor-pointer border-2 border-dashed transition-colors"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setShowCreateForm(true);
+                }}
               >
                 <CardContent className="flex items-center gap-3 p-4">
                   <div className="from-primary/20 to-primary/10 flex size-10 items-center justify-center rounded-lg bg-gradient-to-br">
@@ -198,18 +244,32 @@ export function AdaptiveLearningSection({
                   <p className="text-sm font-medium">الجلسات السابقة</p>
                   <div className="max-h-80 space-y-2 overflow-y-auto">
                     {localSessions.map(session => {
-                      const sessionChapters = getSessionChapters(session.selectedChapterIds);
-                      const statusLabel = session.status === "PLACEMENT" ? "اختبار تحديد المستوى" 
-                        : session.status === "ACTIVE" ? "نشط" : "جديد";
-                      const statusColor = session.status === "PLACEMENT" ? "bg-amber-500" 
-                        : session.status === "ACTIVE" ? "bg-green-500" : "bg-blue-500";
+                      const sessionChapters = getSessionChapters(
+                        session.selectedChapterIds
+                      );
+                      const statusLabel =
+                        session.status === "PLACEMENT"
+                          ? "اختبار تحديد المستوى"
+                          : session.status === "ACTIVE"
+                            ? "نشط"
+                            : "جديد";
+                      const statusColor =
+                        session.status === "PLACEMENT"
+                          ? "bg-amber-500"
+                          : session.status === "ACTIVE"
+                            ? "bg-green-500"
+                            : "bg-blue-500";
                       return (
-                        <div key={session.id} className="relative group">
+                        <div key={session.id} className="group relative">
                           <Link
-                            href={session.placementCompleted ? `/sessions/${session.id}` : `/sessions/${session.id}/assessment`}
+                            href={
+                              session.placementCompleted
+                                ? `/sessions/${session.id}`
+                                : `/sessions/${session.id}/assessment`
+                            }
                             className="block"
                           >
-                            <Card className="hover:bg-accent transition-colors">
+                            <Card className="hover:bg-muted/50 transition-colors">
                               <CardContent className="p-3">
                                 <div className="mb-2 flex items-center justify-between gap-2">
                                   {editingSessionId === session.id ? (
@@ -217,53 +277,109 @@ export function AdaptiveLearningSection({
                                       ref={editInputRef}
                                       type="text"
                                       value={editingTitle}
-                                      onChange={(e) => setEditingTitle(e.target.value)}
+                                      onChange={e =>
+                                        setEditingTitle(e.target.value)
+                                      }
                                       onBlur={async () => {
-                                        if (editingTitle.trim() && editingTitle !== session.title) {
-                                          const result = await updateStudyPlanTitle(session.id, editingTitle);
-                                          if (result.success) {
-                                            setLocalSessions(prev =>
-                                              prev.map(s => s.id === session.id ? { ...s, title: editingTitle.trim() } : s)
-                                            );
-                                          }
+                                        const wasCancelled =
+                                          cancelEditRef.current;
+                                        cancelEditRef.current = false;
+
+                                        if (wasCancelled) {
+                                          setEditingSessionId(null);
+                                          return;
                                         }
-                                        setEditingSessionId(null);
+
+                                        try {
+                                          if (
+                                            editingTitle.trim() &&
+                                            editingTitle !== session.title
+                                          ) {
+                                            const result =
+                                              await updateStudyPlanTitle(
+                                                session.id,
+                                                editingTitle
+                                              );
+                                            if (result.success) {
+                                              setLocalSessions(prev =>
+                                                prev.map(s =>
+                                                  s.id === session.id
+                                                    ? {
+                                                        ...s,
+                                                        title:
+                                                          editingTitle.trim(),
+                                                      }
+                                                    : s
+                                                )
+                                              );
+                                            } else {
+                                              setErrorMessage(
+                                                result.error ||
+                                                  "تعذر تعديل عنوان الجلسة"
+                                              );
+                                            }
+                                          }
+                                        } finally {
+                                          setEditingSessionId(null);
+                                        }
                                       }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") e.currentTarget.blur();
-                                        if (e.key === "Escape") setEditingSessionId(null);
+                                      onKeyDown={e => {
+                                        if (e.key === "Enter")
+                                          e.currentTarget.blur();
+                                        if (e.key === "Escape") {
+                                          e.preventDefault();
+                                          cancelEditRef.current = true;
+                                          setEditingTitle(session.title || "");
+                                          setEditingSessionId(null);
+                                        }
                                       }}
-                                      onClick={(e) => e.preventDefault()}
-                                      className="text-sm font-medium bg-transparent border-b border-primary outline-none w-full"
+                                      onClick={e => e.preventDefault()}
+                                      className="border-primary w-full border-b bg-transparent text-sm font-medium outline-none"
                                       dir="auto"
                                       autoFocus
                                     />
                                   ) : (
-                                    <div className="flex items-center gap-1 min-w-0">
-                                      <p className="text-sm font-medium truncate" dir="auto">
+                                    <div className="flex min-w-0 items-center gap-1">
+                                      <p
+                                        className="truncate text-sm font-medium"
+                                        dir="auto"
+                                      >
                                         {session.title || "جلسة بدون عنوان"}
                                       </p>
                                       <button
-                                        onClick={(e) => {
+                                        onClick={e => {
                                           e.preventDefault();
                                           e.stopPropagation();
+                                          setErrorMessage(null);
                                           setEditingSessionId(session.id);
                                           setEditingTitle(session.title || "");
                                         }}
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-muted rounded"
+                                        className="hover:bg-muted rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
                                       >
-                                        <Pencil className="size-3 text-muted-foreground" />
+                                        <Pencil className="text-muted-foreground size-3" />
                                       </button>
                                     </div>
                                   )}
-                                  <Badge variant="outline" className="text-xs gap-1 shrink-0">
-                                    <span className={cn("size-1.5 rounded-full", statusColor)} />
+                                  <Badge
+                                    variant="outline"
+                                    className="shrink-0 gap-1 text-xs"
+                                  >
+                                    <span
+                                      className={cn(
+                                        "size-1.5 rounded-full",
+                                        statusColor
+                                      )}
+                                    />
                                     {statusLabel}
                                   </Badge>
                                 </div>
                                 <div className="mb-2 flex flex-wrap gap-1">
                                   {sessionChapters.map(ch => (
-                                    <Badge key={ch.id} variant="secondary" className="text-xs">
+                                    <Badge
+                                      key={ch.id}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
                                       {ch.sequence}. {ch.title}
                                     </Badge>
                                   ))}
@@ -271,11 +387,14 @@ export function AdaptiveLearningSection({
                                 <div className="text-muted-foreground flex items-center justify-between text-xs">
                                   <div className="flex items-center gap-1.5">
                                     <Clock className="size-3 shrink-0" />
-                                    <span>{formatRelativeTime(session.updatedAt)}</span>
+                                    <span>
+                                      {formatRelativeTime(session.updatedAt)}
+                                    </span>
                                   </div>
                                   {session.progressPercentage > 0 && (
                                     <span className="text-primary font-medium">
-                                      {Math.round(session.progressPercentage)}% مكتمل
+                                      {Math.round(session.progressPercentage)}%
+                                      مكتمل
                                     </span>
                                   )}
                                 </div>
@@ -287,8 +406,8 @@ export function AdaptiveLearningSection({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity size-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => e.stopPropagation()}
+                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 absolute top-2 left-2 size-7 opacity-0 transition-opacity group-hover:opacity-100"
+                                onClick={e => e.stopPropagation()}
                               >
                                 <Trash2 className="size-4" />
                               </Button>
@@ -297,7 +416,8 @@ export function AdaptiveLearningSection({
                               <AlertDialogHeader>
                                 <AlertDialogTitle>حذف الجلسة</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  هل أنت متأكد من حذف هذه الجلسة؟ لن يتم حذف مهاراتك المكتسبة.
+                                  هل أنت متأكد من حذف هذه الجلسة؟ لن يتم حذف
+                                  مهاراتك المكتسبة.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter className="gap-2">
@@ -305,15 +425,36 @@ export function AdaptiveLearningSection({
                                 <AlertDialogAction
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   onClick={async () => {
-                                    const result = await deleteStudyPlan(session.id);
-                                    if (result.success) {
-                                      setLocalSessions(prev => prev.filter(s => s.id !== session.id));
-                                    } else {
-                                      console.error("Delete failed:", result.error);
+                                    try {
+                                      setErrorMessage(null);
+                                      setDeletingSessionId(session.id);
+                                      const result = await deleteStudyPlan(
+                                        session.id
+                                      );
+                                      if (result.success) {
+                                        setLocalSessions(prev =>
+                                          prev.filter(s => s.id !== session.id)
+                                        );
+                                        return;
+                                      }
+                                      setErrorMessage(
+                                        result.error ||
+                                          "تعذر حذف الجلسة. حاول مرة أخرى."
+                                      );
+                                    } finally {
+                                      setDeletingSessionId(null);
                                     }
                                   }}
+                                  disabled={deletingSessionId === session.id}
                                 >
-                                  حذف
+                                  {deletingSessionId === session.id ? (
+                                    <span className="inline-flex items-center gap-2">
+                                      <Loader2 className="size-4 animate-spin" />
+                                      حذف
+                                    </span>
+                                  ) : (
+                                    "حذف"
+                                  )}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -331,6 +472,7 @@ export function AdaptiveLearningSection({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
+                  setErrorMessage(null);
                   setShowCreateForm(false);
                   setSelectedChapterIds([]);
                   setSessionTitle("");
@@ -348,7 +490,7 @@ export function AdaptiveLearningSection({
                     id="session-title"
                     placeholder="مثال: مراجعة نهائية"
                     value={sessionTitle}
-                    onChange={(e) => setSessionTitle(e.target.value)}
+                    onChange={e => setSessionTitle(e.target.value)}
                     dir="auto"
                   />
                 </div>
@@ -385,7 +527,8 @@ export function AdaptiveLearningSection({
                         key={chapter.id}
                         className={cn(
                           "flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors",
-                          selectedChapterIds.includes(chapter.id) && "bg-accent border-primary"
+                          selectedChapterIds.includes(chapter.id) &&
+                            "bg-primary/10 border-primary/40"
                         )}
                       >
                         <Checkbox
@@ -395,9 +538,7 @@ export function AdaptiveLearningSection({
                         <span className="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium">
                           {chapter.sequence}
                         </span>
-                        <span className="flex-1 text-sm">
-                          {chapter.title}
-                        </span>
+                        <span className="flex-1 text-sm">{chapter.title}</span>
                       </label>
                     ))}
                   </div>

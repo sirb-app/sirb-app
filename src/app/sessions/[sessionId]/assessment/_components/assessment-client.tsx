@@ -15,7 +15,7 @@ type Question = {
   question: string;
   type: string;
   options: string[];
-  correct_answer: string;
+  correct_answer: string; // not worth storing on server due to latency
   justification?: string;
 };
 
@@ -30,10 +30,28 @@ interface AssessmentClientProps {
   };
 }
 
-export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps) {
+export function AssessmentClient({
+  studyPlanId,
+  subject,
+}: AssessmentClientProps) {
   const router = useRouter();
-  
-  const [status, setStatus] = useState<"loading" | "ready" | "question" | "complete" | "error">("loading");
+
+  const fetchWithTimeout = useCallback(
+    async (input: RequestInfo | URL, init: RequestInit, timeoutMs: number) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(input, { ...init, signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+    []
+  );
+
+  const [status, setStatus] = useState<
+    "loading" | "ready" | "question" | "complete" | "error"
+  >("loading");
   const [quizId, setQuizId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [currentTopicSlug, setCurrentTopicSlug] = useState<string | null>(null);
@@ -48,19 +66,21 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
   // Start assessment
   const startAssessment = useCallback(async () => {
     try {
-      const response = await fetch("/api/adaptive/assessment/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ study_plan_id: studyPlanId }),
-      });
+      const response = await fetchWithTimeout(
+        "/api/adaptive/assessment/start",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_plan_id: studyPlanId }),
+        },
+        20000
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to start assessment");
-      }
+      if (!response.ok) throw new Error("HTTP_ERROR");
 
       const data = await response.json();
       setQuizId(data.quiz_id);
-      
+
       if (data.first_question) {
         setCurrentQuestion(data.first_question);
         setCurrentTopicSlug(data.first_topic_slug);
@@ -71,104 +91,119 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
         setStatus("ready");
       }
     } catch (err) {
-      setError("فشل في بدء الاختبار");
+      setError(
+        err instanceof Error && err.name === "AbortError"
+          ? "انتهت مهلة الطلب"
+          : "فشل في بدء الاختبار"
+      );
       setStatus("error");
     }
-  }, [studyPlanId]);
+  }, [fetchWithTimeout, studyPlanId]);
 
   // Fetch next question
-  const fetchNextQuestion = useCallback(async (retryCount = 0) => {
-    if (!quizId) return;
-    
-    const MAX_RETRIES = 5;
-    if (retryCount >= MAX_RETRIES) {
-      setError("فشل في تحميل السؤال بعد عدة محاولات");
-      setStatus("error");
-      return;
-    }
-    
-    setIsLoadingQuestion(true);
+  const fetchNextQuestion = useCallback(
+    async (retryCount = 0) => {
+      if (!quizId) return;
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      const response = await fetch(
-        `/api/adaptive/assessment/next?study_plan_id=${studyPlanId}&quiz_id=${quizId}`,
-        { signal: controller.signal }
-      );
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch question");
-      }
-
-      const data = await response.json();
-
-      if (data.complete) {
-        setStatus("complete");
+      const MAX_RETRIES = 5;
+      if (retryCount >= MAX_RETRIES) {
+        setError("فشل في تحميل السؤال بعد عدة محاولات");
+        setStatus("error");
         return;
       }
 
-      // If question is null, cache is being filled - retry after delay (with limit)
-      if (!data.question) {
-        setIsLoadingQuestion(false);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return fetchNextQuestion(retryCount + 1);
-      }
+      setIsLoadingQuestion(true);
 
-      setCurrentQuestion(data.question);
-      setCurrentTopicSlug(data.topic_slug);
-      setProgress(prev => ({
-        current: data.progress?.current || prev.current + 1,
-        total: data.progress?.estimated_total || 15,
-      }));
-      setSelectedAnswer(null);
-      setConfidence(null);
-      setQuestionStartTime(Date.now());
-      setStatus("question");
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        setError("انتهت مهلة الطلب");
-      } else {
-        setError("فشل في تحميل السؤال");
+      try {
+        const response = await fetchWithTimeout(
+          `/api/adaptive/assessment/next?study_plan_id=${studyPlanId}&quiz_id=${quizId}`,
+          {},
+          30000
+        );
+
+        if (!response.ok) throw new Error("HTTP_ERROR");
+
+        const data = await response.json();
+
+        if (data.complete) {
+          setStatus("complete");
+          return;
+        }
+
+        // If question is null, cache is being filled - retry after delay (with limit)
+        if (!data.question) {
+          setIsLoadingQuestion(false);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return fetchNextQuestion(retryCount + 1);
+        }
+
+        setCurrentQuestion(data.question);
+        setCurrentTopicSlug(data.topic_slug);
+        setProgress(prev => ({
+          current: data.progress?.current || prev.current + 1,
+          total: data.progress?.estimated_total || 15,
+        }));
+        setSelectedAnswer(null);
+        setConfidence(null);
+        setQuestionStartTime(Date.now());
+        setStatus("question");
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          setError("انتهت مهلة الطلب");
+        } else {
+          setError("فشل في تحميل السؤال");
+        }
+        setStatus("error");
+      } finally {
+        setIsLoadingQuestion(false);
       }
-      setStatus("error");
-    } finally {
-      setIsLoadingQuestion(false);
-    }
-  }, [quizId, studyPlanId]);
+    },
+    [fetchWithTimeout, quizId, studyPlanId]
+  );
 
   // Submit answer
   const submitAnswer = async () => {
-    if (!quizId || !currentQuestion || !selectedAnswer || !confidence || !currentTopicSlug) return;
+    if (
+      !quizId ||
+      !currentQuestion ||
+      !selectedAnswer ||
+      !confidence ||
+      !currentTopicSlug
+    )
+      return;
 
     setIsSubmitting(true);
     const timeTaken = Date.now() - questionStartTime;
 
     try {
-      const response = await fetch("/api/adaptive/assessment/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          study_plan_id: studyPlanId,
-          quiz_id: quizId,
-          topic_slug: currentTopicSlug,
-          question_data: currentQuestion,
-          user_answer: selectedAnswer,
-          confidence,
-          time_ms: timeTaken,
-        }),
-      });
+      const response = await fetchWithTimeout(
+        "/api/adaptive/assessment/submit",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            study_plan_id: studyPlanId,
+            quiz_id: quizId,
+            topic_slug: currentTopicSlug,
+            question_data: currentQuestion,
+            user_answer: selectedAnswer,
+            confidence,
+            time_ms: timeTaken,
+          }),
+        },
+        20000
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to submit answer");
-      }
+      if (!response.ok) throw new Error("HTTP_ERROR");
 
       // Always fetch next - backend will return complete:true and update DB if assessment is done
       await fetchNextQuestion();
     } catch (err) {
-      setError("فشل في إرسال الإجابة");
+      setError(
+        err instanceof Error && err.name === "AbortError"
+          ? "انتهت مهلة الطلب"
+          : "فشل في إرسال الإجابة"
+      );
       setStatus("error");
     } finally {
       setIsSubmitting(false);
@@ -182,7 +217,10 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
   // Ready screen (shown only if first_question wasn't included)
   if (status === "ready") {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4" dir="rtl">
+      <div
+        className="flex min-h-screen items-center justify-center p-4"
+        dir="rtl"
+      >
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">اختبار تحديد المستوى</CardTitle>
@@ -190,7 +228,7 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="bg-muted/50 rounded-lg p-4 text-sm">
-              <p className="font-medium mb-2">تعليمات:</p>
+              <p className="mb-2 font-medium">تعليمات:</p>
               <ul className="text-muted-foreground space-y-1">
                 <li>• أجب على كل سؤال بأفضل ما لديك</li>
                 <li>• حدد مستوى ثقتك في إجابتك</li>
@@ -198,9 +236,9 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
               </ul>
             </div>
 
-            <Button 
-              className="w-full" 
-              size="lg" 
+            <Button
+              className="w-full"
+              size="lg"
               onClick={() => fetchNextQuestion()}
               disabled={isLoadingQuestion}
             >
@@ -226,9 +264,9 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
   if (status === "question" && currentQuestion) {
     return (
       <div className="flex h-screen flex-col overflow-hidden" dir="rtl">
-        <header className="border-b p-4 shrink-0">
+        <header className="shrink-0 border-b p-4">
           <div className="container mx-auto max-w-3xl">
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-medium">{subject.name}</span>
               <span className="text-muted-foreground text-sm">
                 سؤال {progress.current} من ~{progress.total}
@@ -242,19 +280,26 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
           <div className="container mx-auto max-w-3xl space-y-6">
             <Card>
               <CardContent className="p-6">
-                <div dir="auto" className="text-lg font-medium mb-6">
+                <div dir="auto" className="mb-6 text-lg font-medium">
                   <MarkdownRenderer content={currentQuestion.question} />
                 </div>
-                
-                <RadioGroup value={selectedAnswer || ""} onValueChange={setSelectedAnswer}>
+
+                <RadioGroup
+                  value={selectedAnswer || ""}
+                  onValueChange={setSelectedAnswer}
+                >
                   {currentQuestion.options.map((option, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 rounded-lg border p-4 cursor-pointer hover:bg-muted"
+                      className="hover:bg-muted flex cursor-pointer items-center gap-3 rounded-lg border p-4"
                       onClick={() => setSelectedAnswer(option)}
                     >
                       <RadioGroupItem value={option} id={`option-${index}`} />
-                      <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer" dir="auto">
+                      <Label
+                        htmlFor={`option-${index}`}
+                        className="flex-1 cursor-pointer"
+                        dir="auto"
+                      >
                         <MarkdownRenderer content={option} />
                       </Label>
                     </div>
@@ -266,19 +311,39 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
             {selectedAnswer && (
               <Card>
                 <CardContent className="p-6">
-                  <p className="font-medium mb-4">ما مدى ثقتك في إجابتك؟</p>
+                  <p className="mb-4 font-medium">ما مدى ثقتك في إجابتك؟</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {([
-                      { value: "GUESS", label: "تخمين", color: "border-red-200 hover:border-red-400" },
-                      { value: "UNSURE", label: "غير متأكد", color: "border-orange-200 hover:border-orange-400" },
-                      { value: "CONFIDENT", label: "واثق", color: "border-blue-200 hover:border-blue-400" },
-                      { value: "CERTAIN", label: "متأكد تماماً", color: "border-green-200 hover:border-green-400" },
-                    ] as const).map((level) => (
+                    {(
+                      [
+                        {
+                          value: "GUESS",
+                          label: "تخمين",
+                          color: "border-red-200 hover:border-red-400",
+                        },
+                        {
+                          value: "UNSURE",
+                          label: "غير متأكد",
+                          color: "border-orange-200 hover:border-orange-400",
+                        },
+                        {
+                          value: "CONFIDENT",
+                          label: "واثق",
+                          color: "border-blue-200 hover:border-blue-400",
+                        },
+                        {
+                          value: "CERTAIN",
+                          label: "متأكد تماماً",
+                          color: "border-green-200 hover:border-green-400",
+                        },
+                      ] as const
+                    ).map(level => (
                       <button
                         key={level.value}
                         onClick={() => setConfidence(level.value)}
                         className={`rounded-lg border-2 p-3 text-sm transition-colors ${level.color} ${
-                          confidence === level.value ? "bg-primary/10 border-primary" : ""
+                          confidence === level.value
+                            ? "bg-primary/10 border-primary"
+                            : ""
                         }`}
                       >
                         {level.label}
@@ -313,15 +378,21 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
   // Complete screen
   if (status === "complete") {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4" dir="rtl">
+      <div
+        className="flex min-h-screen items-center justify-center p-4"
+        dir="rtl"
+      >
         <Card className="w-full max-w-lg text-center">
           <CardContent className="p-8">
-            <CheckCircle2 className="mx-auto size-16 text-green-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">أحسنت!</h2>
+            <CheckCircle2 className="mx-auto mb-4 size-16 text-green-500" />
+            <h2 className="mb-2 text-2xl font-bold">أحسنت!</h2>
             <p className="text-muted-foreground mb-6">
               اكتمل اختبار تحديد المستوى. يمكنك الآن بدء التعلم.
             </p>
-            <Button size="lg" onClick={() => router.push(`/sessions/${studyPlanId}`)}>
+            <Button
+              size="lg"
+              onClick={() => router.push(`/sessions/${studyPlanId}`)}
+            >
               ابدأ التعلم
             </Button>
           </CardContent>
@@ -333,11 +404,14 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
   // Error screen
   if (status === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4" dir="rtl">
+      <div
+        className="flex min-h-screen items-center justify-center p-4"
+        dir="rtl"
+      >
         <Card className="w-full max-w-lg text-center">
           <CardContent className="p-8">
-            <AlertCircle className="mx-auto size-16 text-red-500 mb-4" />
-            <h2 className="text-xl font-bold mb-2">حدث خطأ</h2>
+            <AlertCircle className="mx-auto mb-4 size-16 text-red-500" />
+            <h2 className="mb-2 text-xl font-bold">حدث خطأ</h2>
             <p className="text-muted-foreground mb-6">{error}</p>
             <Button variant="outline" onClick={() => window.location.reload()}>
               حاول مرة أخرى
@@ -352,7 +426,7 @@ export function AssessmentClient({ studyPlanId, subject }: AssessmentClientProps
   return (
     <div className="flex min-h-screen items-center justify-center" dir="rtl">
       <div className="text-center">
-        <Loader2 className="mx-auto size-8 animate-spin text-primary mb-4" />
+        <Loader2 className="text-primary mx-auto mb-4 size-8 animate-spin" />
         <p className="text-muted-foreground">جاري التحميل...</p>
       </div>
     </div>

@@ -20,7 +20,7 @@ import {
   TextQuote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 function inferDirectionFromHtml(
   html: string,
@@ -37,6 +37,8 @@ function inferDirectionFromHtml(
   const rtlCount = rtlChars?.length ?? 0;
   const ltrCount = ltrChars?.length ?? 0;
 
+  if (ltrCount === 0 && rtlCount === 0) return fallback;
+  if (ltrCount === rtlCount) return fallback;
   return ltrCount > rtlCount ? "ltr" : "rtl";
 }
 
@@ -60,7 +62,6 @@ export function TipTapEditor({
   const [direction, setDirection] = useState<"rtl" | "ltr">(() =>
     inferDirectionFromHtml(content, defaultDirection)
   );
-  const userToggledDirectionRef = useRef(false);
 
   const editor = useEditor({
     extensions: [
@@ -104,15 +105,11 @@ export function TipTapEditor({
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content);
-
-      // Parent replaced content (e.g., switching cards): re-infer direction.
-      userToggledDirectionRef.current = false;
       setDirection(inferDirectionFromHtml(content, defaultDirection));
     }
-  }, [content, editor]);
+  }, [content, editor, defaultDirection]);
 
   const toggleDirection = useCallback(() => {
-    userToggledDirectionRef.current = true;
     setDirection(prev => (prev === "rtl" ? "ltr" : "rtl"));
   }, []);
 

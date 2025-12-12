@@ -95,8 +95,9 @@ const useCopyToClipboard = ({
 const defaultComponents = memoizeMarkdownComponents({
   h1: ({ className, ...props }) => (
     <h1
+      dir="auto"
       className={cn(
-        "aui-md-h1 mb-8 scroll-m-20 text-4xl font-extrabold tracking-tight last:mb-0",
+        "aui-md-h1 mb-8 scroll-m-20 text-4xl font-extrabold tracking-tight [unicode-bidi:plaintext] last:mb-0",
         className
       )}
       {...props}
@@ -104,8 +105,9 @@ const defaultComponents = memoizeMarkdownComponents({
   ),
   h2: ({ className, ...props }) => (
     <h2
+      dir="auto"
       className={cn(
-        "aui-md-h2 mt-8 mb-4 scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0 last:mb-0",
+        "aui-md-h2 mt-8 mb-4 scroll-m-20 text-3xl font-semibold tracking-tight [unicode-bidi:plaintext] first:mt-0 last:mb-0",
         className
       )}
       {...props}
@@ -113,8 +115,9 @@ const defaultComponents = memoizeMarkdownComponents({
   ),
   h3: ({ className, ...props }) => (
     <h3
+      dir="auto"
       className={cn(
-        "aui-md-h3 mt-6 mb-4 scroll-m-20 text-2xl font-semibold tracking-tight first:mt-0 last:mb-0",
+        "aui-md-h3 mt-6 mb-4 scroll-m-20 text-2xl font-semibold tracking-tight [unicode-bidi:plaintext] first:mt-0 last:mb-0",
         className
       )}
       {...props}
@@ -122,8 +125,9 @@ const defaultComponents = memoizeMarkdownComponents({
   ),
   h4: ({ className, ...props }) => (
     <h4
+      dir="auto"
       className={cn(
-        "aui-md-h4 mt-6 mb-4 scroll-m-20 text-xl font-semibold tracking-tight first:mt-0 last:mb-0",
+        "aui-md-h4 mt-6 mb-4 scroll-m-20 text-xl font-semibold tracking-tight [unicode-bidi:plaintext] first:mt-0 last:mb-0",
         className
       )}
       {...props}
@@ -131,8 +135,9 @@ const defaultComponents = memoizeMarkdownComponents({
   ),
   h5: ({ className, ...props }) => (
     <h5
+      dir="auto"
       className={cn(
-        "aui-md-h5 my-4 text-lg font-semibold first:mt-0 last:mb-0",
+        "aui-md-h5 my-4 text-lg font-semibold [unicode-bidi:plaintext] first:mt-0 last:mb-0",
         className
       )}
       {...props}
@@ -140,8 +145,9 @@ const defaultComponents = memoizeMarkdownComponents({
   ),
   h6: ({ className, ...props }) => (
     <h6
+      dir="auto"
       className={cn(
-        "aui-md-h6 my-4 font-semibold first:mt-0 last:mb-0",
+        "aui-md-h6 my-4 font-semibold [unicode-bidi:plaintext] first:mt-0 last:mb-0",
         className
       )}
       {...props}
@@ -151,7 +157,7 @@ const defaultComponents = memoizeMarkdownComponents({
     <p
       dir="auto"
       className={cn(
-        "aui-md-p mt-5 mb-5 leading-7 first:mt-0 last:mb-0",
+        "aui-md-p mt-5 mb-5 leading-7 [unicode-bidi:plaintext] first:mt-0 last:mb-0",
         className
       )}
       {...props}
@@ -170,21 +176,31 @@ const defaultComponents = memoizeMarkdownComponents({
   ),
   blockquote: ({ className, ...props }) => (
     <blockquote
-      className={cn("aui-md-blockquote border-l-2 pl-6 italic", className)}
+      dir="auto"
+      className={cn(
+        "aui-md-blockquote border-l-2 pl-6 italic [unicode-bidi:plaintext]",
+        className
+      )}
       {...props}
     />
   ),
   ul: ({ className, ...props }) => (
     <ul
       dir="auto"
-      className={cn("aui-md-ul my-5 ms-6 list-disc [&>li]:mt-2", className)}
+      className={cn(
+        "aui-md-ul my-5 ms-6 list-disc [unicode-bidi:plaintext] [&>li]:mt-2",
+        className
+      )}
       {...props}
     />
   ),
   ol: ({ className, ...props }) => (
     <ol
       dir="auto"
-      className={cn("aui-md-ol my-5 ms-6 list-decimal [&>li]:mt-2", className)}
+      className={cn(
+        "aui-md-ol my-5 ms-6 list-decimal [unicode-bidi:plaintext] [&>li]:mt-2",
+        className
+      )}
       {...props}
     />
   ),
@@ -235,8 +251,9 @@ const defaultComponents = memoizeMarkdownComponents({
   ),
   pre: ({ className, ...props }) => (
     <pre
+      dir="ltr"
       className={cn(
-        "aui-md-pre overflow-x-auto rounded-t-none! rounded-b-lg bg-black p-4 text-white",
+        "aui-md-pre overflow-x-auto rounded-t-none! rounded-b-lg bg-black p-4 text-white [unicode-bidi:isolate]",
         className
       )}
       {...props}
@@ -246,13 +263,17 @@ const defaultComponents = memoizeMarkdownComponents({
     const isCodeBlock = useIsMarkdownCodeBlock();
     return (
       <code
+        dir={isCodeBlock ? "ltr" : "auto"}
         className={cn(
           !isCodeBlock &&
-            "aui-md-inline-code bg-muted rounded border font-semibold",
+            "aui-md-inline-code bg-muted rounded border font-semibold [unicode-bidi:isolate]",
+          isCodeBlock && "[unicode-bidi:isolate]",
           className
         )}
         {...props}
-      />
+      >
+        <bdi dir="auto">{props.children}</bdi>
+      </code>
     );
   },
   CodeHeader,

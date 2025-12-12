@@ -22,23 +22,37 @@ interface DeckManagerProps {
   onCardsChange: () => void;
 }
 
-export function DeckManager({
-  allCards,
-  onCardsChange,
-}: DeckManagerProps) {
+export function DeckManager({ allCards, onCardsChange }: DeckManagerProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFront, setEditFront] = useState("");
   const [editBack, setEditBack] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const fetchWithTimeout = async (
+    input: RequestInfo | URL,
+    init: RequestInit,
+    timeoutMs: number
+  ) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
 
   const startEdit = (card: Flashcard) => {
+    setErrorMessage(null);
     setEditingId(card.id);
     setEditFront(card.front);
     setEditBack(card.back);
   };
 
   const cancelEdit = () => {
+    setErrorMessage(null);
     setEditingId(null);
     setEditFront("");
     setEditBack("");
@@ -48,21 +62,37 @@ export function DeckManager({
     if (!editingId || !editFront.trim() || !editBack.trim()) return;
 
     try {
+      setErrorMessage(null);
       setSaving(true);
-      const res = await fetch(`/api/flashcards/${editingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          front: editFront.trim(),
-          back: editBack.trim(),
-        }),
-      });
+      const res = await fetchWithTimeout(
+        `/api/flashcards/${editingId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            front: editFront.trim(),
+            back: editBack.trim(),
+          }),
+        },
+        15000
+      );
       if (res.ok) {
         onCardsChange();
         cancelEdit();
+        return;
       }
+
+      const error = await res.json().catch(() => ({ error: "" }));
+      setErrorMessage(
+        (error && typeof error.error === "string" && error.error) ||
+          "تعذر حفظ التعديل. حاول مرة أخرى."
+      );
     } catch (error) {
-      console.error("Failed to update card:", error);
+      const message =
+        error instanceof Error && error.name === "AbortError"
+          ? "انتهت مهلة الطلب. حاول مرة أخرى."
+          : "حدث خطأ أثناء حفظ التعديل. حاول مرة أخرى.";
+      setErrorMessage(message);
     } finally {
       setSaving(false);
     }
@@ -72,15 +102,29 @@ export function DeckManager({
     if (!confirm("هل تريد حذف هذه البطاقة؟")) return;
 
     try {
+      setErrorMessage(null);
       setDeleting(id);
-      const res = await fetch(`/api/flashcards/${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetchWithTimeout(
+        `/api/flashcards/${id}`,
+        { method: "DELETE" },
+        15000
+      );
       if (res.ok) {
         onCardsChange();
+        return;
       }
+
+      const error = await res.json().catch(() => ({ error: "" }));
+      setErrorMessage(
+        (error && typeof error.error === "string" && error.error) ||
+          "تعذر حذف البطاقة. حاول مرة أخرى."
+      );
     } catch (error) {
-      console.error("Failed to delete card:", error);
+      const message =
+        error instanceof Error && error.name === "AbortError"
+          ? "انتهت مهلة الطلب. حاول مرة أخرى."
+          : "حدث خطأ أثناء حذف البطاقة. حاول مرة أخرى.";
+      setErrorMessage(message);
     } finally {
       setDeleting(null);
     }
@@ -96,6 +140,11 @@ export function DeckManager({
 
   return (
     <div className="space-y-2" dir="rtl">
+      {errorMessage && (
+        <div className="text-destructive border-destructive/30 bg-destructive/10 rounded-md border px-3 py-2 text-sm">
+          {errorMessage}
+        </div>
+      )}
       {/* Cards list */}
       {allCards.map(card => (
         <div

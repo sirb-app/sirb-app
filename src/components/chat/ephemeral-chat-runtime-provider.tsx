@@ -98,7 +98,15 @@ function createEphemeralChatModelAdapter(
 
       for await (const event of parseSSEStream(streamResponse)) {
         if (event.type === "delta") {
-          const delta = (event.data as { content: string }).content;
+          const data = event.data as unknown;
+          const delta =
+            data &&
+            typeof data === "object" &&
+            "content" in data &&
+            typeof (data as { content?: unknown }).content === "string"
+              ? (data as { content: string }).content
+              : "";
+          if (!delta) continue;
           fullText += delta;
           yield { content: [{ type: "text", text: fullText }] };
         } else if (event.type === "done") {

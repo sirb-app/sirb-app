@@ -28,13 +28,13 @@ export async function createStudyPlan(
   }
 
   const { subjectId, title, selectedChapterIds, startWithAssessment } = input;
+  const uniqueChapterIds = Array.from(new Set(selectedChapterIds));
 
-  if (selectedChapterIds.length === 0) {
+  if (uniqueChapterIds.length === 0) {
     return { success: false, error: "يجب اختيار فصل واحد على الأقل" };
   }
 
   try {
-    // Check enrollment
     const enrollment = await prisma.enrollment.findUnique({
       where: {
         userId_subjectId: {
@@ -48,13 +48,24 @@ export async function createStudyPlan(
       return { success: false, error: "يجب التسجيل في المقرر أولاً" };
     }
 
+    const validChaptersCount = await prisma.chapter.count({
+      where: {
+        id: { in: uniqueChapterIds },
+        subjectId,
+      },
+    });
+
+    if (validChaptersCount !== uniqueChapterIds.length) {
+      return { success: false, error: "الفصول المختارة غير صالحة" };
+    }
+
     // Create study plan with SETUP status
     const studyPlan = await prisma.studyPlan.create({
       data: {
         userId: session.user.id,
         subjectId,
         title: title || "جلسة تعلم جديدة",
-        selectedChapterIds,
+        selectedChapterIds: uniqueChapterIds,
         status: "SETUP",
         placementCompleted: !startWithAssessment,
       },
@@ -66,7 +77,9 @@ export async function createStudyPlan(
       startAssessment: startWithAssessment,
     };
   } catch (error) {
-    console.error("Create study plan error:", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Create study plan error:", error);
+    }
     return { success: false, error: "حدث خطأ أثناء إنشاء الجلسة" };
   }
 }
@@ -103,12 +116,16 @@ export async function getStudyPlans(subjectId: number) {
 
     return studyPlans;
   } catch (error) {
-    console.error("Get study plans error:", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Get study plans error:", error);
+    }
     return [];
   }
 }
 
-export async function deleteStudyPlan(studyPlanId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteStudyPlan(
+  studyPlanId: string
+): Promise<{ success: boolean; error?: string }> {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -118,26 +135,24 @@ export async function deleteStudyPlan(studyPlanId: string): Promise<{ success: b
   }
 
   try {
-    const studyPlan = await prisma.studyPlan.findUnique({
-      where: { id: studyPlanId },
-    });
-
-    if (!studyPlan) {
-      return { success: false, error: "الجلسة غير موجودة" };
-    }
-
-    if (studyPlan.userId !== session.user.id) {
-      return { success: false, error: "غير مصرح لك بحذف هذه الجلسة" };
-    }
-
-    await prisma.studyPlan.update({
-      where: { id: studyPlanId },
+    const result = await prisma.studyPlan.updateMany({
+      where: {
+        id: studyPlanId,
+        userId: session.user.id,
+        deletedAt: null,
+      },
       data: { deletedAt: new Date() },
     });
 
+    if (result.count === 0) {
+      return { success: false, error: "الجلسة غير موجودة أو غير مصرح" };
+    }
+
     return { success: true };
   } catch (error) {
-    console.error("Delete study plan error:", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Delete study plan error:", error);
+    }
     return { success: false, error: "حدث خطأ أثناء حذف الجلسة" };
   }
 }
@@ -159,26 +174,24 @@ export async function updateStudyPlanTitle(
   }
 
   try {
-    const studyPlan = await prisma.studyPlan.findUnique({
-      where: { id: studyPlanId },
-    });
-
-    if (!studyPlan) {
-      return { success: false, error: "الجلسة غير موجودة" };
-    }
-
-    if (studyPlan.userId !== session.user.id) {
-      return { success: false, error: "غير مصرح لك بتعديل هذه الجلسة" };
-    }
-
-    await prisma.studyPlan.update({
-      where: { id: studyPlanId },
+    const result = await prisma.studyPlan.updateMany({
+      where: {
+        id: studyPlanId,
+        userId: session.user.id,
+        deletedAt: null,
+      },
       data: { title: title.trim() },
     });
 
+    if (result.count === 0) {
+      return { success: false, error: "الجلسة غير موجودة أو غير مصرح" };
+    }
+
     return { success: true };
   } catch (error) {
-    console.error("Update study plan title error:", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Update study plan title error:", error);
+    }
     return { success: false, error: "حدث خطأ أثناء تعديل العنوان" };
   }
 }

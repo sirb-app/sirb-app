@@ -101,7 +101,12 @@ export default async function Page({ params }: PageProps) {
   });
 
   const subject = await getSubjectData(subjectId, session?.user.id ?? null);
-  const sessions = await getStudyPlans(parseInt(subjectId));
+  let sessions: Awaited<ReturnType<typeof getStudyPlans>> = [];
+  try {
+    sessions = await getStudyPlans(parseInt(subjectId));
+  } catch {
+    sessions = [];
+  }
 
   return (
     <div className="container mx-auto max-w-7xl px-3 py-8 md:px-8 lg:px-16">

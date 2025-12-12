@@ -7,6 +7,38 @@ const FASTAPI_BASE_URL =
   process.env.FASTAPI_BASE_URL || "http://localhost:8000";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
+function normalizePathSegments(segments: string[]): string | null {
+  if (!Array.isArray(segments)) return null;
+
+  const normalized: string[] = [];
+  for (const raw of segments) {
+    if (!raw) return null;
+    if (raw === "." || raw === "..") return null;
+    if (raw.startsWith("/") || raw.includes("\\")) return null;
+
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(raw);
+    } catch {
+      return null;
+    }
+
+    if (!decoded) return null;
+    if (decoded === "." || decoded === "..") return null;
+    if (decoded.includes("/") || decoded.includes("\\")) return null;
+
+    normalized.push(decoded);
+  }
+
+  return normalized.join("/");
+}
+
+function isSseRequest(request: Request, segments: string[]): boolean {
+  const accept = request.headers.get("accept") || "";
+  if (accept.includes("text/event-stream")) return true;
+  return segments.at(-1) === "stream";
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ path: string[] }> }
@@ -45,21 +77,23 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Validate path segments to prevent path traversal
-  const invalidSegment = params.path.find(
-    segment => segment === ".." || segment.startsWith("/") || segment.includes("\\")
-  );
-  if (invalidSegment) {
-    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
+  if (!INTERNAL_API_KEY) {
+    return NextResponse.json(
+      { error: "Server misconfigured" },
+      { status: 500 }
+    );
   }
 
-  const path = params.path.join("/");
+  const path = normalizePathSegments(params.path);
+  if (!path) {
+    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
+  }
   const url = new URL(request.url);
   const targetUrl = `${FASTAPI_BASE_URL}/api/v1/chat/${path}${url.search}`;
 
   // Prepare headers for the backend
   const backendHeaders: HeadersInit = {
-    "X-API-Key": INTERNAL_API_KEY || "",
+    "X-API-Key": INTERNAL_API_KEY,
     "X-User-ID": session.user.id,
   };
 
@@ -69,30 +103,35 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
     backendHeaders["Content-Type"] = contentType;
   }
 
-  // Longer timeout for streaming endpoints
-  const isStreamEndpoint = path.includes("stream");
+  const isStreamEndpoint = isSseRequest(request, params.path);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), isStreamEndpoint ? 120000 : 30000);
-
-  // Prepare request options
-  const fetchOptions: RequestInit = {
-    method: request.method,
-    headers: backendHeaders,
-    signal: controller.signal,
-  };
-
-  // Forward body for POST/PATCH (use arrayBuffer for binary safety)
-  if (request.method === "POST" || request.method === "PATCH") {
-    const buffer = await request.arrayBuffer();
-    fetchOptions.body = buffer;
-  }
+  const timeoutMs = isStreamEndpoint ? 120000 : 30000;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   try {
+    timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const fetchOptions: RequestInit = {
+      method: request.method,
+      headers: backendHeaders,
+      signal: controller.signal,
+    };
+
+    if (request.method === "POST" || request.method === "PATCH") {
+      const buffer = await request.arrayBuffer();
+      fetchOptions.body = buffer;
+    }
+
     const response = await fetch(targetUrl, fetchOptions);
-    clearTimeout(timeoutId);
 
     const responseContentType = response.headers.get("content-type") || "";
     if (responseContentType.includes("text/event-stream")) {
+      if (!response.body) {
+        return NextResponse.json(
+          { error: "Upstream returned an empty stream" },
+          { status: 502 }
+        );
+      }
       return new Response(response.body, {
         status: response.status,
         headers: {
@@ -103,7 +142,15 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
       });
     }
 
+    if (response.status === 204) {
+      return new Response(null, { status: 204 });
+    }
+
     const responseText = await response.text();
+
+    if (!responseText) {
+      return NextResponse.json({}, { status: response.status });
+    }
 
     try {
       const data = JSON.parse(responseText);
@@ -115,7 +162,6 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
       );
     }
   } catch (err) {
-    clearTimeout(timeoutId);
     if (err instanceof Error && err.name === "AbortError") {
       return NextResponse.json({ error: "Request timeout" }, { status: 504 });
     }
@@ -123,5 +169,7 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
       { error: "Failed to connect to chat service" },
       { status: 502 }
     );
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
