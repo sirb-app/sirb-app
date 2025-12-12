@@ -50,8 +50,9 @@ export function Footer() {
   // Hide footer on certain pages
   const isCanvasPage = pathname?.includes("/canvases/");
   const isAuthPage = pathname?.startsWith("/auth/");
+  const isSessionPage = pathname?.startsWith("/sessions/");
 
-  if (isCanvasPage || isAuthPage) {
+  if (isCanvasPage || isAuthPage || isSessionPage) {
     return null;
   }
 

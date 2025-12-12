@@ -20,7 +20,25 @@ import {
   TextQuote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+
+function inferDirectionFromHtml(
+  html: string,
+  fallback: "rtl" | "ltr"
+): "rtl" | "ltr" {
+  const plainText = (html || "").replace(/<[^>]*>/g, "");
+  if (!plainText.trim()) return fallback;
+
+  const rtlChars = plainText.match(
+    /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/g
+  );
+  const ltrChars = plainText.match(/[A-Za-z]/g);
+
+  const rtlCount = rtlChars?.length ?? 0;
+  const ltrCount = ltrChars?.length ?? 0;
+
+  return ltrCount > rtlCount ? "ltr" : "rtl";
+}
 
 type TipTapEditorProps = {
   readonly content: string;
@@ -39,7 +57,10 @@ export function TipTapEditor({
   className,
   defaultDirection = "rtl",
 }: TipTapEditorProps) {
-  const [direction, setDirection] = useState<"rtl" | "ltr">(defaultDirection);
+  const [direction, setDirection] = useState<"rtl" | "ltr">(() =>
+    inferDirectionFromHtml(content, defaultDirection)
+  );
+  const userToggledDirectionRef = useRef(false);
 
   const editor = useEditor({
     extensions: [
@@ -83,10 +104,15 @@ export function TipTapEditor({
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content);
+
+      // Parent replaced content (e.g., switching cards): re-infer direction.
+      userToggledDirectionRef.current = false;
+      setDirection(inferDirectionFromHtml(content, defaultDirection));
     }
   }, [content, editor]);
 
   const toggleDirection = useCallback(() => {
+    userToggledDirectionRef.current = true;
     setDirection(prev => (prev === "rtl" ? "ltr" : "rtl"));
   }, []);
 

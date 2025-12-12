@@ -51,7 +51,10 @@ export function SessionClient({ session }: SessionClientProps) {
         <div className="container mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" asChild>
-              <Link href={`/subjects/${session.subject.id}`} aria-label="العودة إلى المادة">
+              <Link
+                href={`/subjects/${session.subject.id}`}
+                aria-label="العودة إلى المادة"
+              >
                 <ArrowRight className="size-5" />
               </Link>
             </Button>
@@ -109,9 +112,14 @@ export function SessionClient({ session }: SessionClientProps) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {view === "chat" && <ChatPanel session={session} />}
-        {view === "quiz" && <QuizPanel session={session} placementCompleted={session.placementCompleted} />}
+        {view === "quiz" && (
+          <QuizPanel
+            session={session}
+            placementCompleted={session.placementCompleted}
+          />
+        )}
         {view === "flashcards" && <FlashcardsPanel session={session} />}
       </div>
     </div>

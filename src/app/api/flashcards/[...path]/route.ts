@@ -21,6 +21,20 @@ export async function POST(
   return proxyRequest(request, await params);
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyRequest(request, await params);
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyRequest(request, await params);
+}
+
 async function proxyRequest(request: Request, params: { path: string[] }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -30,7 +44,6 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Validate path segments to prevent path traversal
   const invalidSegment = params.path.find(
     segment =>
       segment === ".." || segment.startsWith("/") || segment.includes("\\")
@@ -41,7 +54,7 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
 
   const path = params.path.join("/");
   const url = new URL(request.url);
-  const targetUrl = `${FASTAPI_BASE_URL}/api/v1/adaptive/${path}${url.search}`;
+  const targetUrl = `${FASTAPI_BASE_URL}/api/v1/flashcards/${path}${url.search}`;
 
   const backendHeaders: HeadersInit = {
     "X-API-Key": INTERNAL_API_KEY || "",
@@ -66,7 +79,7 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
     signal: controller.signal,
   };
 
-  if (request.method === "POST") {
+  if (request.method === "POST" || request.method === "PATCH") {
     const buffer = await request.arrayBuffer();
     fetchOptions.body = buffer;
   }
@@ -74,6 +87,7 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
   try {
     const response = await fetch(targetUrl, fetchOptions);
     clearTimeout(timeoutId);
+
     const responseContentType = response.headers.get("content-type") || "";
     if (responseContentType.includes("text/event-stream")) {
       return new Response(response.body, {
@@ -103,7 +117,7 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
       return NextResponse.json({ error: "Request timeout" }, { status: 504 });
     }
     return NextResponse.json(
-      { error: "Failed to connect to adaptive learning service" },
+      { error: "Failed to connect to flashcards service" },
       { status: 502 }
     );
   }

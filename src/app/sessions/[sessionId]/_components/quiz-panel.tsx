@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -9,10 +10,10 @@ import {
   Filter,
   Lightbulb,
   Loader2,
-  Menu,
   MessageSquare,
   Plus,
   Sparkles,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -20,6 +21,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,12 +46,15 @@ import {
 } from "@/components/ui/sheet";
 import { SessionData } from "./session-client";
 
+import { Thread } from "@/components/assistant-ui/thread";
+import { EphemeralChatRuntimeProvider } from "@/components/chat/ephemeral-chat-runtime-provider";
+
 type TopicInfo = {
   slug: string;
   name: string;
   correct_count: number;
   wrong_count: number;
-  is_due: boolean;  // FSRS says it's time to review
+  is_due: boolean; // FSRS says it's time to review
   is_weak: boolean; // Low proficiency score
 };
 
@@ -75,8 +86,13 @@ interface QuizPanelProps {
   placementCompleted?: boolean;
 }
 
-export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps) {
-  const [practiceState, setPracticeState] = useState<PracticeState | null>(null);
+export function QuizPanel({
+  session,
+  placementCompleted = true,
+}: QuizPanelProps) {
+  const [practiceState, setPracticeState] = useState<PracticeState | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
@@ -90,8 +106,12 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
   const [topicFilter, setTopicFilter] = useState<TopicFilter>("all");
   const [justAnswered, setJustAnswered] = useState(false); // Track if user just answered this question
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null); // Track user's selected option
-  const [questionType, setQuestionType] = useState<"all" | "MCQ_SINGLE" | "TRUE_FALSE">("all");
+  const [questionType, setQuestionType] = useState<
+    "all" | "MCQ_SINGLE" | "TRUE_FALSE"
+  >("all");
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+
+  const [questionChatOpen, setQuestionChatOpen] = useState(false);
 
   useEffect(() => {
     async function fetchState() {
@@ -153,7 +173,10 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
     }
   }, [session.id, selectedTopics, practiceState?.questions.length]);
 
-  const handleOptionClick = async (option: string, isRetry: boolean = false) => {
+  const handleOptionClick = async (
+    option: string,
+    isRetry: boolean = false
+  ) => {
     const currentQuestion = practiceState?.questions[currentIndex];
     if (!currentQuestion || isSubmitting) return;
     // Block if answered AND not doing a retry
@@ -161,7 +184,7 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
 
     // We always have correct_answer from generate - validate instantly
     const isCorrectAnswer = option === currentQuestion.correct_answer;
-    
+
     setSelectedAnswer(option);
     setPracticeState(prev => {
       if (!prev) return prev;
@@ -175,14 +198,16 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
         hint_used: showHint || currentQuestion.hint_used,
       };
       // Only update topic counts on first attempt
-      const updatedTopics = isRetry ? prev.topics : prev.topics.map(t => {
-        if (t.slug === currentQuestion.topic_slug) {
-          return isCorrectAnswer
-            ? { ...t, correct_count: t.correct_count + 1 }
-            : { ...t, wrong_count: t.wrong_count + 1 };
-        }
-        return t;
-      });
+      const updatedTopics = isRetry
+        ? prev.topics
+        : prev.topics.map(t => {
+            if (t.slug === currentQuestion.topic_slug) {
+              return isCorrectAnswer
+                ? { ...t, correct_count: t.correct_count + 1 }
+                : { ...t, wrong_count: t.wrong_count + 1 };
+            }
+            return t;
+          });
       return { topics: updatedTopics, questions: updatedQuestions };
     });
     setJustAnswered(true);
@@ -203,7 +228,8 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
   };
 
   const goToQuestion = (index: number) => {
-    if (index < 0 || !practiceState || index >= practiceState.questions.length) return;
+    if (index < 0 || !practiceState || index >= practiceState.questions.length)
+      return;
     setCurrentIndex(index);
     setShowHint(false);
     setShowAnswer(false);
@@ -212,6 +238,8 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
     const q = practiceState.questions[index];
     if (!q.answered) setQuestionStartTime(Date.now());
   };
+
+  // Keep chat open state when switching questions; runtime is keyed per question.
 
   const toggleTopic = (slug: string) => {
     setSelectedTopics(prev => {
@@ -243,11 +271,13 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
   const getFilteredTopics = useCallback(() => {
     if (!practiceState) return [];
     let topics = practiceState.topics;
-    
+
     if (topicSearch) {
-      topics = topics.filter(t => t.name.toLowerCase().includes(topicSearch.toLowerCase()));
+      topics = topics.filter(t =>
+        t.name.toLowerCase().includes(topicSearch.toLowerCase())
+      );
     }
-    
+
     if (topicFilter === "recommended") {
       topics = topics.filter(t => t.is_due || t.is_weak);
     } else if (topicFilter === "new") {
@@ -255,9 +285,11 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
     } else if (topicFilter === "mastered") {
       topics = topics.filter(t => t.correct_count > t.wrong_count);
     } else if (topicFilter === "needs_work") {
-      topics = topics.filter(t => t.wrong_count > 0 && t.wrong_count >= t.correct_count);
+      topics = topics.filter(
+        t => t.wrong_count > 0 && t.wrong_count >= t.correct_count
+      );
     }
-    
+
     return topics;
   }, [practiceState, topicSearch, topicFilter]);
 
@@ -276,13 +308,17 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
       <div className="flex h-full items-center justify-center p-6">
         <Card className="max-w-md">
           <CardHeader className="text-center">
-            <Sparkles className="mx-auto size-12 text-primary mb-2" />
+            <Sparkles className="text-primary mx-auto mb-2 size-12" />
             <CardTitle>اختبار تحديد المستوى</CardTitle>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-muted-foreground mb-4">أكمل اختبار تحديد المستوى أولاً</p>
+            <p className="text-muted-foreground mb-4">
+              أكمل اختبار تحديد المستوى أولاً
+            </p>
             <Button asChild>
-              <Link href={`/sessions/${session.id}/assessment`}>ابدأ الاختبار</Link>
+              <Link href={`/sessions/${session.id}/assessment`}>
+                ابدأ الاختبار
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -293,18 +329,23 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
   const currentQuestion = practiceState?.questions[currentIndex];
   const hasQuestions = (practiceState?.questions.length ?? 0) > 0;
   const totalQuestions = practiceState?.questions.length ?? 0;
-  
+
   // Only show "previously answered" banner when navigating back, not when just answered
-  const showPreviouslyWrongBanner = currentQuestion?.answered && currentQuestion?.is_correct === false && !justAnswered;
-  const showPreviouslyCorrectBanner = currentQuestion?.answered && currentQuestion?.is_correct === true && !justAnswered;
+  const showPreviouslyWrongBanner =
+    currentQuestion?.answered &&
+    currentQuestion?.is_correct === false &&
+    !justAnswered;
+  const showPreviouslyCorrectBanner =
+    currentQuestion?.answered &&
+    currentQuestion?.is_correct === true &&
+    !justAnswered;
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden flex-row-reverse">
+    <div className="flex h-full min-h-0 flex-row-reverse overflow-hidden">
       {/* Main Quiz Area */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-muted/20">
-        <div className="flex-1 overflow-hidden p-4 lg:p-6 flex flex-col">
-          <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col min-h-0 space-y-4">
-            
+      <div className="bg-muted/20 flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden p-4 lg:p-6">
+          <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col space-y-4">
             {/* Header */}
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -322,27 +363,57 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
                     <div className="mt-4 space-y-3">
                       {/* Mobile topic filters */}
                       <div className="flex flex-wrap gap-1">
-                        {(["all", "recommended", "new", "mastered", "needs_work"] as TopicFilter[]).map(f => (
-                          <Button 
+                        {(
+                          [
+                            "all",
+                            "recommended",
+                            "new",
+                            "mastered",
+                            "needs_work",
+                          ] as TopicFilter[]
+                        ).map(f => (
+                          <Button
                             key={f}
-                            variant={topicFilter === f ? "secondary" : "ghost"} 
-                            size="sm" 
+                            variant={topicFilter === f ? "secondary" : "ghost"}
+                            size="sm"
                             onClick={() => setTopicFilter(f)}
-                            className="h-7 text-xs px-2"
+                            className="h-7 px-2 text-xs"
                           >
-                            {f === "all" ? "الكل" : f === "recommended" ? "موصى به" : f === "new" ? "جديد" : f === "mastered" ? "متقن" : "يحتاج تحسين"}
+                            {f === "all"
+                              ? "الكل"
+                              : f === "recommended"
+                                ? "موصى به"
+                                : f === "new"
+                                  ? "جديد"
+                                  : f === "mastered"
+                                    ? "متقن"
+                                    : "يحتاج تحسين"}
                           </Button>
                         ))}
                       </div>
                       <Input
                         placeholder="بحث..."
                         value={topicSearch}
-                        onChange={(e) => setTopicSearch(e.target.value)}
+                        onChange={e => setTopicSearch(e.target.value)}
                         className="h-8 text-sm"
                       />
                       <div className="flex gap-1">
-                        <Button variant="default" size="sm" onClick={selectAll} className="flex-1 h-8">الكل</Button>
-                        <Button variant="outline" size="sm" onClick={deselectAll} className="flex-1 h-8">لا شيء</Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={selectAll}
+                          className="h-8 flex-1"
+                        >
+                          الكل
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={deselectAll}
+                          className="h-8 flex-1"
+                        >
+                          لا شيء
+                        </Button>
                       </div>
                       <ScrollArea className="h-64">
                         <div className="space-y-1.5 pe-2">
@@ -353,14 +424,24 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
                               <div
                                 key={topic.slug}
                                 onClick={() => toggleTopic(topic.slug)}
-                                className={`flex items-center gap-2 rounded-lg p-2 cursor-pointer transition-all border text-sm ${
-                                  isSelected ? "bg-primary/10 border-primary/40" : "bg-muted border-muted"
+                                className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm transition-all ${
+                                  isSelected
+                                    ? "bg-primary/10 border-primary/40"
+                                    : "bg-muted border-muted"
                                 }`}
                               >
-                                <span className={`size-2 rounded-full shrink-0 ${
-                                  isRecommended ? "bg-amber-500" : isSelected ? "bg-primary" : "bg-muted-foreground/40"
-                                }`} />
-                                <span className="flex-1 truncate" dir="auto">{topic.name}</span>
+                                <span
+                                  className={`size-2 shrink-0 rounded-full ${
+                                    isRecommended
+                                      ? "bg-amber-500"
+                                      : isSelected
+                                        ? "bg-primary"
+                                        : "bg-muted-foreground/40"
+                                  }`}
+                                />
+                                <span className="flex-1 truncate" dir="auto">
+                                  {topic.name}
+                                </span>
                               </div>
                             );
                           })}
@@ -370,27 +451,43 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
                   </SheetContent>
                 </Sheet>
 
-                <Button 
-                  onClick={generateQuestion} 
+                <Button
+                  onClick={generateQuestion}
                   disabled={selectedTopics.size === 0 || isGenerating}
                   size="sm"
                 >
                   <Plus className="me-2 size-4" />
                   سؤال جديد
-                  {isGenerating && <Loader2 className="ms-2 size-4 animate-spin" />}
+                  {isGenerating && (
+                    <Loader2 className="ms-2 size-4 animate-spin" />
+                  )}
                 </Button>
 
                 {/* Question Type Filter */}
                 <DropdownMenu dir="rtl">
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="text-xs">
-                      {questionType === "all" ? "كل الأنواع" : questionType === "MCQ_SINGLE" ? "اختيار متعدد" : "صح/خطأ"}
+                      {questionType === "all"
+                        ? "كل الأنواع"
+                        : questionType === "MCQ_SINGLE"
+                          ? "اختيار متعدد"
+                          : "صح/خطأ"}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => setQuestionType("all")}>كل الأنواع</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setQuestionType("MCQ_SINGLE")}>اختيار متعدد</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setQuestionType("TRUE_FALSE")}>صح / خطأ</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setQuestionType("all")}>
+                      كل الأنواع
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setQuestionType("MCQ_SINGLE")}
+                    >
+                      اختيار متعدد
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setQuestionType("TRUE_FALSE")}
+                    >
+                      صح / خطأ
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -398,19 +495,26 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
               {hasQuestions ? (
                 <DropdownMenu dir="rtl">
                   <DropdownMenuTrigger asChild>
-                    <button className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-2 py-1 rounded hover:bg-muted">
+                    <button className="text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer rounded px-2 py-1 text-sm transition-colors">
                       {currentIndex + 1} / {totalQuestions}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="max-h-60 overflow-y-auto">
+                  <DropdownMenuContent
+                    align="center"
+                    className="max-h-60 overflow-y-auto"
+                  >
                     {Array.from({ length: totalQuestions }, (_, i) => (
                       <DropdownMenuItem
                         key={i}
                         onClick={() => goToQuestion(i)}
-                        className={i === currentIndex ? "bg-primary/10 text-primary" : ""}
+                        className={
+                          i === currentIndex ? "bg-primary/10 text-primary" : ""
+                        }
                       >
                         {practiceState?.questions[i]?.answered && (
-                          <span className={`me-2 text-xs ${practiceState.questions[i].is_correct ? "text-success" : "text-destructive"}`}>
+                          <span
+                            className={`me-2 text-xs ${practiceState.questions[i].is_correct ? "text-success" : "text-destructive"}`}
+                          >
                             {practiceState.questions[i].is_correct ? "✓" : "✗"}
                           </span>
                         )}
@@ -424,220 +528,268 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
               {currentQuestion && !isGenerating && (
                 <Badge variant="outline" className="text-xs">
                   <span dir="auto">
-                    {practiceState?.topics.find(t => t.slug === currentQuestion.topic_slug)?.name}
+                    {
+                      practiceState?.topics.find(
+                        t => t.slug === currentQuestion.topic_slug
+                      )?.name
+                    }
                   </span>
                 </Badge>
               )}
             </div>
 
             {error && (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              <div className="border-destructive/50 bg-destructive/10 text-destructive rounded-lg border p-3 text-sm">
                 {error}
               </div>
             )}
 
             {/* Loading state - skeleton */}
             {isGenerating ? (
-              <div className="rounded-xl bg-card border overflow-hidden">
-                <div className="p-4 lg:p-5 space-y-4">
+              <div className="bg-card overflow-hidden rounded-xl border">
+                <div className="space-y-4 p-4 lg:p-5">
                   {/* Question skeleton */}
                   <div className="space-y-2">
-                    <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                    <div className="h-4 bg-muted rounded animate-pulse w-full" />
-                    <div className="h-4 bg-muted rounded animate-pulse w-5/6" />
+                    <div className="bg-muted h-4 w-3/4 animate-pulse rounded" />
+                    <div className="bg-muted h-4 w-full animate-pulse rounded" />
+                    <div className="bg-muted h-4 w-5/6 animate-pulse rounded" />
                   </div>
                   {/* Options skeleton */}
                   <div className="space-y-2 pt-2">
                     {[1, 2, 3, 4].map(i => (
-                      <div key={i} className="flex items-center gap-3 rounded-lg border border-border/40 p-3">
-                        <div className="flex-1 h-4 bg-muted rounded animate-pulse" />
-                        <div className="size-6 bg-muted rounded animate-pulse" />
+                      <div
+                        key={i}
+                        className="border-border/40 flex items-center gap-3 rounded-lg border p-3"
+                      >
+                        <div className="bg-muted h-4 flex-1 animate-pulse rounded" />
+                        <div className="bg-muted size-6 animate-pulse rounded" />
                       </div>
                     ))}
                   </div>
                   {/* Hint skeleton */}
-                  <div className="h-10 bg-muted/50 rounded-lg animate-pulse" />
+                  <div className="bg-muted/50 h-10 animate-pulse rounded-lg" />
                 </div>
                 {/* Nav skeleton */}
-                <div className="border-t px-4 py-3 flex items-center gap-2 bg-muted/30">
-                  <div className="h-8 w-20 bg-muted rounded animate-pulse" />
-                  <div className="flex-1 h-8 bg-muted rounded animate-pulse" />
-                  <div className="h-8 w-20 bg-muted rounded animate-pulse" />
+                <div className="bg-muted/30 flex items-center gap-2 border-t px-4 py-3">
+                  <div className="bg-muted h-8 w-20 animate-pulse rounded" />
+                  <div className="bg-muted h-8 flex-1 animate-pulse rounded" />
+                  <div className="bg-muted h-8 w-20 animate-pulse rounded" />
                 </div>
               </div>
             ) : !hasQuestions ? (
-              <div className="rounded-xl bg-card border p-8 text-center space-y-4">
+              <div className="bg-card space-y-4 rounded-xl border p-8 text-center">
                 <p className="text-muted-foreground">
                   اضغط على &quot;سؤال جديد&quot; لبدء التدريب
                 </p>
-                <Button onClick={generateQuestion} disabled={selectedTopics.size === 0}>
+                <Button
+                  onClick={generateQuestion}
+                  disabled={selectedTopics.size === 0}
+                >
                   <Plus className="me-2 size-4" />
                   ابدأ التدريب
                 </Button>
               </div>
             ) : currentQuestion ? (
               /* Quiz Container - fills available space with scroll */
-              <div className="rounded-xl bg-card border overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="bg-card flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
                 <ScrollArea className="flex-1">
-                  <div className="p-4 lg:p-5 space-y-4">
-                  {/* Previously answered banners - only when navigating back */}
-                  {showPreviouslyWrongBanner && (
-                    <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-amber-700 dark:text-amber-400">
-                      <AlertCircle className="size-4 shrink-0" />
-                      <span className="text-sm">أجبت على هذا السؤال بشكل خاطئ سابقاً</span>
-                    </div>
-                  )}
-                  
-                  {showPreviouslyCorrectBanner && (
-                    <div className="flex items-center justify-between gap-2 rounded-lg bg-success/10 border border-success/30 p-3">
-                      <div className="flex items-center gap-2 text-success">
-                        <CheckCircle2 className="size-4 shrink-0" />
-                        <span className="text-sm">أجبت على هذا السؤال بشكل صحيح سابقاً</span>
+                  <div className="space-y-4 p-4 lg:p-5">
+                    {/* Previously answered banners - only when navigating back */}
+                    {showPreviouslyWrongBanner && (
+                      <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-700 dark:text-amber-400">
+                        <AlertCircle className="size-4 shrink-0" />
+                        <span className="text-sm">
+                          أجبت على هذا السؤال بشكل خاطئ سابقاً
+                        </span>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setShowAnswer(!showAnswer)}
-                        className="shrink-0 h-7"
-                      >
-                        <Eye className="size-3 me-1" />
-                        {showAnswer ? "إخفاء" : "عرض الإجابة"}
-                      </Button>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Question */}
-                  <div dir="auto">
-                    <MarkdownRenderer content={currentQuestion.question_text} />
-                  </div>
-
-                  {/* Options */}
-                  <div className="space-y-2">
-                    {currentQuestion.options.map((option, index) => {
-                      const num = index + 1;
-                      const isCorrect = option === currentQuestion.correct_answer;
-                      // Check both: selectedAnswer (just answered) OR stored user_answer (previous answer)
-                      const isSelected = option === selectedAnswer || option === currentQuestion.user_answer;
-                      const hasAnswered = currentQuestion.answered;
-                      // Can retry if already answered and attempts < 4 (both correct and wrong can retry)
-                      const canRetry = hasAnswered && (currentQuestion.attempt_count || 1) < 4;
-                      
-                      // Determine option styling based on state
-                      let optionClasses = "border-border/40 hover:border-border hover:bg-muted/50";
-                      let badgeClasses = "bg-muted text-muted-foreground";
-                      let badgeContent: React.ReactNode = num;
-                      
-                      // Only show answer feedback immediately after answering (justAnswered)
-                      // When returning to a question that can be retried, don't show the answer
-                      if (justAnswered) {
-                        // Just answered: show feedback
-                        if (isCorrect) {
-                          optionClasses = "border-success bg-success/10";
-                          badgeClasses = "bg-success text-success-foreground";
-                          badgeContent = "✓";
-                        } else if (isSelected && !isCorrect) {
-                          optionClasses = "border-destructive bg-destructive/10";
-                          badgeClasses = "bg-destructive text-destructive-foreground";
-                          badgeContent = "✗";
-                        }
-                      } else if (hasAnswered && !canRetry) {
-                        // Can't retry (maxed out) - show the final state
-                        if (isCorrect) {
-                          optionClasses = "border-success bg-success/10";
-                          badgeClasses = "bg-success text-success-foreground";
-                          badgeContent = "✓";
-                        } else if (isSelected && !isCorrect) {
-                          optionClasses = "border-destructive bg-destructive/10";
-                          badgeClasses = "bg-destructive text-destructive-foreground";
-                          badgeContent = "✗";
-                        }
-                      } else if (showAnswer && isCorrect) {
-                        // User clicked "Show Answer" button - highlight correct answer
-                        optionClasses = "border-success bg-success/10";
-                        badgeClasses = "bg-success text-success-foreground";
-                        badgeContent = "✓";
-                      }
-                      // If canRetry && !justAnswered && !showAnswer: show normal options (no feedback)
-
-                      // Clickable if:
-                      // 1. Not answered yet, OR
-                      // 2. Answered wrong and can retry (attempts < 4)
-                      // AND not currently submitting AND not just answered this moment
-                      const isClickable = (!hasAnswered || canRetry) && !isSubmitting && !justAnswered;
-
-                      return (
-                        <div
-                          key={index}
-                          onClick={() => isClickable && handleOptionClick(option, canRetry)}
-                          className={`flex items-center gap-3 rounded-lg border p-3 transition-all ${isClickable ? "cursor-pointer" : ""} ${optionClasses}`}
-                        >
-                          <div className="flex-1 text-sm" dir="auto">
-                            <MarkdownRenderer content={option} />
-                          </div>
-                          
-                          <span className={`flex items-center justify-center size-6 rounded text-xs font-medium shrink-0 ${badgeClasses}`}>
-                            {badgeContent}
+                    {showPreviouslyCorrectBanner && (
+                      <div className="bg-success/10 border-success/30 flex items-center justify-between gap-2 rounded-lg border p-3">
+                        <div className="text-success flex items-center gap-2">
+                          <CheckCircle2 className="size-4 shrink-0" />
+                          <span className="text-sm">
+                            أجبت على هذا السؤال بشكل صحيح سابقاً
                           </span>
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  {isSubmitting && (
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground py-2">
-                      <Loader2 className="size-4 animate-spin" />
-                      <span className="text-sm">جاري التحقق...</span>
-                    </div>
-                  )}
-
-                  {/* Justification - shown immediately after answering (justAnswered) */}
-                  {justAnswered && currentQuestion.answered && currentQuestion.justification && (
-                    <div className="rounded-lg bg-muted/50 border p-4 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Lightbulb className="size-4 text-muted-foreground shrink-0" />
-                        <span className="text-sm font-medium">الشرح</span>
-                      </div>
-                      <div className="text-sm leading-relaxed" dir="auto">
-                        <MarkdownRenderer content={currentQuestion.justification} />
-                      </div>
-                    </div>
-                  )}
-
-
-
-                  {/* Hint Box - only shown BEFORE answering */}
-                  {!currentQuestion.answered && !justAnswered && (
-                    <>
-                      {!showHint ? (
-                        <button
-                          onClick={() => setShowHint(true)}
-                          className="w-full rounded-lg border border-secondary/30 p-3 text-sm hover:bg-muted/30 transition-colors flex items-center justify-center gap-2"
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAnswer(!showAnswer)}
+                          className="h-7 shrink-0"
                         >
-                          <Lightbulb className="size-4 text-secondary" />
-                          <span>عرض التلميح</span>
-                        </button>
-                      ) : (
-                        <div className="rounded-lg bg-muted/50 border border-secondary/30 p-4 space-y-2">
+                          <Eye className="me-1 size-3" />
+                          {showAnswer ? "إخفاء" : "عرض الإجابة"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Question */}
+                    <div dir="auto">
+                      <MarkdownRenderer
+                        content={currentQuestion.question_text}
+                      />
+                    </div>
+
+                    {/* Options */}
+                    <div className="space-y-2">
+                      {currentQuestion.options.map((option, index) => {
+                        const num = index + 1;
+                        const isCorrect =
+                          option === currentQuestion.correct_answer;
+                        // Check both: selectedAnswer (just answered) OR stored user_answer (previous answer)
+                        const isSelected =
+                          option === selectedAnswer ||
+                          option === currentQuestion.user_answer;
+                        const hasAnswered = currentQuestion.answered;
+                        // Can retry if already answered and attempts < 4 (both correct and wrong can retry)
+                        const canRetry =
+                          hasAnswered &&
+                          (currentQuestion.attempt_count || 1) < 4;
+
+                        // Determine option styling based on state
+                        let optionClasses =
+                          "border-muted hover:border-primary/50";
+                        let badgeClasses = "bg-muted text-muted-foreground";
+                        let badgeContent: React.ReactNode = num;
+
+                        // Only show answer feedback immediately after answering (justAnswered)
+                        // When returning to a question that can be retried, don't show the answer
+                        if (justAnswered) {
+                          // Just answered: show feedback
+                          if (isCorrect) {
+                            optionClasses = "border-success bg-success/15";
+                            badgeClasses = "bg-success text-success-foreground";
+                            badgeContent = <Check className="size-4" />;
+                          } else if (isSelected && !isCorrect) {
+                            optionClasses =
+                              "border-destructive bg-destructive/15";
+                            badgeClasses =
+                              "bg-destructive text-destructive-foreground";
+                            badgeContent = <X className="size-4" />;
+                          }
+                        } else if (hasAnswered && !canRetry) {
+                          // Can't retry (maxed out) - show the final state
+                          if (isCorrect) {
+                            optionClasses = "border-success bg-success/15";
+                            badgeClasses = "bg-success text-success-foreground";
+                            badgeContent = <Check className="size-4" />;
+                          } else if (isSelected && !isCorrect) {
+                            optionClasses =
+                              "border-destructive bg-destructive/15";
+                            badgeClasses =
+                              "bg-destructive text-destructive-foreground";
+                            badgeContent = <X className="size-4" />;
+                          }
+                        } else if (showAnswer && isCorrect) {
+                          // User clicked "Show Answer" button - highlight correct answer
+                          optionClasses = "border-success bg-success/15";
+                          badgeClasses = "bg-success text-success-foreground";
+                          badgeContent = <Check className="size-4" />;
+                        }
+                        // If canRetry && !justAnswered && !showAnswer: show normal options (no feedback)
+
+                        // Clickable if:
+                        // 1. Not answered yet, OR
+                        // 2. Answered wrong and can retry (attempts < 4)
+                        // AND not currently submitting AND not just answered this moment
+                        const isClickable =
+                          (!hasAnswered || canRetry) &&
+                          !isSubmitting &&
+                          !justAnswered;
+
+                        return (
+                          <div
+                            key={index}
+                            onClick={() =>
+                              isClickable && handleOptionClick(option, canRetry)
+                            }
+                            className={`flex items-center gap-3 rounded-lg border-2 p-4 transition-all ${isClickable ? "cursor-pointer" : ""} ${optionClasses}`}
+                          >
+                            <div
+                              className="flex-1 text-base leading-relaxed"
+                              dir="auto"
+                            >
+                              <MarkdownRenderer content={option} />
+                            </div>
+
+                            <span
+                              className={`flex size-6 shrink-0 items-center justify-center rounded text-xs font-medium ${badgeClasses}`}
+                            >
+                              {badgeContent}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {isSubmitting && (
+                      <div className="text-muted-foreground flex items-center justify-center gap-2 py-2">
+                        <Loader2 className="size-4 animate-spin" />
+                        <span className="text-sm">جاري التحقق...</span>
+                      </div>
+                    )}
+
+                    {/* Justification - shown immediately after answering (justAnswered) */}
+                    {justAnswered &&
+                      currentQuestion.answered &&
+                      currentQuestion.justification && (
+                        <div className="bg-accent/15 border-accent/30 space-y-2 rounded-lg border p-4">
                           <div className="flex items-center gap-2">
-                            <Lightbulb className="size-4 text-secondary shrink-0" />
-                            <span className="text-sm font-medium">تلميح</span>
+                            <Lightbulb className="text-muted-foreground size-4 shrink-0" />
+                            <span className="text-sm font-semibold">
+                              التوضيح:
+                            </span>
                           </div>
                           <div className="text-sm leading-relaxed" dir="auto">
-                            {currentQuestion.hint ? (
-                              <MarkdownRenderer content={currentQuestion.hint} />
-                            ) : (
-                              <span>راجع المفاهيم الأساسية للموضوع.</span>
-                            )}
+                            <MarkdownRenderer
+                              content={currentQuestion.justification}
+                            />
                           </div>
                         </div>
                       )}
-                    </>
-                  )}
+
+                    {/* Hint Box - shown before answering OR when returning to wrong answer */}
+                    {(!currentQuestion.answered || showPreviouslyWrongBanner) &&
+                      !justAnswered && (
+                        <>
+                          {!showHint ? (
+                            <button
+                              onClick={() => setShowHint(true)}
+                              className="border-secondary/30 hover:bg-muted/30 flex w-full items-center justify-center gap-2 rounded-lg border p-3 text-sm transition-colors"
+                            >
+                              <Lightbulb className="text-secondary size-4" />
+                              <span>عرض التلميح</span>
+                            </button>
+                          ) : (
+                            <div className="bg-muted/50 border-secondary/30 space-y-2 rounded-lg border p-4">
+                              <div className="flex items-center gap-2">
+                                <Lightbulb className="text-secondary size-4 shrink-0" />
+                                <span className="text-sm font-medium">
+                                  تلميح
+                                </span>
+                              </div>
+                              <div
+                                className="text-sm leading-relaxed"
+                                dir="auto"
+                              >
+                                {currentQuestion.hint ? (
+                                  <MarkdownRenderer
+                                    content={currentQuestion.hint}
+                                  />
+                                ) : (
+                                  <span>راجع المفاهيم الأساسية للموضوع.</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                   </div>
                 </ScrollArea>
 
                 {/* Navigation - inside the card at bottom */}
-                <div className="border-t px-4 py-3 flex items-center gap-2 bg-muted/30">
+                <div className="bg-muted/30 flex items-center gap-2 border-t px-4 py-3">
                   <Button
                     variant="outline"
                     size="sm"
@@ -645,16 +797,46 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
                     disabled={currentIndex <= 0}
                     className="h-8"
                   >
-                    <ChevronRight className="size-4 me-1" />
+                    <ChevronRight className="me-1 size-4" />
                     السابق
                   </Button>
 
-                  <div className="flex-1 relative">
-                    <MessageSquare className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                    <Input placeholder="اسأل المساعد الذكي..." className="ps-10 h-8 text-sm" disabled />
-                  </div>
+                  <Dialog
+                    open={questionChatOpen}
+                    onOpenChange={setQuestionChatOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 flex-1 justify-start gap-2"
+                        disabled={!currentQuestion}
+                      >
+                        <MessageSquare className="text-muted-foreground size-4" />
+                        اسأل عن هذا السؤال
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent
+                      forceMount
+                      className="flex h-[85dvh] max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+                    >
+                      <DialogHeader className="border-b p-4">
+                        <DialogTitle>اسأل عن هذا السؤال</DialogTitle>
+                      </DialogHeader>
+                      <div className="min-h-0 flex-1 p-2">
+                        {currentQuestion && (
+                          <EphemeralChatRuntimeProvider
+                            key={`question-chat-${currentQuestion.id}`}
+                            endpoint={`/api/adaptive/questions/${currentQuestion.id}/chat`}
+                          >
+                            <Thread />
+                          </EphemeralChatRuntimeProvider>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
-                  <Button 
+                  <Button
                     onClick={() => {
                       // If there are more questions ahead, go to next; otherwise generate new
                       if (currentIndex < totalQuestions - 1) {
@@ -662,13 +844,13 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
                       } else {
                         generateQuestion();
                       }
-                    }} 
-                    disabled={selectedTopics.size === 0 || isGenerating} 
+                    }}
+                    disabled={selectedTopics.size === 0 || isGenerating}
                     size="sm"
                     className="h-8"
                   >
                     {currentIndex < totalQuestions - 1 ? "التالي" : "سؤال جديد"}
-                    <ChevronLeft className="size-4 ms-1" />
+                    <ChevronLeft className="ms-1 size-4" />
                   </Button>
                 </div>
               </div>
@@ -678,76 +860,112 @@ export function QuizPanel({ session, placementCompleted = true }: QuizPanelProps
       </div>
 
       {/* Topics Sidebar */}
-      <div className="w-72 lg:w-80 shrink-0 border-e flex flex-col min-h-0 overflow-hidden hidden md:flex bg-card">
-        <div className="px-3 py-3 border-b space-y-2">
+      <div className="bg-card hidden min-h-0 w-72 shrink-0 flex-col overflow-hidden border-e md:flex lg:w-80">
+        <div className="space-y-2 border-b px-3 py-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">المواضيع</h3>
-            <span className="text-xs text-muted-foreground">{selectedTopics.size} من {practiceState?.topics.length ?? 0}</span>
+            <span className="text-muted-foreground text-xs">
+              {selectedTopics.size} من {practiceState?.topics.length ?? 0}
+            </span>
           </div>
-          
+
           <div className="flex gap-1">
-            <Button variant="default" size="sm" onClick={selectAll} className="flex-1 h-8">الكل</Button>
-            <Button variant="outline" size="sm" onClick={deselectAll} className="flex-1 h-8">لا شيء</Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={selectAll}
+              className="h-8 flex-1"
+            >
+              الكل
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={deselectAll}
+              className="h-8 flex-1"
+            >
+              لا شيء
+            </Button>
           </div>
-          
+
           <div className="flex flex-wrap gap-1">
-            {(["all", "recommended", "new", "mastered", "needs_work"] as TopicFilter[]).map(f => (
-              <Button 
+            {(
+              [
+                "all",
+                "recommended",
+                "new",
+                "mastered",
+                "needs_work",
+              ] as TopicFilter[]
+            ).map(f => (
+              <Button
                 key={f}
-                variant={topicFilter === f ? "secondary" : "ghost"} 
-                size="sm" 
+                variant={topicFilter === f ? "secondary" : "ghost"}
+                size="sm"
                 onClick={() => setTopicFilter(f)}
-                className="h-7 text-xs px-2"
+                className="h-7 px-2 text-xs"
               >
-                {f === "all" ? "الكل" : f === "recommended" ? "موصى به" : f === "new" ? "جديد" : f === "mastered" ? "متقن" : "يحتاج تحسين"}
+                {f === "all"
+                  ? "الكل"
+                  : f === "recommended"
+                    ? "موصى به"
+                    : f === "new"
+                      ? "جديد"
+                      : f === "mastered"
+                        ? "متقن"
+                        : "يحتاج تحسين"}
               </Button>
             ))}
           </div>
-          
+
           <Input
             placeholder="بحث..."
             value={topicSearch}
-            onChange={(e) => setTopicSearch(e.target.value)}
+            onChange={e => setTopicSearch(e.target.value)}
             className="h-8 text-sm"
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+        <div className="flex-1 space-y-1.5 overflow-y-auto p-2">
           {filteredTopics.map(topic => {
             const isSelected = selectedTopics.has(topic.slug);
             const hasStats = topic.correct_count > 0 || topic.wrong_count > 0;
             const isRecommended = topic.is_due || topic.is_weak;
-            
+
             return (
               <div
                 key={topic.slug}
                 onClick={() => toggleTopic(topic.slug)}
-                className={`
-                  flex items-center gap-2 rounded-lg p-2.5 min-h-12 cursor-pointer transition-all border
-                  ${isSelected 
-                    ? "bg-primary/10 border-primary/40" 
+                className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border p-2.5 transition-all ${
+                  isSelected
+                    ? "bg-primary/10 border-primary/40"
                     : "bg-muted border-muted hover:bg-muted/80"
-                  }
-                `}
+                } `}
               >
                 {/* Selection dot - orange if recommended */}
-                <span className={`size-2.5 rounded-full shrink-0 ${
-                  isRecommended ? "bg-amber-500" : isSelected ? "bg-primary" : "bg-muted-foreground/40"
-                }`} />
-                
+                <span
+                  className={`size-2.5 shrink-0 rounded-full ${
+                    isRecommended
+                      ? "bg-amber-500"
+                      : isSelected
+                        ? "bg-primary"
+                        : "bg-muted-foreground/40"
+                  }`}
+                />
+
                 <span className="flex-1 text-sm leading-relaxed" dir="auto">
                   {topic.name}
                 </span>
-                
+
                 {hasStats && (
-                  <div className="flex flex-col gap-0.5 shrink-0">
+                  <div className="flex shrink-0 flex-col gap-0.5">
                     {topic.correct_count > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success font-medium">
+                      <span className="bg-success/20 text-success rounded px-1.5 py-0.5 text-[10px] font-medium">
                         ✓{topic.correct_count}
                       </span>
                     )}
                     {topic.wrong_count > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive font-medium">
+                      <span className="bg-destructive/20 text-destructive rounded px-1.5 py-0.5 text-[10px] font-medium">
                         ✗{topic.wrong_count}
                       </span>
                     )}
