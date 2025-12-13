@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { TipTapEditor } from "@/components/ui/tiptap-editor";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -61,16 +61,6 @@ import { SessionData } from "./session-client";
 
 import { Thread } from "@/components/assistant-ui/thread";
 import { EphemeralChatRuntimeProvider } from "@/components/chat/ephemeral-chat-runtime-provider";
-
-// Detect text direction based on content
-function detectDirection(text: string): "rtl" | "ltr" {
-  const plainText = text.replace(/<[^>]*>/g, "");
-  const rtlChars = plainText.match(
-    /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/g
-  );
-  const ltrChars = plainText.match(/[A-Za-z]/g);
-  return (rtlChars?.length || 0) >= (ltrChars?.length || 0) ? "rtl" : "ltr";
-}
 
 function TopicCombobox({
   topics,
@@ -794,20 +784,24 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
                     <label className="text-muted-foreground mb-1.5 block text-xs">
                       السؤال
                     </label>
-                    <TipTapEditor
-                      content={manualFront}
-                      onChange={setManualFront}
+                    <Textarea
+                      value={manualFront}
+                      onChange={e => setManualFront(e.target.value)}
                       placeholder="اكتب السؤال هنا..."
+                      dir="auto"
+                      className="min-h-[120px]"
                     />
                   </div>
                   <div>
                     <label className="text-muted-foreground mb-1.5 block text-xs">
                       الإجابة
                     </label>
-                    <TipTapEditor
-                      content={manualBack}
-                      onChange={setManualBack}
+                    <Textarea
+                      value={manualBack}
+                      onChange={e => setManualBack(e.target.value)}
                       placeholder="اكتب الإجابة هنا..."
+                      dir="auto"
+                      className="min-h-[140px]"
                     />
                   </div>
 
@@ -874,26 +868,24 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
                     <label className="text-muted-foreground mb-1.5 block text-sm">
                       السؤال
                     </label>
-                    <TipTapEditor
-                      content={editFront}
-                      onChange={setEditFront}
+                    <Textarea
+                      value={editFront}
+                      onChange={e => setEditFront(e.target.value)}
                       placeholder="السؤال"
-                      defaultDirection={
-                        card ? detectDirection(card.front) : "rtl"
-                      }
+                      dir="auto"
+                      className="min-h-[120px]"
                     />
                   </div>
                   <div>
                     <label className="text-muted-foreground mb-1.5 block text-sm">
                       الإجابة
                     </label>
-                    <TipTapEditor
-                      content={editBack}
-                      onChange={setEditBack}
+                    <Textarea
+                      value={editBack}
+                      onChange={e => setEditBack(e.target.value)}
                       placeholder="الإجابة"
-                      defaultDirection={
-                        card ? detectDirection(card.back) : "rtl"
-                      }
+                      dir="auto"
+                      className="min-h-[160px]"
                     />
                   </div>
                 </div>

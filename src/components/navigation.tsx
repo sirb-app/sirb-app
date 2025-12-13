@@ -11,12 +11,11 @@ export const Navigation = () => {
   const user = session?.user;
   const pathname = usePathname();
 
-  // Hide navigation on canvas pages, tutor pages, and session pages
+  // Hide navigation on canvas pages and session pages
   const isCanvasPage = pathname?.includes("/canvases/");
-  const isTutorPage = pathname?.startsWith("/tutor");
   const isSessionPage = pathname?.startsWith("/sessions/");
 
-  if (isCanvasPage || isTutorPage || isSessionPage) {
+  if (isCanvasPage || isSessionPage) {
     return null;
   }
 

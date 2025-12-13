@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
-import { TipTapEditor } from "@/components/ui/tiptap-editor";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface Flashcard {
@@ -158,18 +158,21 @@ export function DeckManager({ allCards, onCardsChange }: DeckManagerProps) {
         >
           {editingId === card.id ? (
             // Edit mode
+            // TODO: add tiptap with markdown support
             <div className="space-y-2">
-              <TipTapEditor
-                content={editFront}
-                onChange={setEditFront}
+              <Textarea
+                value={editFront}
+                onChange={e => setEditFront(e.target.value)}
                 placeholder="السؤال..."
-                defaultDirection="rtl"
+                dir="auto"
+                className="min-h-[110px]"
               />
-              <TipTapEditor
-                content={editBack}
-                onChange={setEditBack}
+              <Textarea
+                value={editBack}
+                onChange={e => setEditBack(e.target.value)}
                 placeholder="الإجابة..."
-                defaultDirection="rtl"
+                dir="auto"
+                className="min-h-[130px]"
               />
               <div className="flex gap-2">
                 <Button

@@ -170,6 +170,7 @@ function createThreadListAdapter(
     },
 
     async initialize(_threadId: string) {
+      void _threadId;
       const response = await fetch("/api/chat/threads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -280,7 +281,11 @@ function createThreadListAdapter(
       });
     },
 
-    unstable_Provider: ({ children }) => {
+    unstable_Provider: function UnstableProvider({
+      children,
+    }: {
+      children?: ReactNode;
+    }) {
       const remoteId = useAssistantState(
         ({ threadListItem }) => threadListItem?.remoteId ?? null
       );
