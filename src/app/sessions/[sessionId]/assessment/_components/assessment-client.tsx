@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 
 type Question = {
   question: string;
@@ -62,6 +63,14 @@ export function AssessmentClient({
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [questionStartTime, setQuestionStartTime] = useState<number>(0);
+
+  const isOpenEnded =
+    (currentQuestion?.type || "").toUpperCase() === "OPEN_ENDED" ||
+    (currentQuestion?.options?.length ?? 0) === 0;
+
+  const hasAnswer = isOpenEnded
+    ? (selectedAnswer ?? "").trim().length > 0
+    : Boolean(selectedAnswer);
 
   // Start assessment
   const startAssessment = useCallback(async () => {
@@ -163,14 +172,8 @@ export function AssessmentClient({
 
   // Submit answer
   const submitAnswer = async () => {
-    if (
-      !quizId ||
-      !currentQuestion ||
-      !selectedAnswer ||
-      !confidence ||
-      !currentTopicSlug
-    )
-      return;
+    if (!quizId || !currentQuestion || !confidence || !currentTopicSlug) return;
+    if (!hasAnswer) return;
 
     setIsSubmitting(true);
     const timeTaken = Date.now() - questionStartTime;
@@ -284,31 +287,44 @@ export function AssessmentClient({
                   <MarkdownRenderer content={currentQuestion.question} />
                 </div>
 
-                <RadioGroup
-                  value={selectedAnswer || ""}
-                  onValueChange={setSelectedAnswer}
-                >
-                  {currentQuestion.options.map((option, index) => (
-                    <div
-                      key={index}
-                      className="hover:bg-muted flex cursor-pointer items-center gap-3 rounded-lg border p-4"
-                      onClick={() => setSelectedAnswer(option)}
-                    >
-                      <RadioGroupItem value={option} id={`option-${index}`} />
-                      <Label
-                        htmlFor={`option-${index}`}
-                        className="flex-1 cursor-pointer"
-                        dir="auto"
+                {isOpenEnded ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">اكتب إجابتك</Label>
+                    <Textarea
+                      dir="auto"
+                      value={selectedAnswer ?? ""}
+                      onChange={e => setSelectedAnswer(e.target.value)}
+                      placeholder="اكتب إجابتك هنا..."
+                      className="min-h-32"
+                    />
+                  </div>
+                ) : (
+                  <RadioGroup
+                    value={selectedAnswer || ""}
+                    onValueChange={setSelectedAnswer}
+                  >
+                    {currentQuestion.options.map((option, index) => (
+                      <div
+                        key={index}
+                        className="hover:bg-muted flex cursor-pointer items-center gap-3 rounded-lg border p-4"
+                        onClick={() => setSelectedAnswer(option)}
                       >
-                        <MarkdownRenderer content={option} />
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+                        <RadioGroupItem value={option} id={`option-${index}`} />
+                        <Label
+                          htmlFor={`option-${index}`}
+                          className="flex-1 cursor-pointer"
+                          dir="auto"
+                        >
+                          <MarkdownRenderer content={option} />
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                )}
               </CardContent>
             </Card>
 
-            {selectedAnswer && (
+            {hasAnswer && (
               <Card>
                 <CardContent className="p-6">
                   <p className="mb-4 font-medium">ما مدى ثقتك في إجابتك؟</p>
@@ -357,7 +373,7 @@ export function AssessmentClient({
             <Button
               className="w-full"
               size="lg"
-              disabled={!selectedAnswer || !confidence || isSubmitting}
+              disabled={!hasAnswer || !confidence || isSubmitting}
               onClick={submitAnswer}
             >
               {isSubmitting ? (

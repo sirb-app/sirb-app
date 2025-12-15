@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -65,13 +66,17 @@ type PracticeQuestion = {
   correct_answer: string | null;
   justification: string | null;
   hint: string | null;
-  type: "MCQ_SINGLE" | "TRUE_FALSE";
+  type: "MCQ_SINGLE" | "TRUE_FALSE" | "OPEN_ENDED";
   topic_slug: string;
   user_answer: string | null; // User's selected answer
   is_correct: boolean | null;
   answered: boolean;
   hint_used: boolean; // Whether hint was viewed (affects score weight)
   attempt_count: number; // Number of attempts (for diminishing returns)
+  // Open-ended grading details (from API response)
+  grading_score?: number | null; // 0.0-1.0 rubric score
+  missed_points?: string[] | null; // Points student didn't cover
+  grading_feedback?: string | null; // LLM-generated feedback
 };
 
 type PracticeState = {
@@ -104,9 +109,11 @@ export function QuizPanel({ session }: QuizPanelProps) {
   const [justAnswered, setJustAnswered] = useState(false); // Track if user just answered this question
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null); // Track user's selected option
   const [questionType, setQuestionType] = useState<
-    "all" | "MCQ_SINGLE" | "TRUE_FALSE"
+    "all" | "MCQ_SINGLE" | "TRUE_FALSE" | "OPEN_ENDED"
   >("all");
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  // Map of question ID -> open-ended text (persists text per question)
+  const [openEndedTextMap, setOpenEndedTextMap] = useState<Record<number, string>>({});
 
   const [questionChatOpen, setQuestionChatOpen] = useState(false);
 
@@ -243,6 +250,78 @@ export function QuizPanel({ session }: QuizPanelProps) {
     }
   };
 
+  // Handle open-ended question submission - calls API for LLM grading
+  const handleOpenEndedSubmit = async (isRetry: boolean = false) => {
+    const currentQuestion = practiceState?.questions[currentIndex];
+    const currentText = currentQuestion ? (openEndedTextMap[currentQuestion.id] || "") : "";
+    if (!currentQuestion || isSubmitting || !currentText.trim()) return;
+    // Block if answered AND not doing a retry
+    if (currentQuestion.answered && !isRetry) return;
+
+    setIsSubmitting(true);
+    const timeTaken = Date.now() - questionStartTime;
+
+    try {
+      const res = await fetch(
+        `/api/adaptive/practice/${currentQuestion.id}/submit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_answer: currentText.trim(),
+            confidence: "CONFIDENT",
+            time_ms: timeTaken,
+            hint_used: showHint || currentQuestion.hint_used,
+          }),
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        // The API returns is_correct based on LLM grading
+        const isCorrectAnswer = data.is_correct ?? false;
+        
+        setSelectedAnswer(currentText);
+        setPracticeState(prev => {
+          if (!prev) return prev;
+          const updatedQuestions = [...prev.questions];
+          updatedQuestions[currentIndex] = {
+            ...updatedQuestions[currentIndex],
+            is_correct: isCorrectAnswer,
+            user_answer: currentText,
+            answered: true,
+            attempt_count: (currentQuestion.attempt_count || 1) + (isRetry ? 1 : 0),
+            hint_used: showHint || currentQuestion.hint_used,
+            // Store grading details for display
+            grading_score: data.grading_score ?? null,
+            missed_points: data.missed_points ?? null,
+            grading_feedback: data.grading_feedback ?? null,
+          };
+          // Only update topic counts on first attempt
+          const updatedTopics = isRetry
+            ? prev.topics
+            : prev.topics.map(t => {
+                if (t.slug === currentQuestion.topic_slug) {
+                  return isCorrectAnswer
+                    ? { ...t, correct_count: t.correct_count + 1 }
+                    : { ...t, wrong_count: t.wrong_count + 1 };
+                }
+                return t;
+              });
+          return { topics: updatedTopics, questions: updatedQuestions };
+        });
+        setJustAnswered(true);
+        setShowHint(false);
+      } else {
+        setError("تعذر تقييم إجابتك. حاول مرة أخرى.");
+      }
+    } catch {
+      setError("تعذر الاتصال بالخادم لتقييم الإجابة.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const goToQuestion = (index: number) => {
     if (index < 0 || !practiceState || index >= practiceState.questions.length)
       return;
@@ -363,7 +442,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
         <div className="flex flex-1 flex-col overflow-hidden p-4 lg:p-6">
           <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 {/* Mobile Topics Trigger */}
                 <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
@@ -403,7 +482,9 @@ export function QuizPanel({ session }: QuizPanelProps) {
                                   ? "جديد"
                                   : f === "mastered"
                                     ? "متقن"
-                                    : "يحتاج تحسين"}
+                                    : f === "needs_work"
+                                      ? "يحتاج تحسين"
+                                      : f}
                           </Button>
                         ))}
                       </div>
@@ -471,9 +552,10 @@ export function QuizPanel({ session }: QuizPanelProps) {
                   onClick={generateQuestion}
                   disabled={selectedTopics.size === 0 || isGenerating}
                   size="sm"
+                  className="shrink-0"
                 >
                   <Plus className="me-2 size-4" />
-                  سؤال جديد
+                  <span className="hidden sm:inline">سؤال جديد</span>
                   {isGenerating && (
                     <Loader2 className="ms-2 size-4 animate-spin" />
                   )}
@@ -482,12 +564,14 @@ export function QuizPanel({ session }: QuizPanelProps) {
                 {/* Question Type Filter */}
                 <DropdownMenu dir="rtl">
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="text-xs">
+                    <Button variant="outline" size="sm" className="text-xs shrink-0">
                       {questionType === "all"
                         ? "كل الأنواع"
                         : questionType === "MCQ_SINGLE"
-                          ? "اختيار متعدد"
-                          : "صح/خطأ"}
+                          ? "اختيار"
+                          : questionType === "TRUE_FALSE"
+                            ? "صح/خطأ"
+                            : "مقالي"}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
@@ -504,54 +588,61 @@ export function QuizPanel({ session }: QuizPanelProps) {
                     >
                       صح / خطأ
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setQuestionType("OPEN_ENDED")}
+                    >
+                      إجابة قصيرة
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
 
-              {hasQuestions ? (
-                <DropdownMenu dir="rtl">
-                  <DropdownMenuTrigger asChild>
-                    <button className="text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer rounded px-2 py-1 text-sm transition-colors">
-                      {currentIndex + 1} / {totalQuestions}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="center"
-                    className="max-h-60 overflow-y-auto"
-                  >
-                    {Array.from({ length: totalQuestions }, (_, i) => (
-                      <DropdownMenuItem
-                        key={i}
-                        onClick={() => goToQuestion(i)}
-                        className={
-                          i === currentIndex ? "bg-primary/10 text-primary" : ""
-                        }
-                      >
-                        {practiceState?.questions[i]?.answered && (
-                          <span
-                            className={`me-2 text-xs ${practiceState.questions[i].is_correct ? "text-success" : "text-destructive"}`}
-                          >
-                            {practiceState.questions[i].is_correct ? "✓" : "✗"}
-                          </span>
-                        )}
-                        سؤال {i + 1}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
+              <div className="flex items-center gap-2 overflow-hidden">
+                {hasQuestions ? (
+                  <DropdownMenu dir="rtl">
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer rounded px-2 py-1 text-sm transition-colors shrink-0 whitespace-nowrap">
+                        {currentIndex + 1} / {totalQuestions}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="center"
+                      className="max-h-60 overflow-y-auto"
+                    >
+                      {Array.from({ length: totalQuestions }, (_, i) => (
+                        <DropdownMenuItem
+                          key={i}
+                          onClick={() => goToQuestion(i)}
+                          className={
+                            i === currentIndex ? "bg-primary/10 text-primary" : ""
+                          }
+                        >
+                          {practiceState?.questions[i]?.answered && (
+                            <span
+                              className={`me-2 text-xs ${practiceState.questions[i].is_correct ? "text-success" : "text-destructive"}`}
+                            >
+                              {practiceState.questions[i].is_correct ? "✓" : "✗"}
+                            </span>
+                          )}
+                          سؤال {i + 1}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
 
-              {currentQuestion && !isGenerating && (
-                <Badge variant="outline" className="text-xs">
-                  <span dir="auto">
-                    {
-                      practiceState?.topics.find(
-                        t => t.slug === currentQuestion.topic_slug
-                      )?.name
-                    }
-                  </span>
-                </Badge>
-              )}
+                {currentQuestion && !isGenerating && (
+                  <Badge variant="outline" className="text-xs">
+                    <span dir="auto">
+                      {
+                        practiceState?.topics.find(
+                          t => t.slug === currentQuestion.topic_slug
+                        )?.name
+                      }
+                    </span>
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {error && (
@@ -647,120 +738,197 @@ export function QuizPanel({ session }: QuizPanelProps) {
                       />
                     </div>
 
-                    {/* Options */}
-                    <div className="space-y-2">
-                      {currentQuestion.options.map((option, index) => {
-                        const num = index + 1;
-                        const isCorrect =
-                          option === currentQuestion.correct_answer;
-                        // Check both: selectedAnswer (just answered) OR stored user_answer (previous answer)
-                        const isSelected =
-                          option === selectedAnswer ||
-                          option === currentQuestion.user_answer;
-                        const hasAnswered = currentQuestion.answered;
-                        // Can retry if already answered and attempts < 4 (both correct and wrong can retry)
-                        const canRetry =
-                          hasAnswered &&
-                          (currentQuestion.attempt_count || 1) < 4;
+                    {/* Options - for MCQ and T/F */}
+                    {currentQuestion.type !== "OPEN_ENDED" ? (
+                      <div className="space-y-2">
+                        {currentQuestion.options.map((option, index) => {
+                          const num = index + 1;
+                          const isCorrect =
+                            option === currentQuestion.correct_answer;
+                          // Check both: selectedAnswer (just answered) OR stored user_answer (previous answer)
+                          const isSelected =
+                            option === selectedAnswer ||
+                            option === currentQuestion.user_answer;
+                          const hasAnswered = currentQuestion.answered;
+                          // Can retry if already answered and attempts < 4 (both correct and wrong can retry)
+                          const canRetry =
+                            hasAnswered &&
+                            (currentQuestion.attempt_count || 1) < 4;
 
-                        // Determine option styling based on state
-                        let optionClasses =
-                          "border-muted hover:border-primary/50";
-                        let badgeClasses = "bg-muted text-muted-foreground";
-                        let badgeContent: React.ReactNode = num;
+                          // Determine option styling based on state
+                          let optionClasses =
+                            "border-muted hover:border-primary/50";
+                          let badgeClasses = "bg-muted text-muted-foreground";
+                          let badgeContent: React.ReactNode = num;
 
-                        // Only show answer feedback immediately after answering (justAnswered)
-                        // When returning to a question that can be retried, don't show the answer
-                        if (justAnswered) {
-                          // Just answered: show feedback
-                          if (isCorrect) {
-                            optionClasses = "border-success bg-success/15";
-                            badgeClasses = "bg-success text-success-foreground";
-                            badgeContent = <Check className="size-4" />;
-                          } else if (isSelected && !isCorrect) {
-                            optionClasses =
-                              "border-destructive bg-destructive/15";
-                            badgeClasses =
-                              "bg-destructive text-destructive-foreground";
-                            badgeContent = <X className="size-4" />;
-                          }
-                        } else if (hasAnswered && !canRetry) {
-                          // Can't retry (maxed out) - show the final state
-                          if (isCorrect) {
-                            optionClasses = "border-success bg-success/15";
-                            badgeClasses = "bg-success text-success-foreground";
-                            badgeContent = <Check className="size-4" />;
-                          } else if (isSelected && !isCorrect) {
-                            optionClasses =
-                              "border-destructive bg-destructive/15";
-                            badgeClasses =
-                              "bg-destructive text-destructive-foreground";
-                            badgeContent = <X className="size-4" />;
-                          }
-                        } else if (showAnswer && isCorrect) {
-                          // User clicked "Show Answer" button - highlight correct answer
-                          optionClasses = "border-success bg-success/15";
-                          badgeClasses = "bg-success text-success-foreground";
-                          badgeContent = <Check className="size-4" />;
-                        }
-                        // If canRetry && !justAnswered && !showAnswer: show normal options (no feedback)
-
-                        // Clickable if:
-                        // 1. Not answered yet, OR
-                        // 2. Answered wrong and can retry (attempts < 4)
-                        // AND not currently submitting AND not just answered this moment
-                        const isClickable =
-                          (!hasAnswered || canRetry) &&
-                          !isSubmitting &&
-                          !justAnswered;
-
-                        return (
-                          <div
-                            key={index}
-                            onClick={() =>
-                              isClickable && handleOptionClick(option, canRetry)
+                          // Only show answer feedback immediately after answering (justAnswered)
+                          // When returning to a question that can be retried, don't show the answer
+                          if (justAnswered) {
+                            // Just answered: show feedback
+                            if (isCorrect) {
+                              optionClasses = "border-success bg-success/15";
+                              badgeClasses = "bg-success text-success-foreground";
+                              badgeContent = <Check className="size-4" />;
+                            } else if (isSelected && !isCorrect) {
+                              optionClasses =
+                                "border-destructive bg-destructive/15";
+                              badgeClasses =
+                                "bg-destructive text-destructive-foreground";
+                              badgeContent = <X className="size-4" />;
                             }
-                            className={`flex items-center gap-3 rounded-lg border-2 p-4 transition-all ${isClickable ? "cursor-pointer" : ""} ${optionClasses}`}
-                          >
+                          } else if (hasAnswered && !canRetry) {
+                            // Can't retry (maxed out) - show the final state
+                            if (isCorrect) {
+                              optionClasses = "border-success bg-success/15";
+                              badgeClasses = "bg-success text-success-foreground";
+                              badgeContent = <Check className="size-4" />;
+                            } else if (isSelected && !isCorrect) {
+                              optionClasses =
+                                "border-destructive bg-destructive/15";
+                              badgeClasses =
+                                "bg-destructive text-destructive-foreground";
+                              badgeContent = <X className="size-4" />;
+                            }
+                          } else if (showAnswer && isCorrect) {
+                            // User clicked "Show Answer" button - highlight correct answer
+                            optionClasses = "border-success bg-success/15";
+                            badgeClasses = "bg-success text-success-foreground";
+                            badgeContent = <Check className="size-4" />;
+                          }
+                          // If canRetry && !justAnswered && !showAnswer: show normal options (no feedback)
+
+                          // Clickable if:
+                          // 1. Not answered yet, OR
+                          // 2. Answered wrong and can retry (attempts < 4)
+                          // AND not currently submitting AND not just answered this moment
+                          const isClickable =
+                            (!hasAnswered || canRetry) &&
+                            !isSubmitting &&
+                            !justAnswered;
+
+                          return (
                             <div
-                              className="flex-1 text-base leading-relaxed"
-                              dir="auto"
+                              key={index}
+                              onClick={() =>
+                                isClickable && handleOptionClick(option, canRetry)
+                              }
+                              className={`flex items-center gap-3 rounded-lg border-2 p-4 transition-all ${isClickable ? "cursor-pointer" : ""} ${optionClasses}`}
                             >
-                              <MarkdownRenderer content={option} />
+                              <div
+                                className="flex-1 text-base leading-relaxed"
+                                dir="auto"
+                              >
+                                <MarkdownRenderer content={option} />
+                              </div>
+
+                              <span
+                                className={`flex size-6 shrink-0 items-center justify-center rounded text-xs font-medium ${badgeClasses}`}
+                              >
+                                {badgeContent}
+                              </span>
                             </div>
-
-                            <span
-                              className={`flex size-6 shrink-0 items-center justify-center rounded text-xs font-medium ${badgeClasses}`}
-                            >
-                              {badgeContent}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {isSubmitting && (
-                      <div className="text-muted-foreground flex items-center justify-center gap-2 py-2">
-                        <Loader2 className="size-4 animate-spin" />
-                        <span className="text-sm">جاري التحقق...</span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Open-ended question - textarea always visible like MCQ options */
+                      <div className="space-y-3">
+                        <Textarea
+                          placeholder="اكتب إجابتك هنا"
+                          value={openEndedTextMap[currentQuestion.id] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setOpenEndedTextMap(prev => ({ ...prev, [currentQuestion.id]: val }));
+                          }}
+                          className="min-h-[120px] resize-none text-base placeholder:text-right"
+                          dir="auto"
+                          disabled={isSubmitting || justAnswered}
+                        />
+                        {!justAnswered && (
+                          <Button
+                            onClick={() => handleOpenEndedSubmit(currentQuestion.answered)}
+                            disabled={!(openEndedTextMap[currentQuestion.id] || "").trim() || isSubmitting}
+                            className="w-full"
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <Loader2 className="me-2 size-4 animate-spin" />
+                                جاري التقييم...
+                              </>
+                            ) : (
+                              "إرسال الإجابة"
+                            )}
+                          </Button>
+                        )}
                       </div>
                     )}
 
-                    {/* Justification - shown immediately after answering (justAnswered) */}
-                    {justAnswered &&
+                    {/* Justification - shown immediately after answering (justAnswered) OR when Show Answer clicked */}
+                    {(justAnswered || showAnswer) &&
                       currentQuestion.answered &&
-                      currentQuestion.justification && (
-                        <div className="bg-accent/15 border-accent/30 space-y-2 rounded-lg border p-4">
-                          <div className="flex items-center gap-2">
-                            <Lightbulb className="text-muted-foreground size-4 shrink-0" />
-                            <span className="text-sm font-semibold">
-                              التوضيح:
-                            </span>
-                          </div>
-                          <div className="text-sm leading-relaxed" dir="auto">
-                            <MarkdownRenderer
-                              content={currentQuestion.justification}
-                            />
+                      (currentQuestion.justification || currentQuestion.grading_feedback) && (
+                        <div className="bg-accent/15 border-accent/30 space-y-3 rounded-lg border p-4">
+                          {/* Open-ended: Show user's previous answer */}
+                          {currentQuestion.type === "OPEN_ENDED" && currentQuestion.user_answer && (
+                            <div className="space-y-2">
+                              <span className="text-sm font-medium text-muted-foreground">إجابتك السابقة:</span>
+                              <div className="bg-muted/50 rounded-lg p-3 text-sm whitespace-pre-wrap" dir="auto">
+                                {currentQuestion.user_answer}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Open-ended: Show score badge and grading details */}
+                          {currentQuestion.type === "OPEN_ENDED" && currentQuestion.grading_score !== null && currentQuestion.grading_score !== undefined && (
+                            <div className="flex items-center gap-3">
+                              <div className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                                currentQuestion.grading_score >= 0.75 
+                                  ? "bg-success/20 text-success" 
+                                  : currentQuestion.grading_score >= 0.5 
+                                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                                    : "bg-destructive/20 text-destructive"
+                              }`}>
+                                {Math.round(currentQuestion.grading_score * 100)}%
+                              </div>
+                              <span className="text-muted-foreground text-sm">
+                                {currentQuestion.grading_score >= 0.75 
+                                  ? "إجابة ممتازة!" 
+                                  : currentQuestion.grading_score >= 0.5 
+                                    ? "إجابة جيدة، يمكن تحسينها"
+                                    : "تحتاج لمزيد من التفاصيل"}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Missed points for open-ended */}
+                          {currentQuestion.type === "OPEN_ENDED" && currentQuestion.missed_points && currentQuestion.missed_points.length > 0 && (
+                            <div className="space-y-2 px-2">
+                              <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                                نقاط مفقودة:
+                              </span>
+                              <ul className="ms-5 list-disc space-y-2 text-sm" dir="auto">
+                                {currentQuestion.missed_points.map((point, i) => (
+                                  <li key={i} className="text-muted-foreground">
+                                    <MarkdownRenderer content={point} />
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* LLM feedback for open-ended OR justification for MCQ/T-F */}
+                          <div className="border-t border-accent/30 pt-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Lightbulb className="text-muted-foreground size-4 shrink-0" />
+                              <span className="text-sm font-semibold">
+                                {currentQuestion.type === "OPEN_ENDED" ? "ملاحظات:" : "التوضيح:"}
+                              </span>
+                            </div>
+                            <div className="text-sm leading-relaxed" dir="auto">
+                              <MarkdownRenderer
+                                content={currentQuestion.grading_feedback || currentQuestion.justification || ""}
+                              />
+                            </div>
                           </div>
                         </div>
                       )}
@@ -805,7 +973,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
                 </ScrollArea>
 
                 {/* Navigation - inside the card at bottom */}
-                <div className="bg-muted/30 flex items-center gap-2 border-t px-4 py-3">
+                <div className="bg-muted/30 flex flex-wrap items-center gap-2 border-t px-4 py-3">
                   <Button
                     variant="outline"
                     size="sm"
