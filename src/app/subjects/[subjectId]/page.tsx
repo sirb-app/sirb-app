@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import ChapterPlaylists from "./_components/chapter-playlists";
@@ -8,6 +9,28 @@ import SubjectInfoCard from "./_components/subject-info-card";
 type PageProps = {
   params: Promise<{ subjectId: string }>;
 };
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { subjectId } = await params;
+
+  const subject = await prisma.subject.findUnique({
+    where: { id: parseInt(subjectId) },
+    select: { name: true, code: true },
+  });
+
+  if (!subject) {
+    return {
+      title: "المادة غير موجودة | سرب",
+    };
+  }
+
+  return {
+    title: `${subject.name} (${subject.code}) | سرب`,
+    description: `استكشف محتوى مادة ${subject.name} في منصة سرب`,
+  };
+}
 
 async function getSubjectData(subjectId: string, userId: string | null) {
   const subject = await prisma.subject.findUnique({

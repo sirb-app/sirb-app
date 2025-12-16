@@ -6,11 +6,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { auth } from "@/lib/auth";
 import { Lock, LogOut, Shield } from "lucide-react";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EditableAvatar } from "./_components/editable-avatar";
 import { EditableNameField } from "./_components/editable-name-field";
+
+export const metadata: Metadata = {
+  title: "الملف الشخصي | سرب",
+  description: "إدارة ملفك الشخصي وإعداداتك في منصة سرب",
+};
 
 export default async function Page() {
   const headersList = await headers();

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import ChapterContentTabs from "./_components/chapter-content-tabs";
@@ -11,6 +12,28 @@ type PageProps = {
     chapterId: string;
   }>;
 };
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { subjectId } = await params;
+
+  const subject = await prisma.subject.findUnique({
+    where: { id: parseInt(subjectId) },
+    select: { name: true },
+  });
+
+  if (!subject) {
+    return {
+      title: "سرب",
+    };
+  }
+
+  return {
+    title: `${subject.name} | سرب`,
+    description: `محتوى مادة ${subject.name}`,
+  };
+}
 
 async function getChapterData(
   subjectId: string,
