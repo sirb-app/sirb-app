@@ -79,10 +79,7 @@ function createEphemeralChatModelAdapter(
         });
 
         if (!fallback.ok) {
-          const error = await fallback
-            .json()
-            .catch(() => ({ error: "Unknown error" }));
-          throw new Error(error.error || `HTTP ${fallback.status}`);
+          throw new Error("حدث خطأ أثناء الاتصال بالخادم");
         }
 
         const data = (await fallback.json().catch(() => null)) as {

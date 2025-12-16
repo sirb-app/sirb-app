@@ -163,8 +163,8 @@ export function QuizPanel({ session }: QuizPanelProps) {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "فشل في توليد السؤال");
+        const err = await response.json().catch(() => ({ detail: "فشل في توليد السؤال" }));
+        throw new Error(err?.detail || "فشل في توليد السؤال");
       }
 
       const data = await response.json();

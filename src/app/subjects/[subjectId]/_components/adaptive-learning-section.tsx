@@ -100,6 +100,7 @@ export function AdaptiveLearningSection({
     const now = new Date();
     const diff = now.getTime() - new Date(date).getTime();
     const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "الآن";
     if (minutes < 60) return `قبل ${minutes} دقيقة`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `قبل ${hours} ساعة`;

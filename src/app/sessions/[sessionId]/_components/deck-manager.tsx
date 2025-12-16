@@ -188,7 +188,7 @@ export function DeckManager({ allCards, onCardsChange }: DeckManagerProps) {
                   )}
                   حفظ
                 </Button>
-                <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={saving}>
                   <X className="size-3" />
                   إلغاء
                 </Button>

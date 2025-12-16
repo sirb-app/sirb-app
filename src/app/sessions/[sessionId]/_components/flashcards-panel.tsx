@@ -368,6 +368,7 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
         setManualTopic("none");
         setDialogOpen(false);
         fetchStats();
+        fetchAllCards();
       }
     } catch (error) {
       console.error("Failed to create flashcard:", error);
@@ -447,7 +448,8 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
           setIdx(idx - 1);
         }
         setFlipped(false);
-        fetchStats(); // Refresh stats
+        fetchStats();
+        fetchAllCards();
       }
     } catch (error) {
       console.error("Failed to delete flashcard:", error);
@@ -496,6 +498,7 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
           )
         );
         cancelEdit();
+        fetchAllCards();
       }
     } catch (error) {
       console.error("Failed to save edit:", error);
