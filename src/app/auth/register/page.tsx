@@ -7,11 +7,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "إنشاء حساب | سرب",
+  description: "انضم إلى منصة سرب وابدأ رحلتك التعليمية",
+};
 
 export default function Page() {
   return (
-    <div className="bg-muted/40 flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+    <div className="bg-muted/40 flex min-h-svh flex-col items-center gap-6 p-6 pt-20 md:p-10 md:pt-24">
       <div className="w-full max-w-sm">
         <Card>
           <CardHeader className="text-center">

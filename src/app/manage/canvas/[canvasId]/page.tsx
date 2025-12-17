@@ -1,6 +1,7 @@
 import { ContentStatus } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import CanvasFooterActions from "./_components/canvas-footer-actions";
@@ -12,6 +13,13 @@ type PageProps = {
     canvasId: string;
   }>;
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "إدارة المحتوى | سرب",
+    description: "إدارة المحتوى التعليمي",
+  };
+}
 
 async function getCanvasDetails(canvasId: number, userId: string) {
   const canvas = await prisma.canvas.findUnique({
