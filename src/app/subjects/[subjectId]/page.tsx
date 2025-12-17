@@ -1,3 +1,4 @@
+import { getStudyPlans } from "@/actions/study-plan.action";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Metadata } from "next";
@@ -123,11 +124,21 @@ export default async function Page({ params }: PageProps) {
   });
 
   const subject = await getSubjectData(subjectId, session?.user.id ?? null);
+  let sessions: Awaited<ReturnType<typeof getStudyPlans>> = [];
+  try {
+    sessions = await getStudyPlans(parseInt(subjectId));
+  } catch {
+    sessions = [];
+  }
 
   return (
     <div className="container mx-auto max-w-7xl px-3 py-8 md:px-8 lg:px-16">
       <section className="mb-12" aria-label="معلومات المقرر">
-        <SubjectInfoCard subject={subject} isAuthenticated={!!session} />
+        <SubjectInfoCard
+          subject={subject}
+          isAuthenticated={!!session}
+          sessions={sessions}
+        />
       </section>
 
       <section aria-label="فصول المقرر">
