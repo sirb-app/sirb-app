@@ -1,0 +1,317 @@
+"use client";
+
+import { deleteCanvas, updateCanvas } from "@/actions/canvas-manage.action";
+import { CanvasImageUpload } from "@/components/canvas-image-upload";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ContentStatus } from "@/generated/prisma";
+import {
+  AlertCircle,
+  Check,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "";
+
+function extractR2KeyFromUrl(url: string | null): string | null {
+  if (!url || !R2_PUBLIC_URL) return null;
+  if (!url.startsWith(R2_PUBLIC_URL)) return null;
+  return url.slice(R2_PUBLIC_URL.length + 1);
+}
+
+type CanvasHeaderProps = {
+  canvas: {
+    id: number;
+    title: string;
+    description: string | null;
+    imageUrl: string | null;
+    status: ContentStatus;
+    rejectionReason?: string | null;
+    chapterId: number;
+    chapter: { subjectId: number };
+  };
+};
+
+export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const [title, setTitle] = useState(canvas.title);
+  const [description, setDescription] = useState(canvas.description || "");
+  const [imageUrl, setImageUrl] = useState(canvas.imageUrl);
+  const newImageKeyRef = useRef<string | null>(null);
+
+  const handleImageChange = (url: string | null, key: string | null) => {
+    setImageUrl(url);
+    newImageKeyRef.current = key;
+  };
+
+  const getStatusBadge = () => {
+    switch (canvas.status) {
+      case "DRAFT":
+        return <Badge variant="secondary">مسودة</Badge>;
+      case "PENDING":
+        return (
+          <Badge className="border-accent/30 bg-accent/20 hover:bg-accent/30">
+            قيد المراجعة
+          </Badge>
+        );
+      case "APPROVED":
+        return (
+          <Badge className="border-success/30 bg-success/20 hover:bg-success/30 text-success">
+            منشور
+          </Badge>
+        );
+      case "REJECTED":
+        return <Badge variant="destructive">مرفوض</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const handleSaveDetails = async () => {
+    if (!title.trim()) return;
+
+    // Track old image key before save (to delete after successful update)
+    const oldImageKey =
+      canvas.imageUrl !== imageUrl
+        ? extractR2KeyFromUrl(canvas.imageUrl)
+        : null;
+
+    try {
+      setIsLoading(true);
+      await updateCanvas({
+        canvasId: canvas.id,
+        title,
+        description,
+        imageUrl: imageUrl || undefined,
+      });
+
+      // Delete old image after successful save (if image was changed)
+      if (oldImageKey) {
+        try {
+          await fetch("/api/r2/delete/canvas-image", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: oldImageKey }),
+          });
+        } catch (deleteError) {
+          console.error("Failed to delete old image:", deleteError);
+        }
+      }
+
+      newImageKeyRef.current = null;
+      setIsEditing(false);
+      toast.success("تم تحديث التفاصيل");
+      router.refresh();
+    } catch {
+      toast.error("فشل التحديث");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelEdit = async () => {
+    // Cleanup newly uploaded image if user cancels
+    if (newImageKeyRef.current) {
+      try {
+        await fetch("/api/r2/delete/canvas-image", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: newImageKeyRef.current }),
+        });
+      } catch (error) {
+        console.error("Failed to cleanup image:", error);
+      }
+      newImageKeyRef.current = null;
+    }
+    setTitle(canvas.title);
+    setDescription(canvas.description || "");
+    setImageUrl(canvas.imageUrl);
+    setIsEditing(false);
+  };
+
+  const handleDeleteCanvas = async () => {
+    try {
+      setIsLoading(true);
+      await deleteCanvas(canvas.id);
+      toast.success("تم حذف الشرح");
+      router.push(
+        `/subjects/${canvas.chapter.subjectId}/chapters/${canvas.chapterId}`
+      );
+    } catch {
+      toast.error("حدث خطأ أثناء الحذف");
+      setIsLoading(false);
+    }
+  };
+
+  const isEditable = canvas.status !== "PENDING";
+
+  return (
+    <div className="space-y-3 border-b pb-4 sm:space-y-4 sm:pb-6">
+      <div className="flex flex-col gap-4 sm:gap-6">
+        {/* Top Bar: Title/Badge & Actions */}
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
+          {/* Title Section */}
+          <div className="flex-1 space-y-2">
+            {isEditing ? (
+              <div className="max-w-xl space-y-3">
+                <div className="space-y-2">
+                  <Label>صورة الغلاف</Label>
+                  <CanvasImageUpload
+                    currentImageUrl={imageUrl}
+                    onImageChange={handleImageChange}
+                    canvasId={canvas.id}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>عنوان الشرح</Label>
+                  <Input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    className="text-lg font-bold"
+                    placeholder="عنوان الشرح"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>وصف مختصر</Label>
+                  <Textarea
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder="اكتب نبذة عن محتوى الشرح..."
+                    rows={2}
+                  />
+                </div>
+                {/* Buttons in RTL order: Cancel then Save */}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleCancelEdit}
+                    disabled={isLoading}
+                  >
+                    <X className="ml-1 h-4 w-4" /> إلغاء
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveDetails}
+                    disabled={isLoading}
+                  >
+                    <Check className="ml-1 h-4 w-4" /> حفظ
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Options Dropdown */}
+                  {isEditable && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-primary h-8 w-8"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => setIsEditing(true)}
+                          className="flex-row-reverse"
+                        >
+                          <Pencil className="ml-2 h-4 w-4" />
+                          <span>تعديل التفاصيل</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive focus:bg-destructive/15 flex-row-reverse"
+                          onClick={() => setIsDeleteDialogOpen(true)}
+                        >
+                          <Trash2 className="text-destructive ml-2 h-4 w-4" />
+                          <span>حذف الشرح</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+
+                  <h1 className="text-xl font-bold sm:text-2xl">
+                    {canvas.title}
+                  </h1>
+
+                  {getStatusBadge()}
+                </div>
+                {canvas.description && (
+                  <p className="text-muted-foreground mt-1 text-sm sm:pr-11 sm:text-base">
+                    {canvas.description}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {canvas.status === "REJECTED" && canvas.rejectionReason && (
+              <div className="bg-destructive/15 border-destructive/30 text-destructive mt-2 flex items-start gap-2 rounded-md border p-3 text-sm">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <span className="font-semibold">سبب الرفض: </span>
+                  {canvas.rejectionReason}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الشرح نهائياً؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف هذا الشرح وجميع محتوياته. لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCanvas}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

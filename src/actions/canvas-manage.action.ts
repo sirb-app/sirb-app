@@ -1,0 +1,809 @@
+"use server";
+
+import { ContentStatus, QuestionType, UserRole } from "@/generated/prisma";
+import { auth } from "@/lib/auth";
+import { notifyModeratorsOfSubmission } from "@/lib/email/email-service";
+import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
+import { z } from "zod";
+
+// --- Schemas ---
+
+const CreateCanvasSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  description: z.string().optional(),
+  chapterId: z.number(),
+  imageUrl: z.string().url().optional(),
+});
+
+const UpdateCanvasSchema = z.object({
+  canvasId: z.number(),
+  title: z.string().min(3, "Title must be at least 3 characters").optional(),
+  description: z.string().optional(),
+  imageUrl: z.string().url().optional(),
+});
+
+const AddTextBlockSchema = z.object({
+  canvasId: z.number(),
+  content: z.string().min(1, "Content cannot be empty"),
+});
+
+const UpdateTextBlockSchema = z.object({
+  blockId: z.number(),
+  canvasId: z.number(),
+  content: z.string().min(1, "Content cannot be empty"),
+});
+
+const AddVideoBlockSchema = z.object({
+  canvasId: z.number(),
+  title: z.string().min(1, "Title is required"),
+  url: z.string().url("Invalid YouTube URL"),
+  isOriginal: z.boolean().default(false),
+});
+
+const UpdateVideoBlockSchema = z.object({
+  blockId: z.number(),
+  canvasId: z.number(),
+  title: z.string().min(1, "Title is required"),
+  url: z.string().url("Invalid YouTube URL"),
+  isOriginal: z.boolean().default(false),
+});
+
+const AddFileBlockSchema = z.object({
+  canvasId: z.number(),
+  title: z.string().min(1, "Title is required"),
+  r2Key: z.string().min(1, "R2 key is required"),
+  fileSize: z.number(),
+  mimeType: z.string(),
+  isOriginal: z.boolean().default(false),
+  description: z.string().optional(),
+});
+
+const UpdateFileBlockSchema = z.object({
+  blockId: z.number(),
+  canvasId: z.number(),
+  title: z.string().min(1, "Title is required").optional(),
+  description: z.string().optional(),
+  r2Key: z.string().min(1).optional(), // For file replacement
+  fileSize: z.number().optional(),
+  mimeType: z.string().optional(),
+  isOriginal: z.boolean().optional(),
+});
+
+const AddCanvasQuestionBlockSchema = z
+  .object({
+    canvasId: z.number(),
+    questionText: z.string().min(5, "Question must be at least 5 characters"),
+    questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
+    justification: z.string().optional(),
+    options: z.array(
+      z.object({
+        optionText: z.string().min(1, "Option text cannot be empty"),
+        isCorrect: z.boolean(),
+      })
+    ),
+  })
+  .refine(
+    data => {
+      // TRUE_FALSE must have exactly 2 options
+      if (data.questionType === "TRUE_FALSE") {
+        return data.options.length === 2;
+      }
+      // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
+      return data.options.length === 4;
+    },
+    {
+      message:
+        "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
+    }
+  )
+  .refine(
+    data => {
+      const correctCount = data.options.filter(o => o.isCorrect).length;
+
+      if (
+        data.questionType === "MCQ_SINGLE" ||
+        data.questionType === "TRUE_FALSE"
+      ) {
+        return correctCount === 1;
+      }
+      return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
+    },
+    {
+      message: "Invalid correct answer configuration for question type",
+    }
+  );
+
+const UpdateCanvasQuestionBlockSchema = z
+  .object({
+    blockId: z.number(),
+    canvasId: z.number(),
+    questionText: z.string().min(5, "Question must be at least 5 characters"),
+    questionType: z.enum(["MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"]),
+    justification: z.string().optional(),
+    options: z.array(
+      z.object({
+        optionText: z.string().min(1, "Option text cannot be empty"),
+        isCorrect: z.boolean(),
+      })
+    ),
+  })
+  .refine(
+    data => {
+      // TRUE_FALSE must have exactly 2 options
+      if (data.questionType === "TRUE_FALSE") {
+        return data.options.length === 2;
+      }
+      // MCQ_SINGLE and MCQ_MULTI must have exactly 4 options
+      return data.options.length === 4;
+    },
+    {
+      message:
+        "TRUE_FALSE questions require 2 options, MCQ questions require 4 options",
+    }
+  )
+  .refine(
+    data => {
+      const correctCount = data.options.filter(o => o.isCorrect).length;
+
+      if (
+        data.questionType === "MCQ_SINGLE" ||
+        data.questionType === "TRUE_FALSE"
+      ) {
+        return correctCount === 1;
+      }
+      return correctCount >= 1; // MCQ_MULTI must have at least 1 correct
+    },
+    {
+      message: "Invalid correct answer configuration for question type",
+    }
+  );
+
+const ReorderBlocksSchema = z.object({
+  canvasId: z.number(),
+  updates: z.array(
+    z.object({
+      blockId: z.number(),
+      sequence: z.number(),
+    })
+  ),
+});
+
+// --- Helpers ---
+
+async function getSession() {
+  return await auth.api.getSession({
+    headers: await headers(),
+  });
+}
+
+async function checkCanvasOwnership(canvasId: number, userId: string) {
+  const canvas = await prisma.canvas.findUnique({
+    where: { id: canvasId },
+    select: {
+      contributorId: true,
+      status: true,
+      isDeleted: true,
+      chapter: { select: { subjectId: true } },
+    },
+  });
+
+  if (!canvas || canvas.isDeleted) throw new Error("Canvas not found");
+
+  if (canvas.contributorId === userId) return canvas;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+
+  if (user?.role === UserRole.ADMIN) return canvas;
+
+  throw new Error("Unauthorized");
+}
+
+// --- Canvas Actions ---
+
+export async function createCanvas(data: z.infer<typeof CreateCanvasSchema>) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = CreateCanvasSchema.parse(data);
+
+  // Get next sequence (exclude soft-deleted canvases)
+  const lastCanvas = await prisma.canvas.findFirst({
+    where: {
+      chapterId: validated.chapterId,
+      isDeleted: false,
+    },
+    orderBy: { sequence: "desc" },
+    select: { sequence: true },
+  });
+  const sequence = (lastCanvas?.sequence ?? 0) + 1;
+
+  const canvas = await prisma.canvas.create({
+    data: {
+      title: validated.title,
+      description: validated.description,
+      imageUrl: validated.imageUrl,
+      chapterId: validated.chapterId,
+      contributorId: session.user.id,
+      sequence,
+      // status defaults to DRAFT in schema
+    },
+  });
+
+  return { success: true, canvasId: canvas.id };
+}
+
+export async function updateCanvas(data: z.infer<typeof UpdateCanvasSchema>) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = UpdateCanvasSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  await prisma.canvas.update({
+    where: { id: validated.canvasId },
+    data: {
+      title: validated.title,
+      description: validated.description,
+      imageUrl: validated.imageUrl,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function deleteCanvas(canvasId: number) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const canvas = await checkCanvasOwnership(canvasId, session.user.id);
+
+  if (canvas.status === ContentStatus.APPROVED) {
+    // Soft delete
+    await prisma.canvas.update({
+      where: { id: canvasId },
+      data: { isDeleted: true },
+    });
+  } else {
+    // Hard delete
+    await prisma.canvas.delete({
+      where: { id: canvasId },
+    });
+  }
+
+  return { success: true };
+}
+
+export async function submitCanvas(canvasId: number) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const canvas = await checkCanvasOwnership(canvasId, session.user.id);
+
+  if (
+    canvas.status !== ContentStatus.DRAFT &&
+    canvas.status !== ContentStatus.REJECTED
+  ) {
+    throw new Error("Canvas cannot be submitted in current status");
+  }
+
+  await prisma.canvas.update({
+    where: { id: canvasId },
+    data: { status: ContentStatus.PENDING },
+  });
+
+  // Notify moderators of the new submission (fire and forget)
+  const canvasData = await prisma.canvas.findUnique({
+    where: { id: canvasId },
+    include: {
+      contributor: { select: { name: true } },
+      chapter: {
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  if (canvasData) {
+    notifyModeratorsOfSubmission({
+      subjectId: canvasData.chapter.subject.id,
+      subjectName: canvasData.chapter.subject.name,
+      contentType: "CANVAS",
+      contentId: canvasData.id,
+      contentTitle: canvasData.title,
+      contributorName: canvasData.contributor.name,
+      chapterTitle: canvasData.chapter.title,
+    }).catch(err => console.error("[Email] Failed to notify moderators:", err));
+  }
+
+  return { success: true };
+}
+
+export async function cancelSubmission(canvasId: number) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const canvas = await checkCanvasOwnership(canvasId, session.user.id);
+
+  if (canvas.status !== ContentStatus.PENDING) {
+    throw new Error("Canvas is not pending review");
+  }
+
+  await prisma.canvas.update({
+    where: { id: canvasId },
+    data: { status: ContentStatus.DRAFT },
+  });
+
+  return { success: true };
+}
+
+// --- Content Block Actions ---
+
+async function getNextBlockSequence(
+  canvasId: number,
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+) {
+  const lastBlock = await tx.contentBlock.findFirst({
+    where: { canvasId },
+    orderBy: { sequence: "desc" },
+    select: { sequence: true },
+  });
+  return (lastBlock?.sequence ?? 0) + 1;
+}
+
+export async function addTextBlock(data: z.infer<typeof AddTextBlockSchema>) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = AddTextBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  return await prisma.$transaction(async tx => {
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
+
+    // Create ContentBlock first
+    const block = await tx.contentBlock.create({
+      data: {
+        canvasId: validated.canvasId,
+        sequence,
+        contentType: "TEXT",
+      },
+    });
+
+    // Create content with reference to ContentBlock
+    await tx.textContent.create({
+      data: {
+        content: validated.content,
+        contentBlockId: block.id,
+      },
+    });
+
+    return block;
+  });
+}
+
+export async function updateTextBlock(
+  data: z.infer<typeof UpdateTextBlockSchema>
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = UpdateTextBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  const block = await prisma.contentBlock.findUnique({
+    where: { id: validated.blockId },
+    include: { textContent: true },
+  });
+
+  if (
+    !block ||
+    block.canvasId !== validated.canvasId ||
+    block.contentType !== "TEXT" ||
+    !block.textContent
+  ) {
+    throw new Error("Block not found or invalid type");
+  }
+
+  await prisma.textContent.update({
+    where: { contentBlockId: validated.blockId },
+    data: { content: validated.content },
+  });
+
+  return { success: true };
+}
+
+function extractYoutubeId(url: string) {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
+}
+
+export async function addVideoBlock(data: z.infer<typeof AddVideoBlockSchema>) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = AddVideoBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  const videoId = extractYoutubeId(validated.url);
+  if (!videoId) throw new Error("Invalid YouTube URL");
+
+  return await prisma.$transaction(async tx => {
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
+
+    // Create ContentBlock first
+    const block = await tx.contentBlock.create({
+      data: {
+        canvasId: validated.canvasId,
+        sequence,
+        contentType: "VIDEO",
+      },
+    });
+
+    // Create content with reference to ContentBlock
+    await tx.video.create({
+      data: {
+        title: validated.title,
+        url: validated.url,
+        youtubeVideoId: videoId,
+        duration: 0, // Pending duration fetch
+        isOriginal: validated.isOriginal,
+        contentBlockId: block.id,
+      },
+    });
+
+    return block;
+  });
+}
+
+export async function updateVideoBlock(
+  data: z.infer<typeof UpdateVideoBlockSchema>
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = UpdateVideoBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  const block = await prisma.contentBlock.findUnique({
+    where: { id: validated.blockId },
+    include: { video: true },
+  });
+
+  if (
+    !block ||
+    block.canvasId !== validated.canvasId ||
+    block.contentType !== "VIDEO" ||
+    !block.video
+  ) {
+    throw new Error("Block not found or invalid type");
+  }
+
+  const videoId = extractYoutubeId(validated.url);
+  if (!videoId) throw new Error("Invalid YouTube URL");
+
+  await prisma.video.update({
+    where: { contentBlockId: validated.blockId },
+    data: {
+      title: validated.title,
+      url: validated.url,
+      youtubeVideoId: videoId,
+      isOriginal: validated.isOriginal,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function addFileBlock(data: z.infer<typeof AddFileBlockSchema>) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = AddFileBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  return await prisma.$transaction(async tx => {
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
+
+    // Create ContentBlock first
+    const block = await tx.contentBlock.create({
+      data: {
+        canvasId: validated.canvasId,
+        sequence,
+        contentType: "FILE",
+      },
+    });
+
+    // Create content with reference to ContentBlock
+    await tx.file.create({
+      data: {
+        title: validated.title,
+        description: validated.description,
+        url: validated.r2Key, // Store R2 key in url field
+        fileSize: BigInt(validated.fileSize),
+        mimeType: validated.mimeType,
+        isOriginal: validated.isOriginal,
+        contentBlockId: block.id,
+      },
+    });
+
+    return block;
+  });
+}
+
+export async function updateFileBlock(
+  data: z.infer<typeof UpdateFileBlockSchema>
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = UpdateFileBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  const block = await prisma.contentBlock.findUnique({
+    where: { id: validated.blockId },
+    include: { file: true },
+  });
+
+  if (
+    !block ||
+    block.canvasId !== validated.canvasId ||
+    block.contentType !== "FILE" ||
+    !block.file
+  ) {
+    throw new Error("Block not found or invalid type");
+  }
+
+  // Get old file URL for cleanup if file is being replaced
+  const oldKey = validated.r2Key ? block.file.url : null;
+
+  // Update file with new data
+  const updateData: {
+    title?: string;
+    description?: string | null;
+    url?: string;
+    fileSize?: bigint;
+    mimeType?: string;
+    isOriginal?: boolean;
+  } = {};
+  if (validated.title) updateData.title = validated.title;
+  if (validated.description !== undefined)
+    updateData.description = validated.description;
+  if (validated.r2Key) updateData.url = validated.r2Key; // Store new R2 key
+  if (validated.fileSize) updateData.fileSize = BigInt(validated.fileSize);
+  if (validated.mimeType) updateData.mimeType = validated.mimeType;
+  if (validated.isOriginal !== undefined)
+    updateData.isOriginal = validated.isOriginal;
+
+  await prisma.file.update({
+    where: { contentBlockId: validated.blockId },
+    data: updateData,
+  });
+
+  // Return old key for cleanup if file was replaced
+  return {
+    success: true,
+    oldKey,
+  };
+}
+
+export async function addCanvasQuestionBlock(
+  data: z.infer<typeof AddCanvasQuestionBlockSchema>
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = AddCanvasQuestionBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  return await prisma.$transaction(async tx => {
+    // Get sequence INSIDE transaction for proper isolation
+    const sequence = await getNextBlockSequence(validated.canvasId, tx);
+
+    // Create ContentBlock first
+    const block = await tx.contentBlock.create({
+      data: {
+        canvasId: validated.canvasId,
+        sequence,
+        contentType: "QUESTION",
+      },
+    });
+
+    // Special handling for TRUE_FALSE - auto-set Arabic labels
+    let options = validated.options;
+    if (validated.questionType === "TRUE_FALSE") {
+      const correctAnswerIndex = validated.options.findIndex(o => o.isCorrect);
+      options = [
+        { optionText: "صح", isCorrect: correctAnswerIndex === 0 },
+        { optionText: "خطأ", isCorrect: correctAnswerIndex === 1 },
+        { optionText: "", isCorrect: false }, // Placeholder (not displayed)
+        { optionText: "", isCorrect: false }, // Placeholder (not displayed)
+      ];
+    }
+
+    // Create CanvasQuestion
+    const question = await tx.canvasQuestion.create({
+      data: {
+        questionText: validated.questionText,
+        questionType: validated.questionType as QuestionType,
+        justification: validated.justification,
+        contentBlockId: block.id,
+      },
+    });
+
+    // Create Options
+    await tx.canvasQuestionOption.createMany({
+      data: options.map((option, index) => ({
+        optionText: option.optionText,
+        isCorrect: option.isCorrect,
+        sequence: index + 1,
+        questionId: question.id,
+      })),
+    });
+
+    return block;
+  });
+}
+
+export async function updateCanvasQuestionBlock(
+  data: z.infer<typeof UpdateCanvasQuestionBlockSchema>
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = UpdateCanvasQuestionBlockSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  return await prisma.$transaction(async tx => {
+    const block = await tx.contentBlock.findUnique({
+      where: { id: validated.blockId },
+      include: { canvasQuestion: true },
+    });
+
+    if (
+      !block ||
+      block.canvasId !== validated.canvasId ||
+      block.contentType !== "QUESTION" ||
+      !block.canvasQuestion
+    ) {
+      throw new Error("Block not found or invalid type");
+    }
+
+    const questionId = block.canvasQuestion.id;
+
+    // Update question text and justification
+    await tx.canvasQuestion.update({
+      where: { id: questionId },
+      data: {
+        questionText: validated.questionText,
+        questionType: validated.questionType as QuestionType,
+        justification: validated.justification,
+      },
+    });
+
+    // Replace all options (simpler than updating each)
+    await tx.canvasQuestionOption.deleteMany({
+      where: { questionId },
+    });
+
+    // Special handling for TRUE_FALSE
+    let options = validated.options;
+    if (validated.questionType === "TRUE_FALSE") {
+      const correctAnswerIndex = validated.options.findIndex(o => o.isCorrect);
+      options = [
+        { optionText: "صح", isCorrect: correctAnswerIndex === 0 },
+        { optionText: "خطأ", isCorrect: correctAnswerIndex === 1 },
+        { optionText: "", isCorrect: false },
+        { optionText: "", isCorrect: false },
+      ];
+    }
+
+    await tx.canvasQuestionOption.createMany({
+      data: options.map((option, index) => ({
+        optionText: option.optionText,
+        isCorrect: option.isCorrect,
+        sequence: index + 1,
+        questionId,
+      })),
+    });
+
+    return { success: true };
+  });
+}
+
+export async function deleteContentBlock(blockId: number, canvasId: number) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+  await checkCanvasOwnership(canvasId, session.user.id);
+
+  let r2Key: string | null = null;
+
+  await prisma.$transaction(async tx => {
+    const block = await tx.contentBlock.findUnique({
+      where: { id: blockId },
+      include: { file: true },
+    });
+
+    if (!block || block.canvasId !== canvasId) {
+      throw new Error("Block not found");
+    }
+
+    // Get R2 key before deleting file
+    if (block.contentType === "FILE" && block.file) {
+      r2Key = block.file.url;
+    }
+
+    // Delete ContentBlock (this will CASCADE delete the content due to onDelete: Cascade)
+    await tx.contentBlock.delete({ where: { id: blockId } });
+
+    // Resequence remaining blocks
+    const remainingBlocks = await tx.contentBlock.findMany({
+      where: { canvasId },
+      orderBy: { sequence: "asc" },
+    });
+
+    for (let i = 0; i < remainingBlocks.length; i++) {
+      if (remainingBlocks[i].sequence !== i + 1) {
+        await tx.contentBlock.update({
+          where: { id: remainingBlocks[i].id },
+          data: { sequence: i + 1 },
+        });
+      }
+    }
+  });
+
+  return { success: true, r2Key };
+}
+
+export async function reorderBlocks(data: z.infer<typeof ReorderBlocksSchema>) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const validated = ReorderBlocksSchema.parse(data);
+  await checkCanvasOwnership(validated.canvasId, session.user.id);
+
+  await prisma.$transaction(async tx => {
+    // Verify all blocks belong to this canvas before reordering
+    const blockIds = validated.updates.map(u => u.blockId);
+    const blocks = await tx.contentBlock.findMany({
+      where: { id: { in: blockIds } },
+      select: { id: true, canvasId: true },
+    });
+
+    if (blocks.length !== blockIds.length) {
+      throw new Error("One or more blocks not found");
+    }
+
+    const invalidBlock = blocks.find(b => b.canvasId !== validated.canvasId);
+    if (invalidBlock) {
+      throw new Error("One or more blocks do not belong to this canvas");
+    }
+
+    // Two-phase update to avoid unique constraint violations:
+    // Phase 1: Move all blocks to temporary negative sequences
+    for (let i = 0; i < validated.updates.length; i++) {
+      await tx.contentBlock.update({
+        where: { id: validated.updates[i].blockId },
+        data: { sequence: -(i + 1) }, // Use negative sequences temporarily
+      });
+    }
+
+    // Phase 2: Set the final sequences
+    for (const update of validated.updates) {
+      await tx.contentBlock.update({
+        where: { id: update.blockId },
+        data: { sequence: update.sequence },
+      });
+    }
+  });
+
+  return { success: true };
+}

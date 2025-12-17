@@ -1,0 +1,112 @@
+import {
+  DeleteUserButton,
+  PlaceholderDeleteUserButton,
+} from "@/components/delete-user-button";
+import { Button } from "@/components/ui/button";
+import { UserRoleSelect } from "@/components/user-role-select";
+import { UserRole } from "@/generated/prisma";
+import { auth } from "@/lib/auth";
+import { ArrowLeftIcon } from "lucide-react";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  title: "لوحة الإدارة | سرب",
+  description: "لوحة التحكم الإدارية لإدارة المستخدمين والمحتوى في منصة سرب",
+};
+
+export default async function Page() {
+  const headersList = await headers();
+
+  const session = await auth.api.getSession({
+    headers: headersList,
+  });
+
+  if (!session) redirect("/auth/login");
+
+  if (session.user.role !== "ADMIN") {
+    return (
+      <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
+        <div className="space-y-4">
+          <Button size="icon" asChild>
+            <Link href="/profile">
+              <ArrowLeftIcon />
+            </Link>
+          </Button>
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <p className="bg-destructive text-destructive-foreground rounded-md p-2 text-lg font-bold">
+            أنت لست مسؤولاً
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const { users } = await auth.api.listUsers({
+    headers: headersList,
+    query: {
+      sortBy: "name",
+    },
+  });
+
+  const sortedUsers = users.sort((a, b) => {
+    if (a.role === "ADMIN" && b.role !== "ADMIN") return -1;
+    if (a.role !== "ADMIN" && b.role === "ADMIN") return 1;
+    return 0;
+  });
+
+  return (
+    <div className="container mx-auto max-w-screen-lg space-y-8 px-8 py-16">
+      <div className="space-y-4">
+        <Button size="icon" asChild>
+          <Link href="/profile">
+            <ArrowLeftIcon />
+          </Link>
+        </Button>
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <p className="bg-primary text-primary-foreground rounded-md p-2 text-lg font-bold">
+          مرحباً بك في لوحة التحكم
+        </p>
+      </div>
+
+      <div className="w-full overflow-x-auto">
+        <table className="min-w-full table-auto whitespace-nowrap">
+          <thead>
+            <tr className="border-b text-left text-sm">
+              <th className="px-4 py-2">ID</th>
+              <th className="px-4 py-2">Name</th>
+              <th className="px-4 py-2">Email</th>
+              <th className="px-4 py-2 text-center">Role</th>
+              <th className="px-4 py-2 text-center">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {sortedUsers.map(user => (
+              <tr key={user.id} className="border-b text-left text-sm">
+                <td className="px-4 py-2">{user.id.slice(0, 8)}</td>
+                <td className="px-4 py-2">{user.name}</td>
+                <td className="px-4 py-2">{user.email}</td>
+                <td className="px-4 py-2 text-center">
+                  <UserRoleSelect
+                    userId={user.id}
+                    role={user.role as UserRole}
+                  />
+                </td>
+                <td className="px-4 py-2 text-center">
+                  {user.role === "USER" ? (
+                    <DeleteUserButton userId={user.id} />
+                  ) : (
+                    <PlaceholderDeleteUserButton />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

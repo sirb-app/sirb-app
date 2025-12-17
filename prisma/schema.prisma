@@ -1,0 +1,829 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum ContentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DRAFT
+}
+
+enum VoteType {
+  LIKE
+  DISLIKE
+}
+
+enum QuestionType {
+  MCQ_SINGLE
+  MCQ_MULTI
+  TRUE_FALSE
+}
+
+enum CompletionType {
+  AUTO
+  MANUAL
+}
+
+enum ReportReason {
+  SPAM
+  INAPPROPRIATE
+  WRONG_INFO
+  HARASSMENT
+  COPYRIGHT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  createdAt DateTime
+  updatedAt DateTime
+
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  role          UserRole  @default(USER)
+  banned        Boolean?
+  banReason     String?
+  banExpires    DateTime?
+  totalPoints   Int       @default(0) // denormalized for performance
+
+  sessions Session[]
+  accounts Account[]
+
+  // Content system relations
+  contributedCanvases Canvas[]
+  canvasVotes         CanvasVote[]
+
+  // Quiz system relations
+  contributedQuizzes Quiz[]            @relation("ContributedQuizzes")
+  quizAttempts       QuizAttempt[]
+  questionAnswers    QuestionAnswer[]
+  quizVotes          QuizVote[]
+  quizComments       QuizComment[]
+  quizCommentVotes   QuizCommentVote[]
+
+  // Progress tracking relations
+  enrollments        Enrollment[]
+  canvasProgress     CanvasProgress[]
+  videoProgress      VideoProgress[]
+  chapterCompletions ChapterCompletion[]
+
+  // Engagement relations
+  comments     Comment[]
+  commentVotes CommentVote[]
+
+  // Moderation & reporting relations
+  userPoints        UserPoints[]
+  moderatedSubjects SubjectModerator[]
+  reportsSubmitted  Report[]           @relation("ReportedBy")
+  reportsReceived   Report[]           @relation("ReportedUser")
+  reportsResolved   Report[]           @relation("ResolvedBy")
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  createdAt DateTime
+  updatedAt DateTime
+
+  expiresAt      DateTime
+  token          String   @unique
+  ipAddress      String?
+  userAgent      String?
+  impersonatedBy String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Account {
+  id        String   @id @default(uuid())
+  createdAt DateTime
+  updatedAt DateTime
+
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("accounts")
+}
+
+model Verification {
+  id        String    @id @default(uuid())
+  createdAt DateTime?
+  updatedAt DateTime?
+
+  identifier String
+  value      String
+  expiresAt  DateTime
+
+  @@map("verifications")
+}
+
+// ACADEMIC HIERARCHY
+
+model University {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name     String
+  code     String  @unique
+  imageUrl String? // University logo
+
+  colleges College[]
+
+  @@index([name])
+  @@map("universities")
+}
+
+model College {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name         String
+  universityId Int
+
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  subjects   Subject[]
+
+  @@index([universityId])
+  @@index([name])
+  @@map("colleges")
+}
+
+model Subject {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name        String
+  code        String
+  description String?
+  imageUrl    String? // Subject cover image
+  collegeId   Int
+
+  college     College            @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  chapters    Chapter[]
+  enrollments Enrollment[]
+  moderators  SubjectModerator[]
+  userPoints  UserPoints[]
+
+  @@unique([code, collegeId])
+  @@index([collegeId])
+  @@index([name])
+  @@map("subjects")
+}
+
+model Chapter {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  description String?
+  sequence    Int
+  subjectId   Int
+
+  subject            Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  canvases           Canvas[]
+  quizzes            Quiz[]
+  chapterCompletions ChapterCompletion[]
+
+  @@unique([subjectId, sequence])
+  @@index([subjectId])
+  @@map("chapters")
+}
+
+// CONTENT SYSTEM - Canvas-based approach
+
+// Junction table for content ordering across different types
+model ContentBlock {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  canvasId    Int
+  sequence    Int // Global sequence across all content types
+  contentType String // "TEXT" | "VIDEO" | "FILE" | "QUESTION"
+
+  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  // One-to-one relations (content owns the block)
+  textContent    TextContent?
+  video          Video?
+  file           File?
+  canvasQuestion CanvasQuestion? // Canvas questions (decoupled from quiz questions)
+
+  @@unique([canvasId, sequence]) // Enforces global uniqueness!
+  @@index([canvasId])
+  @@map("content_blocks")
+}
+
+// Text content blocks
+model TextContent {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  content String @db.Text // Plain text content
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int          @unique
+  contentBlock   ContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+
+  @@map("text_contents")
+}
+
+model Canvas {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title           String
+  description     String?
+  imageUrl        String? // Canvas thumbnail image
+  sequence        Int
+  status          ContentStatus @default(DRAFT) // New canvases start as DRAFT
+  rejectionReason String?
+  moderatorNotes  String?
+  isDeleted       Boolean       @default(false)
+  chapterId       Int
+  contributorId   String // UUID reference to User
+
+  // Denormalized vote counts for performance
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+  viewCount      Int @default(0)
+
+  // Relations
+  chapter       Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributor   User             @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  contentBlocks ContentBlock[]
+  votes         CanvasVote[]
+  userProgress  CanvasProgress[]
+  comments      Comment[]
+  reports       Report[]
+
+  @@unique([chapterId, sequence])
+  @@index([chapterId, status])
+  @@index([contributorId])
+  @@index([status])
+  @@index([netScore]) // for sorting by popularity
+  @@map("canvases")
+}
+
+model Video {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title          String
+  description    String?
+  url            String // YouTube URL
+  youtubeVideoId String // Extracted video ID
+  duration       Int // seconds
+  isOriginal     Boolean @default(false)
+
+  progress VideoProgress[]
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int          @unique
+  contentBlock   ContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+
+  @@map("videos")
+}
+
+model File {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  description String?
+  url         String // R2 storage key
+  fileSize    BigInt // bytes
+  mimeType    String // application/pdf, image/png, etc
+  isOriginal  Boolean @default(false)
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int          @unique
+  contentBlock   ContentBlock @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+
+  @@map("files")
+}
+
+// Canvas questions - standalone interactive questions (decoupled from quiz questions)
+model CanvasQuestion {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questionText  String       @db.Text
+  questionType  QuestionType // MCQ_SINGLE, MCQ_MULTI, TRUE_FALSE
+  justification String?      @db.Text // Explanation shown after answering
+
+  // One-to-one relation with ContentBlock
+  contentBlockId Int                    @unique
+  contentBlock   ContentBlock           @relation(fields: [contentBlockId], references: [id], onDelete: Cascade)
+  options        CanvasQuestionOption[]
+
+  @@index([contentBlockId])
+  @@map("canvas_questions")
+}
+
+model CanvasQuestionOption {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  optionText String
+  isCorrect  Boolean @default(false)
+  sequence   Int // Order of options (1-4 for MCQ)
+
+  questionId Int
+  question   CanvasQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, sequence])
+  @@index([questionId])
+  @@map("canvas_question_options")
+}
+
+model CanvasVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType VoteType
+  userId   String // UUID reference to User
+  canvasId Int
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, canvasId]) // one vote per user per canvas
+  @@index([canvasId, voteType]) // for counting votes by type
+  @@map("canvas_votes")
+}
+
+// QUIZ SYSTEM
+
+model Quiz {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title           String
+  description     String?
+  sequence        Int
+  status          ContentStatus @default(DRAFT)
+  rejectionReason String?
+  moderatorNotes  String?
+  isDeleted       Boolean       @default(false)
+
+  // CHANGED: chapterId instead of canvasId
+  chapterId     Int
+  contributorId String // UUID reference to User
+
+  // Denormalized counts (like Canvas)
+  attemptCount   Int @default(0)
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+
+  chapter     Chapter       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributor User          @relation("ContributedQuizzes", fields: [contributorId], references: [id], onDelete: Cascade)
+  questions   Question[]
+  attempts    QuizAttempt[]
+  votes       QuizVote[]
+  comments    QuizComment[]
+  reports     Report[]
+
+  @@unique([chapterId, sequence])
+  @@index([chapterId, status])
+  @@index([contributorId])
+  @@index([status])
+  @@index([netScore])
+  @@map("quizzes")
+}
+
+model Question {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questionText  String       @db.Text
+  questionType  QuestionType
+  sequence      Int
+  justification String?      @db.Text // Educational explanation
+
+  quizId Int
+
+  quiz    Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options QuestionOption[]
+  answers QuestionAnswer[]
+
+  @@unique([quizId, sequence])
+  @@index([quizId])
+  @@map("questions")
+}
+
+model QuestionOption {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  optionText String
+  isCorrect  Boolean @default(false)
+  sequence   Int // Order matters
+
+  questionId        Int
+  question          Question                 @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedInAnswers SelectedQuestionOption[]
+
+  @@unique([questionId, sequence])
+  @@index([questionId])
+  @@map("question_options")
+}
+
+model QuizAttempt {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  score          Int // Number of correct answers
+  totalQuestions Int // Total questions in quiz
+  percentage     Float // Calculated percentage
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  userId String
+  quizId Int
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz    Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers QuestionAnswer[]
+
+  @@index([userId, quizId])
+  @@index([quizId])
+  @@map("quiz_attempts")
+}
+
+model QuestionAnswer {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  isCorrect Boolean
+
+  userId     String
+  questionId Int
+  attemptId  Int // Required - this is for quiz attempts only
+
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question        Question                 @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  attempt         QuizAttempt              @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  selectedOptions SelectedQuestionOption[]
+
+  @@unique([attemptId, questionId]) // One answer per question per attempt
+  @@index([userId])
+  @@index([questionId])
+  @@index([attemptId])
+  @@map("question_answers")
+}
+
+model SelectedQuestionOption {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  answerId Int
+  optionId Int
+
+  answer QuestionAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  option QuestionOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([answerId, optionId]) // Each option selected only once per answer
+  @@index([answerId])
+  @@index([optionId])
+  @@map("selected_question_options")
+}
+
+model QuizVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType VoteType
+  userId   String
+  quizId   Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, quizId])
+  @@index([quizId, voteType])
+  @@map("quiz_votes")
+}
+
+model QuizComment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  text            String
+  isAnnouncement  Boolean   @default(false)
+  isPinned        Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  editedAt        DateTime?
+  userId          String
+  quizId          Int
+  parentCommentId Int?
+
+  // Denormalized counts
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz          Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  parentComment QuizComment?      @relation("QuizCommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       QuizComment[]     @relation("QuizCommentReplies")
+  votes         QuizCommentVote[]
+  reports       Report[]
+
+  @@index([quizId, isDeleted, createdAt])
+  @@index([parentCommentId])
+  @@index([quizId, isPinned, isAnnouncement])
+  @@index([quizId, parentCommentId, isDeleted, netScore])
+  @@map("quiz_comments")
+}
+
+model QuizCommentVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType  VoteType
+  userId    String
+  commentId Int
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment QuizComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId, voteType])
+  @@map("quiz_comment_votes")
+}
+
+// PROGRESS TRACKING
+
+model Enrollment {
+  id         Int      @id @default(autoincrement())
+  enrolledAt DateTime @default(now())
+  userId     String // UUID reference to User
+  subjectId  Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId]) // one enrollment per user per subject
+  @@index([subjectId]) // for subject enrollment counts
+  @@index([userId]) // for user's enrolled subjects
+  @@map("enrollments")
+}
+
+model CanvasProgress {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  completedAt  DateTime? // null = not completed
+  lastAccessed DateTime  @default(now())
+  lastViewed   DateTime  @default(now()) // for view tracking
+  userId       String // UUID reference to User
+  canvasId     Int
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canvas Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, canvasId]) // one progress record per user per canvas
+  @@index([userId, completedAt]) // for user progress queries
+  @@index([canvasId]) // for canvas completion statistics
+  @@map("canvas_progress")
+}
+
+model VideoProgress {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lastPosition Int      @default(0) // seconds into video
+  lastAccessed DateTime @default(now())
+  userId       String // UUID reference to User
+  videoId      Int
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId]) // one progress record per user per video
+  @@index([userId]) // for user video progress queries
+  @@index([videoId]) // for video statistics
+  @@map("video_progress")
+}
+
+model ChapterCompletion {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  completedAt    DateTime? // null = not completed
+  completionType CompletionType @default(AUTO) // 'manual' or 'auto'
+  userId         String // UUID reference to User
+  chapterId      Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chapterId]) // one completion record per user per chapter
+  @@index([userId]) // for user's completed chapters
+  @@index([chapterId]) // for chapter completion statistics
+  @@map("chapter_completions")
+}
+
+// ENGAGEMENT FEATURES
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  text            String
+  isAnnouncement  Boolean   @default(false) // for moderator/contributor announcements
+  isPinned        Boolean   @default(false)
+  isDeleted       Boolean   @default(false) // soft delete
+  editedAt        DateTime?
+  userId          String // UUID reference to User
+  canvasId        Int
+  parentCommentId Int? // for replies
+
+  // Denormalized vote counts for performance
+  upvotesCount   Int @default(0)
+  downvotesCount Int @default(0)
+  netScore       Int @default(0)
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canvas        Canvas        @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  parentComment Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       Comment[]     @relation("CommentReplies")
+  votes         CommentVote[]
+  reports       Report[]
+
+  @@index([canvasId, isDeleted, createdAt]) // for canvas comments (excluding deleted)
+  @@index([parentCommentId]) // for loading replies
+  @@index([canvasId, isPinned, isAnnouncement]) // for featured comments
+  @@index([canvasId, parentCommentId, isDeleted, netScore]) // for paginated top-level comments sorted by score
+  @@map("comments")
+}
+
+model CommentVote {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType  VoteType
+  userId    String // UUID reference to User
+  commentId Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId]) // one vote per user per comment
+  @@index([commentId, voteType]) // for counting votes by type
+  @@map("comment_votes")
+}
+
+// MODERATION & REPORTING
+
+model SubjectModerator {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String // UUID reference to User
+  subjectId Int
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId]) // one moderator role per user per subject
+  @@index([subjectId]) // for finding moderators of a subject
+  @@index([userId]) // for user's moderated subjects
+  @@map("subject_moderators")
+}
+
+model Report {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reason                ReportReason
+  description           String?
+  status                ReportStatus @default(PENDING)
+  resolutionNotes       String?
+  resolvedAt            DateTime?
+  reporterUserId        String // UUID reference to User
+  reportedCanvasId      Int? // One of these must be non-null
+  reportedCommentId     Int?
+  reportedUserId        String?
+  reportedQuizId        Int?
+  reportedQuizCommentId Int?
+  resolvedBy            String? // UUID reference to User (admin/moderator)
+
+  reporter            User         @relation("ReportedBy", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reportedCanvas      Canvas?      @relation(fields: [reportedCanvasId], references: [id], onDelete: SetNull)
+  reportedComment     Comment?     @relation(fields: [reportedCommentId], references: [id], onDelete: SetNull)
+  reportedUser        User?        @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  reportedQuiz        Quiz?        @relation(fields: [reportedQuizId], references: [id], onDelete: SetNull)
+  reportedQuizComment QuizComment? @relation(fields: [reportedQuizCommentId], references: [id], onDelete: SetNull)
+  resolver            User?        @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt]) // for moderation queue
+  @@index([reporterUserId]) // for user's reports
+  @@index([reportedCanvasId]) // for canvas reports
+  @@index([reportedCommentId]) // for comment reports
+  @@index([reportedUserId]) // for user reports
+  @@index([resolvedBy]) // for moderator activity
+  @@map("reports")
+}
+
+model UserPoints {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  points    Int      @default(0)
+  earnedAt  DateTime @default(now())
+  reason    String? // Point award reason (e.g., "canvas_approved", "quiz_upvote_received")
+  metadata  Json? // Contextual data for idempotency (e.g., canvasId, voterId)
+  userId    String // UUID reference to User
+  subjectId Int // Required - all points are subject-specific
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, earnedAt]) // for user point history
+  @@index([subjectId, earnedAt]) // for subject leaderboards
+  @@index([earnedAt]) // for global leaderboards (sum across all subjects)
+  @@index([reason]) // for point breakdown by type
+  @@map("user_points")
+}
+
+// EMAIL NOTIFICATION TRACKING (for rate limiting)
+
+model EmailNotificationLog {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  type        String // SUBMISSION_PENDING, REPORT_SUBMITTED
+  contentType String? // CANVAS, QUIZ
+  contentId   Int?
+  subjectId   Int?
+  lastSentAt  DateTime @default(now())
+
+  @@unique([type, contentType, contentId])
+  @@index([type, contentType, contentId, lastSentAt])
+  @@map("email_notification_logs")
+}
