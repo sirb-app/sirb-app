@@ -2,9 +2,15 @@ import { getModerationQueue } from "@/actions/moderation.action";
 import { UserRole } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import ModerationDashboard from "./_components/moderation-dashboard";
+
+export const metadata: Metadata = {
+  title: "الإشراف | سرب",
+  description: "مراجعة والموافقة على المحتوى المقدم من الطلاب",
+};
 
 type PageProps = {
   searchParams: Promise<{

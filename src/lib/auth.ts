@@ -3,9 +3,13 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
-import { sendEmailAction } from "@/actions/send-email.action";
 import { UserRole } from "@/generated/prisma";
 import { hashPassword, verifyPassword } from "@/lib/argon2";
+import { sendEmail } from "@/lib/email/email-service";
+import {
+  authPasswordResetTemplate,
+  authVerificationTemplate,
+} from "@/lib/email/templates";
 import { ac, roles } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -33,14 +37,8 @@ export const auth = betterAuth({
     },
     requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
-      await sendEmailAction({
-        to: user.email,
-        subject: "Reset Your Password",
-        meta: {
-          description: "Please click the link below to reset your password.",
-          link: url,
-        },
-      });
+      const html = authPasswordResetTemplate({ resetUrl: url });
+      await sendEmail(user.email, "استعادة كلمة المرور - سرب", html);
     },
   },
   emailVerification: {
@@ -50,15 +48,8 @@ export const auth = betterAuth({
       const link = new URL(url);
       link.searchParams.set("callbackURL", "/profile");
 
-      await sendEmailAction({
-        to: user.email,
-        subject: "Verify Your Email Address",
-        meta: {
-          description:
-            "Please verify your email address to complete registration.",
-          link: String(link),
-        },
-      });
+      const html = authVerificationTemplate({ verificationUrl: String(link) });
+      await sendEmail(user.email, "تأكيد البريد الإلكتروني - سرب", html);
     },
   },
   // hooks: {

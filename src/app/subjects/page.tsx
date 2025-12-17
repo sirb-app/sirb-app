@@ -3,6 +3,12 @@ import SubjectList from "@/components/subject-list";
 import SubjectsPagination from "@/components/subjects-pagination";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "المواد الدراسية | سرب",
+  description: "تصفح جميع المواد الدراسية المتاحة في منصة سرب",
+};
 
 type SearchParams = Promise<{
   search?: string;

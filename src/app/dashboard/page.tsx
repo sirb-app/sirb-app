@@ -1,119 +1,126 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import DashboardStats from "./_components/dashboard-stats";
 import DashboardTabs from "./_components/dashboard-tabs";
 
+export const metadata: Metadata = {
+  title: "لوحة التحكم | سرب",
+  description: "لوحة التحكم الشخصية - تتبع تقدمك ومساهماتك في منصة سرب",
+};
+
 async function getDashboardData(userId: string) {
-  const [contributedCanvases, contributedQuizzes, enrollments, userStats] = await Promise.all([
-    prisma.canvas.findMany({
-      where: {
-        contributorId: userId,
-        isDeleted: false,
-      },
-      include: {
-        chapter: {
-          select: {
-            id: true,
-            title: true,
-            subject: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
+  const [contributedCanvases, contributedQuizzes, enrollments, userStats] =
+    await Promise.all([
+      prisma.canvas.findMany({
+        where: {
+          contributorId: userId,
+          isDeleted: false,
+        },
+        include: {
+          chapter: {
+            select: {
+              id: true,
+              title: true,
+              subject: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                },
               },
             },
           },
-        },
-        _count: {
-          select: {
-            contentBlocks: true,
-          },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    }),
-
-    prisma.quiz.findMany({
-      where: {
-        contributorId: userId,
-        isDeleted: false,
-      },
-      include: {
-        chapter: {
-          select: {
-            id: true,
-            title: true,
-            subject: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-              },
+          _count: {
+            select: {
+              contentBlocks: true,
             },
           },
         },
-        _count: {
-          select: {
-            questions: true,
+        orderBy: { updatedAt: "desc" },
+      }),
+
+      prisma.quiz.findMany({
+        where: {
+          contributorId: userId,
+          isDeleted: false,
+        },
+        include: {
+          chapter: {
+            select: {
+              id: true,
+              title: true,
+              subject: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              questions: true,
+            },
           },
         },
-      },
-      orderBy: { updatedAt: "desc" },
-    }),
+        orderBy: { updatedAt: "desc" },
+      }),
 
-    prisma.enrollment.findMany({
-      where: { userId },
-      include: {
-        subject: {
-          include: {
-            chapters: {
-              orderBy: { sequence: "asc" },
-              include: {
-                _count: {
-                  select: {
-                    canvases: {
-                      where: { status: "APPROVED" },
+      prisma.enrollment.findMany({
+        where: { userId },
+        include: {
+          subject: {
+            include: {
+              chapters: {
+                orderBy: { sequence: "asc" },
+                include: {
+                  _count: {
+                    select: {
+                      canvases: {
+                        where: { status: "APPROVED" },
+                      },
                     },
                   },
                 },
               },
-            },
-            college: {
-              select: {
-                name: true,
+              college: {
+                select: {
+                  name: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { enrolledAt: "desc" },
-    }),
+        orderBy: { enrolledAt: "desc" },
+      }),
 
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        totalPoints: true,
-        _count: {
-          select: {
-            contributedCanvases: {
-              where: { isDeleted: false },
-            },
-            contributedQuizzes: {
-              where: { isDeleted: false },
-            },
-            enrollments: true,
-            canvasProgress: {
-              where: {
-                completedAt: { not: null },
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          totalPoints: true,
+          _count: {
+            select: {
+              contributedCanvases: {
+                where: { isDeleted: false },
+              },
+              contributedQuizzes: {
+                where: { isDeleted: false },
+              },
+              enrollments: true,
+              canvasProgress: {
+                where: {
+                  completedAt: { not: null },
+                },
               },
             },
           },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
 
   const subjectIds = enrollments.map(e => e.subject.id);
   const allCompletions = await prisma.canvasProgress.groupBy({
@@ -134,25 +141,29 @@ async function getDashboardData(userId: string) {
   });
 
   const completedCanvasIds = allCompletions.map(c => c.canvasId);
-  const completedCanvases = completedCanvasIds.length > 0
-    ? await prisma.canvas.findMany({
-        where: { id: { in: completedCanvasIds } },
-        select: {
-          id: true,
-          chapter: {
-            select: {
-              subjectId: true,
+  const completedCanvases =
+    completedCanvasIds.length > 0
+      ? await prisma.canvas.findMany({
+          where: { id: { in: completedCanvasIds } },
+          select: {
+            id: true,
+            chapter: {
+              select: {
+                subjectId: true,
+              },
             },
           },
-        },
-      })
-    : [];
+        })
+      : [];
 
-  const completionsBySubject = completedCanvases.reduce((acc, canvas) => {
-    const subjectId = canvas.chapter.subjectId;
-    acc[subjectId] = (acc[subjectId] || 0) + 1;
-    return acc;
-  }, {} as Record<number, number>);
+  const completionsBySubject = completedCanvases.reduce(
+    (acc, canvas) => {
+      const subjectId = canvas.chapter.subjectId;
+      acc[subjectId] = (acc[subjectId] || 0) + 1;
+      return acc;
+    },
+    {} as Record<number, number>
+  );
 
   const enrollmentsWithProgress = enrollments.map(enrollment => {
     const totalCanvases = enrollment.subject.chapters.reduce(

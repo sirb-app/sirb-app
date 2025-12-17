@@ -7,9 +7,15 @@ import { UserRoleSelect } from "@/components/user-role-select";
 import { UserRole } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { ArrowLeftIcon } from "lucide-react";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  title: "لوحة الإدارة | سرب",
+  description: "لوحة التحكم الإدارية لإدارة المستخدمين والمحتوى في منصة سرب",
+};
 
 export default async function Page() {
   const headersList = await headers();

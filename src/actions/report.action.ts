@@ -2,6 +2,7 @@
 
 import { ReportReason } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
+import { notifyModeratorsOfReport } from "@/lib/email/email-service";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { headers } from "next/headers";
@@ -45,6 +46,32 @@ export async function reportCanvas(
         reportedCanvasId: canvasId,
       },
     });
+
+    // Notify moderators of the new report (fire and forget)
+    const canvasData = await prisma.canvas.findUnique({
+      where: { id: canvasId },
+      include: {
+        chapter: {
+          include: {
+            subject: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (canvasData) {
+      notifyModeratorsOfReport({
+        subjectId: canvasData.chapter.subject.id,
+        subjectName: canvasData.chapter.subject.name,
+        reporterName: session.user.name,
+        reportReason: reason,
+        reportDescription: description?.trim(),
+        reportedContentType: "CANVAS",
+        reportedContentTitle: canvasData.title,
+      }).catch(err =>
+        console.error("[Email] Failed to notify moderators:", err)
+      );
+    }
 
     return { success: true };
   } catch (error) {
@@ -92,6 +119,36 @@ export async function reportComment(
         reportedCommentId: commentId,
       },
     });
+
+    // Notify moderators of the new report (fire and forget)
+    const commentData = await prisma.comment.findUnique({
+      where: { id: commentId },
+      include: {
+        canvas: {
+          include: {
+            chapter: {
+              include: {
+                subject: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (commentData) {
+      notifyModeratorsOfReport({
+        subjectId: commentData.canvas.chapter.subject.id,
+        subjectName: commentData.canvas.chapter.subject.name,
+        reporterName: session.user.name,
+        reportReason: reason,
+        reportDescription: description?.trim(),
+        reportedContentType: "COMMENT",
+        reportedContentTitle: commentData.text.slice(0, 50),
+      }).catch(err =>
+        console.error("[Email] Failed to notify moderators:", err)
+      );
+    }
 
     return { success: true };
   } catch (error) {

@@ -14,7 +14,7 @@ const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "سرب - تطبيق تعليمي",
+  title: "سرب",
   description: "تطبيق سرب التعليمي - منصة تعليمية متطورة",
   appleWebApp: {
     title: "Sirb",

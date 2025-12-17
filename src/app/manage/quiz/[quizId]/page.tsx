@@ -1,17 +1,25 @@
 import { ContentStatus } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import QuestionList from "./_components/question-list";
 import QuizFooterActions from "./_components/quiz-footer-actions";
 import QuizHeader from "./_components/quiz-header";
-import QuestionList from "./_components/question-list";
 
 type PageProps = {
   params: Promise<{
     quizId: string;
   }>;
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "إدارة المحتوى | سرب",
+    description: "إدارة الاختبارات",
+  };
+}
 
 async function getQuizDetails(quizId: number, userId: string) {
   const quiz = await prisma.quiz.findUnique({

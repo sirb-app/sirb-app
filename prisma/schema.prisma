@@ -817,6 +817,23 @@ model UserPoints {
   @@map("user_points")
 }
 
+// EMAIL NOTIFICATION TRACKING (for rate limiting)
+
+model EmailNotificationLog {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  type        String // SUBMISSION_PENDING, REPORT_SUBMITTED
+  contentType String? // CANVAS, QUIZ
+  contentId   Int?
+  subjectId   Int?
+  lastSentAt  DateTime @default(now())
+
+  @@unique([type, contentType, contentId])
+  @@index([type, contentType, contentId, lastSentAt])
+  @@map("email_notification_logs")
+}
+
 // ADAPTIVE LEARNING SYSTEM
 
 model StudyPlan {
