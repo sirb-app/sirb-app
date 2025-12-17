@@ -41,18 +41,22 @@ export async function recordNotificationSent(
   contentId: number | null,
   subjectId: number | null
 ): Promise<void> {
+  // Normalize null values to match the unique constraint lookup
+  const normalizedContentType = contentType ?? "";
+  const normalizedContentId = contentId ?? 0;
+
   await prisma.emailNotificationLog.upsert({
     where: {
       type_contentType_contentId: {
         type,
-        contentType: contentType ?? "",
-        contentId: contentId ?? 0,
+        contentType: normalizedContentType,
+        contentId: normalizedContentId,
       },
     },
     create: {
       type,
-      contentType,
-      contentId,
+      contentType: normalizedContentType,
+      contentId: normalizedContentId,
       subjectId,
       lastSentAt: new Date(),
     },
