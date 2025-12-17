@@ -42,6 +42,11 @@ export async function generateUploadUrl(input: {
   try {
     await requireAdmin();
 
+    // Only allow PDF uploads
+    if (input.contentType !== "application/pdf") {
+      return { error: "يُسمح فقط برفع ملفات PDF" } as const;
+    }
+
     const timestamp = Date.now();
     const randomId = crypto.randomUUID().slice(0, 8);
     const sanitizedName =

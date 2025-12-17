@@ -19,7 +19,7 @@ type PageProps = {
 
 const VALID_STATUSES = Object.values(ReportStatus);
 const VALID_REASONS = Object.values(ReportReason);
-const VALID_TYPES = ["canvas", "comment", "user"] as const;
+const VALID_TYPES = ["canvas", "comment", "user", "quiz", "quizComment"] as const;
 
 export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;

@@ -113,6 +113,96 @@ export type ReportWithRelations = Prisma.ReportGetPayload<{
         };
       };
     };
+    reportedQuiz: {
+      select: {
+        id: true;
+        title: true;
+        description: true;
+        chapter: {
+          select: {
+            id: true;
+            title: true;
+            subjectId: true;
+            subject: {
+              select: {
+                id: true;
+                name: true;
+                code: true;
+                college: {
+                  select: {
+                    id: true;
+                    name: true;
+                    university: {
+                      select: {
+                        id: true;
+                        name: true;
+                        code: true;
+                        imageUrl: true;
+                      };
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+        contributor: {
+          select: {
+            id: true;
+            name: true;
+            email: true;
+          };
+        };
+      };
+    };
+    reportedQuizComment: {
+      select: {
+        id: true;
+        text: true;
+        createdAt: true;
+        user: {
+          select: {
+            id: true;
+            name: true;
+            email: true;
+          };
+        };
+        quiz: {
+          select: {
+            id: true;
+            title: true;
+            chapter: {
+              select: {
+                id: true;
+                title: true;
+                subjectId: true;
+                subject: {
+                  select: {
+                    id: true;
+                    name: true;
+                    code: true;
+                    college: {
+                      select: {
+                        id: true;
+                        name: true;
+                        university: {
+                          select: {
+                            id: true;
+                            name: true;
+                            code: true;
+                            imageUrl: true;
+                          };
+                        };
+                      };
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+      };
+    };
     resolver: {
       select: {
         id: true;
@@ -122,7 +212,7 @@ export type ReportWithRelations = Prisma.ReportGetPayload<{
   };
 }>;
 
-type ReportType = "canvas" | "comment" | "user";
+type ReportType = "canvas" | "comment" | "user" | "quiz" | "quizComment";
 
 export async function getReports(
   page: number = 1,
@@ -185,6 +275,8 @@ export async function getReports(
     ...(type === "canvas" && { reportedCanvasId: { not: null } }),
     ...(type === "comment" && { reportedCommentId: { not: null } }),
     ...(type === "user" && { reportedUserId: { not: null } }),
+    ...(type === "quiz" && { reportedQuizId: { not: null } }),
+    ...(type === "quizComment" && { reportedQuizCommentId: { not: null } }),
   };
 
   if (!isAdmin) {
@@ -205,9 +297,25 @@ export async function getReports(
           },
         },
       },
+      {
+        reportedQuiz: {
+          chapter: {
+            subjectId: { in: moderatedSubjectIds },
+          },
+        },
+      },
+      {
+        reportedQuizComment: {
+          quiz: {
+            chapter: {
+              subjectId: { in: moderatedSubjectIds },
+            },
+          },
+        },
+      },
     ];
   } else if (universityId || subjectId) {
-    const filters: any[] = [];
+    const filters: Prisma.ReportWhereInput[] = [];
 
     if (subjectId) {
       filters.push(
@@ -221,6 +329,22 @@ export async function getReports(
         {
           reportedComment: {
             canvas: {
+              chapter: {
+                subjectId,
+              },
+            },
+          },
+        },
+        {
+          reportedQuiz: {
+            chapter: {
+              subjectId,
+            },
+          },
+        },
+        {
+          reportedQuizComment: {
+            quiz: {
               chapter: {
                 subjectId,
               },
@@ -244,6 +368,30 @@ export async function getReports(
         {
           reportedComment: {
             canvas: {
+              chapter: {
+                subject: {
+                  college: {
+                    universityId,
+                  },
+                },
+              },
+            },
+          },
+        },
+        {
+          reportedQuiz: {
+            chapter: {
+              subject: {
+                college: {
+                  universityId,
+                },
+              },
+            },
+          },
+        },
+        {
+          reportedQuizComment: {
+            quiz: {
               chapter: {
                 subject: {
                   college: {
@@ -372,6 +520,96 @@ export async function getReports(
             },
           },
         },
+        reportedQuiz: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            chapter: {
+              select: {
+                id: true,
+                title: true,
+                subjectId: true,
+                subject: {
+                  select: {
+                    id: true,
+                    name: true,
+                    code: true,
+                    college: {
+                      select: {
+                        id: true,
+                        name: true,
+                        university: {
+                          select: {
+                            id: true,
+                            name: true,
+                            code: true,
+                            imageUrl: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            contributor: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+        reportedQuizComment: {
+          select: {
+            id: true,
+            text: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            quiz: {
+              select: {
+                id: true,
+                title: true,
+                chapter: {
+                  select: {
+                    id: true,
+                    title: true,
+                    subjectId: true,
+                    subject: {
+                      select: {
+                        id: true,
+                        name: true,
+                        code: true,
+                        college: {
+                          select: {
+                            id: true,
+                            name: true,
+                            university: {
+                              select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                                imageUrl: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         resolver: {
           select: {
             id: true,
@@ -435,6 +673,24 @@ export async function updateReportStatus(
             },
           },
         },
+        reportedQuiz: {
+          select: {
+            chapter: {
+              select: { subjectId: true },
+            },
+          },
+        },
+        reportedQuizComment: {
+          select: {
+            quiz: {
+              select: {
+                chapter: {
+                  select: { subjectId: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -444,7 +700,9 @@ export async function updateReportStatus(
 
     const subjectId =
       report.reportedCanvas?.chapter.subjectId ||
-      report.reportedComment?.canvas.chapter.subjectId;
+      report.reportedComment?.canvas.chapter.subjectId ||
+      report.reportedQuiz?.chapter.subjectId ||
+      report.reportedQuizComment?.quiz.chapter.subjectId;
 
     if (!subjectId) {
       throw new Error(
@@ -525,6 +783,24 @@ export async function resolveReportWithAction(
           },
         },
       },
+      reportedQuiz: {
+        select: {
+          id: true,
+          contributorId: true,
+          chapter: { select: { subjectId: true } },
+        },
+      },
+      reportedQuizComment: {
+        select: {
+          id: true,
+          userId: true,
+          quiz: {
+            select: {
+              chapter: { select: { subjectId: true } },
+            },
+          },
+        },
+      },
       reportedUser: {
         select: {
           id: true,
@@ -542,7 +818,9 @@ export async function resolveReportWithAction(
   if (!isAdmin) {
     const subjectId =
       report.reportedCanvas?.chapter.subjectId ||
-      report.reportedComment?.canvas?.chapter.subjectId;
+      report.reportedComment?.canvas?.chapter.subjectId ||
+      report.reportedQuiz?.chapter.subjectId ||
+      report.reportedQuizComment?.quiz?.chapter.subjectId;
 
     if (!subjectId || report.reportedUserId) {
       throw new Error(
@@ -583,6 +861,20 @@ export async function resolveReportWithAction(
           where: { id: report.reportedCommentId },
           data: { isDeleted: true },
         });
+      } else if (report.reportedQuizId) {
+        await tx.quizComment.updateMany({
+          where: { quizId: report.reportedQuizId },
+          data: { isDeleted: true },
+        });
+        await tx.quiz.update({
+          where: { id: report.reportedQuizId },
+          data: { isDeleted: true },
+        });
+      } else if (report.reportedQuizCommentId) {
+        await tx.quizComment.update({
+          where: { id: report.reportedQuizCommentId },
+          data: { isDeleted: true },
+        });
       }
     }
 
@@ -616,6 +908,24 @@ export async function resolveReportWithAction(
           throw new Error("Cannot ban admin users");
         }
         targetUserId = report.reportedComment.userId;
+      } else if (report.reportedQuiz?.contributorId) {
+        const contributor = await tx.user.findUnique({
+          where: { id: report.reportedQuiz.contributorId },
+          select: { role: true },
+        });
+        if (contributor?.role === "ADMIN") {
+          throw new Error("Cannot ban admin users");
+        }
+        targetUserId = report.reportedQuiz.contributorId;
+      } else if (report.reportedQuizComment?.userId) {
+        const commenter = await tx.user.findUnique({
+          where: { id: report.reportedQuizComment.userId },
+          select: { role: true },
+        });
+        if (commenter?.role === "ADMIN") {
+          throw new Error("Cannot ban admin users");
+        }
+        targetUserId = report.reportedQuizComment.userId;
       }
 
       if (!targetUserId) {
@@ -729,7 +1039,7 @@ export async function getSubjectsByUniversity(universityId: number) {
   const isAdmin = session.user.role === "ADMIN";
   const userId = session.user.id;
 
-  const where: any = {
+  const where: Prisma.SubjectWhereInput = {
     college: {
       universityId,
     },

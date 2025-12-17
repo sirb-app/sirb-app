@@ -40,12 +40,7 @@ type User = {
 } | null;
 
 type NavigationMobileProps = {
-<<<<<<< HEAD
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  user: any;
-=======
   user: User;
->>>>>>> 17f1a3bce64b4a60c8b65e88954dc3dba8d6dc22
   isPending: boolean;
 };
 

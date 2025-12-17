@@ -86,6 +86,8 @@ const typeFilters = [
   { value: "canvas", label: "دروس" },
   { value: "comment", label: "تعليقات" },
   { value: "user", label: "مستخدمين" },
+  { value: "quiz", label: "اختبارات" },
+  { value: "quizComment", label: "تعليقات الاختبارات" },
 ];
 
 const reasonFilters = [
@@ -322,13 +324,31 @@ export function ReportsManager({
         </Badge>
       );
     }
+    if (report.reportedQuiz) {
+      return (
+        <Badge variant="default" className="gap-1 bg-emerald-600">
+          <FileText className="h-3 w-3" />
+          اختبار
+        </Badge>
+      );
+    }
+    if (report.reportedQuizComment) {
+      return (
+        <Badge variant="default" className="gap-1 bg-teal-600">
+          <MessageSquare className="h-3 w-3" />
+          تعليق اختبار
+        </Badge>
+      );
+    }
     return null;
   };
 
   const getSubjectInfo = (report: ReportWithRelations) => {
     const subject =
       report.reportedCanvas?.chapter.subject ||
-      report.reportedComment?.canvas?.chapter.subject;
+      report.reportedComment?.canvas?.chapter.subject ||
+      report.reportedQuiz?.chapter.subject ||
+      report.reportedQuizComment?.quiz?.chapter.subject;
     if (!subject) return null;
     return {
       subject: { id: subject.id, name: subject.name, code: subject.code },
@@ -605,6 +625,28 @@ export function ReportsManager({
                             </span>
                           </div>
                         )}
+                        {report.reportedQuiz && (
+                          <div className="flex flex-col gap-1">
+                            <span className="truncate font-medium">
+                              {report.reportedQuiz.title}
+                            </span>
+                            <span className="text-muted-foreground truncate text-xs">
+                              {report.reportedQuiz.chapter.title}
+                            </span>
+                          </div>
+                        )}
+                        {report.reportedQuizComment && (
+                          <div className="flex flex-col gap-1">
+                            <span className="line-clamp-2 text-sm">
+                              {report.reportedQuizComment.text}
+                            </span>
+                            {report.reportedQuizComment.quiz && (
+                              <span className="text-muted-foreground truncate text-xs">
+                                في: {report.reportedQuizComment.quiz.title}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         {subjectInfo ? (
@@ -788,6 +830,34 @@ export function ReportsManager({
                           <span className="font-medium">
                             {report.reportedUser.name}
                           </span>
+                        </div>
+                      )}
+                      {report.reportedQuiz && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 shrink-0" />
+                            <span className="font-medium">
+                              {report.reportedQuiz.title}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground pr-6 text-xs">
+                            {report.reportedQuiz.chapter.title}
+                          </p>
+                        </div>
+                      )}
+                      {report.reportedQuizComment && (
+                        <div className="space-y-1">
+                          <div className="flex items-start gap-2">
+                            <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span className="line-clamp-2">
+                              {report.reportedQuizComment.text}
+                            </span>
+                          </div>
+                          {report.reportedQuizComment.quiz && (
+                            <p className="text-muted-foreground pr-6 text-xs">
+                              في: {report.reportedQuizComment.quiz.title}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1374,7 +1444,7 @@ export function ReportsManager({
 
             {actionType === "dismiss" && (
               <p className="text-muted-foreground text-sm leading-relaxed">
-                سيتم وضع علامة على هذا البلاغ كـ "تم التجاهل" بدون اتخاذ أي
+                سيتم وضع علامة على هذا البلاغ كـ &quot;تم التجاهل&quot; بدون اتخاذ أي
                 إجراء.
               </p>
             )}

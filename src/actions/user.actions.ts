@@ -11,6 +11,7 @@ type UserWithCounts = Prisma.UserGetPayload<{
     _count: {
       select: {
         contributedCanvases: true;
+        contributedQuizzes: true;
         enrollments: true;
         moderatedSubjects: true;
       };
@@ -70,6 +71,7 @@ export async function listUsersAction(params?: {
           _count: {
             select: {
               contributedCanvases: true,
+              contributedQuizzes: true,
               enrollments: true,
               moderatedSubjects: true,
             },
@@ -255,6 +257,7 @@ export async function getUserDetailsAction(
         _count: {
           select: {
             contributedCanvases: true,
+            contributedQuizzes: true,
             enrollments: true,
             moderatedSubjects: true,
             comments: true,
@@ -359,6 +362,7 @@ type UserWithDetails = Prisma.UserGetPayload<{
     _count: {
       select: {
         contributedCanvases: true;
+        contributedQuizzes: true;
         enrollments: true;
         moderatedSubjects: true;
         comments: true;
