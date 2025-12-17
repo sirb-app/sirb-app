@@ -570,7 +570,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
                           ? "اختيار"
                           : questionType === "TRUE_FALSE"
                             ? "صح/خطأ"
-                            : "مقالي"}
+                            : "إجابة قصيرة"}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">

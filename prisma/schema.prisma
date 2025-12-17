@@ -29,6 +29,11 @@ enum QuestionType {
   MCQ_SINGLE
   MCQ_MULTI
   TRUE_FALSE
+}
+
+enum AdaptiveQuestionType {
+  MCQ_SINGLE
+  TRUE_FALSE
   SHORT_ANSWER
 }
 
@@ -955,7 +960,7 @@ model AdaptiveQuizQuestion {
 
   // Question snapshot (AI-generated)
   questionText  String       @db.Text
-  questionType  QuestionType
+  questionType  AdaptiveQuestionType
   options       String?      @db.Text // JSON string for MCQ options
   correctAnswer String       @db.Text // Correct answer(s)
   justification String?      @db.Text // Explanation
