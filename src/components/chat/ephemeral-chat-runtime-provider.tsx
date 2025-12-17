@@ -7,7 +7,7 @@ import {
   type ChatModelRunResult,
 } from "@assistant-ui/react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { parseSSEStream } from "@/lib/chat-api";
 
@@ -114,21 +114,53 @@ function createEphemeralChatModelAdapter(
   };
 }
 
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
 export function EphemeralChatRuntimeProvider({
   children,
   endpoint,
   historyLimit = 20,
+  initialMessages,
+  onMessagesChange,
 }: {
   children: ReactNode;
   endpoint: string;
   historyLimit?: number;
+  initialMessages?: ChatMessage[];
+  onMessagesChange?: (messages: ChatMessage[]) => void;
 }) {
   const adapter = useMemo(
     () => createEphemeralChatModelAdapter(endpoint, historyLimit),
     [endpoint, historyLimit]
   );
 
-  const runtime = useLocalRuntime(adapter);
+  const runtime = useLocalRuntime(adapter, {
+    initialMessages: initialMessages?.map(m => ({
+      role: m.role,
+      content: [{ type: "text" as const, text: m.content }],
+    })),
+  });
+
+  const onMessagesChangeRef = useRef(onMessagesChange);
+  onMessagesChangeRef.current = onMessagesChange;
+
+  useEffect(() => {
+    if (!onMessagesChangeRef.current) return;
+    return runtime.thread.subscribe(() => {
+      const msgs = runtime.thread.getState().messages;
+      const simplified: ChatMessage[] = msgs
+        .filter(m => m.role === "user" || m.role === "assistant")
+        .map(m => ({
+          role: m.role as "user" | "assistant",
+          content: m.content
+            .filter((c): c is { type: "text"; text: string } => c.type === "text" && "text" in c)
+            .map(c => c.text)
+            .join("\n"),
+        }))
+        .filter(m => m.content.trim());
+      onMessagesChangeRef.current?.(simplified);
+    });
+  }, [runtime.thread]);
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>

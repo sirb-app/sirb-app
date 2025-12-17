@@ -48,7 +48,7 @@ import {
 import { SessionData } from "./session-client";
 
 import { Thread } from "@/components/assistant-ui/thread";
-import { EphemeralChatRuntimeProvider } from "@/components/chat/ephemeral-chat-runtime-provider";
+import { EphemeralChatRuntimeProvider, type ChatMessage } from "@/components/chat/ephemeral-chat-runtime-provider";
 
 type TopicInfo = {
   slug: string;
@@ -66,14 +66,14 @@ type PracticeQuestion = {
   correct_answer: string | null;
   justification: string | null;
   hint: string | null;
-  type: "MCQ_SINGLE" | "TRUE_FALSE" | "OPEN_ENDED";
+  type: "MCQ_SINGLE" | "TRUE_FALSE" | "SHORT_ANSWER";
   topic_slug: string;
   user_answer: string | null; // User's selected answer
   is_correct: boolean | null;
   answered: boolean;
   hint_used: boolean; // Whether hint was viewed (affects score weight)
   attempt_count: number; // Number of attempts (for diminishing returns)
-  // Open-ended grading details (from API response)
+  // Short-answer grading details (from API response)
   grading_score?: number | null; // 0.0-1.0 rubric score
   missed_points?: string[] | null; // Points student didn't cover
   grading_feedback?: string | null; // LLM-generated feedback
@@ -109,13 +109,14 @@ export function QuizPanel({ session }: QuizPanelProps) {
   const [justAnswered, setJustAnswered] = useState(false); // Track if user just answered this question
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null); // Track user's selected option
   const [questionType, setQuestionType] = useState<
-    "all" | "MCQ_SINGLE" | "TRUE_FALSE" | "OPEN_ENDED"
+    "all" | "MCQ_SINGLE" | "TRUE_FALSE" | "SHORT_ANSWER"
   >("all");
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
-  // Map of question ID -> open-ended text (persists text per question)
-  const [openEndedTextMap, setOpenEndedTextMap] = useState<Record<number, string>>({});
+  // Map of question ID -> short-answer text (persists text per question)
+  const [shortAnswerTextMap, setShortAnswerTextMap] = useState<Record<number, string>>({});
 
   const [questionChatOpen, setQuestionChatOpen] = useState(false);
+  const [chatHistoryMap, setChatHistoryMap] = useState<Record<number, ChatMessage[]>>({});
 
   useEffect(() => {
     async function fetchState() {
@@ -250,10 +251,10 @@ export function QuizPanel({ session }: QuizPanelProps) {
     }
   };
 
-  // Handle open-ended question submission - calls API for LLM grading
-  const handleOpenEndedSubmit = async (isRetry: boolean = false) => {
+  // Handle short-answer question submission - calls API for LLM grading
+  const handleShortAnswerSubmit = async (isRetry: boolean = false) => {
     const currentQuestion = practiceState?.questions[currentIndex];
-    const currentText = currentQuestion ? (openEndedTextMap[currentQuestion.id] || "") : "";
+    const currentText = currentQuestion ? (shortAnswerTextMap[currentQuestion.id] || "") : "";
     if (!currentQuestion || isSubmitting || !currentText.trim()) return;
     // Block if answered AND not doing a retry
     if (currentQuestion.answered && !isRetry) return;
@@ -325,16 +326,14 @@ export function QuizPanel({ session }: QuizPanelProps) {
   const goToQuestion = (index: number) => {
     if (index < 0 || !practiceState || index >= practiceState.questions.length)
       return;
-    setCurrentIndex(index);
+    setSelectedAnswer(null);
     setShowHint(false);
     setShowAnswer(false);
-    setJustAnswered(false); // Coming back to a question, not just answered
-    setSelectedAnswer(null); // Reset selected answer when navigating
+    setJustAnswered(false);
+    setCurrentIndex(index);
     const q = practiceState.questions[index];
     if (!q.answered) setQuestionStartTime(Date.now());
   };
-
-  // Keep chat open state when switching questions; runtime is keyed per question.
 
   const toggleTopic = (slug: string) => {
     setSelectedTopics(prev => {
@@ -589,7 +588,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
                       صح / خطأ
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setQuestionType("OPEN_ENDED")}
+                      onClick={() => setQuestionType("SHORT_ANSWER")}
                     >
                       إجابة قصيرة
                     </DropdownMenuItem>
@@ -739,7 +738,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
                     </div>
 
                     {/* Options - for MCQ and T/F */}
-                    {currentQuestion.type !== "OPEN_ENDED" ? (
+                    {currentQuestion.type !== "SHORT_ANSWER" ? (
                       <div className="space-y-2">
                         {currentQuestion.options.map((option, index) => {
                           const num = index + 1;
@@ -750,10 +749,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
                             option === selectedAnswer ||
                             option === currentQuestion.user_answer;
                           const hasAnswered = currentQuestion.answered;
-                          // Can retry if already answered and attempts < 4 (both correct and wrong can retry)
-                          const canRetry =
-                            hasAnswered &&
-                            (currentQuestion.attempt_count || 1) < 4;
+                          const canRetry = hasAnswered;
 
                           // Determine option styling based on state
                           let optionClasses =
@@ -831,14 +827,13 @@ export function QuizPanel({ session }: QuizPanelProps) {
                         })}
                       </div>
                     ) : (
-                      /* Open-ended question - textarea always visible like MCQ options */
                       <div className="space-y-3">
                         <Textarea
                           placeholder="اكتب إجابتك هنا"
-                          value={openEndedTextMap[currentQuestion.id] || ""}
+                          value={shortAnswerTextMap[currentQuestion.id] || ""}
                           onChange={(e) => {
                             const val = e.target.value;
-                            setOpenEndedTextMap(prev => ({ ...prev, [currentQuestion.id]: val }));
+                            setShortAnswerTextMap(prev => ({ ...prev, [currentQuestion.id]: val }));
                           }}
                           className="min-h-[120px] resize-none text-base placeholder:text-right"
                           dir="auto"
@@ -846,8 +841,8 @@ export function QuizPanel({ session }: QuizPanelProps) {
                         />
                         {!justAnswered && (
                           <Button
-                            onClick={() => handleOpenEndedSubmit(currentQuestion.answered)}
-                            disabled={!(openEndedTextMap[currentQuestion.id] || "").trim() || isSubmitting}
+                            onClick={() => handleShortAnswerSubmit(currentQuestion.answered)}
+                            disabled={!(shortAnswerTextMap[currentQuestion.id] || "").trim() || isSubmitting}
                             className="w-full"
                           >
                             {isSubmitting ? (
@@ -863,13 +858,11 @@ export function QuizPanel({ session }: QuizPanelProps) {
                       </div>
                     )}
 
-                    {/* Justification - shown immediately after answering (justAnswered) OR when Show Answer clicked */}
                     {(justAnswered || showAnswer) &&
                       currentQuestion.answered &&
                       (currentQuestion.justification || currentQuestion.grading_feedback) && (
                         <div className="bg-accent/15 border-accent/30 space-y-3 rounded-lg border p-4">
-                          {/* Open-ended: Show user's previous answer */}
-                          {currentQuestion.type === "OPEN_ENDED" && currentQuestion.user_answer && (
+                          {currentQuestion.type === "SHORT_ANSWER" && currentQuestion.user_answer && (
                             <div className="space-y-2">
                               <span className="text-sm font-medium text-muted-foreground">إجابتك السابقة:</span>
                               <div className="bg-muted/50 rounded-lg p-3 text-sm whitespace-pre-wrap" dir="auto">
@@ -878,8 +871,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
                             </div>
                           )}
 
-                          {/* Open-ended: Show score badge and grading details */}
-                          {currentQuestion.type === "OPEN_ENDED" && currentQuestion.grading_score !== null && currentQuestion.grading_score !== undefined && (
+                          {currentQuestion.type === "SHORT_ANSWER" && currentQuestion.grading_score !== null && currentQuestion.grading_score !== undefined && (
                             <div className="flex items-center gap-3">
                               <div className={`rounded-full px-3 py-1 text-sm font-semibold ${
                                 currentQuestion.grading_score >= 0.75 
@@ -900,8 +892,8 @@ export function QuizPanel({ session }: QuizPanelProps) {
                             </div>
                           )}
 
-                          {/* Missed points for open-ended */}
-                          {currentQuestion.type === "OPEN_ENDED" && currentQuestion.missed_points && currentQuestion.missed_points.length > 0 && (
+                          {/* Missed points for short-answer */}
+                          {currentQuestion.type === "SHORT_ANSWER" && currentQuestion.missed_points && currentQuestion.missed_points.length > 0 && (
                             <div className="space-y-2 px-2">
                               <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
                                 نقاط مفقودة:
@@ -916,12 +908,12 @@ export function QuizPanel({ session }: QuizPanelProps) {
                             </div>
                           )}
 
-                          {/* LLM feedback for open-ended OR justification for MCQ/T-F */}
+                          {/* LLM feedback for short-answer OR justification for MCQ/T-F */}
                           <div className="border-t border-accent/30 pt-3">
                             <div className="flex items-center gap-2 mb-2">
                               <Lightbulb className="text-muted-foreground size-4 shrink-0" />
                               <span className="text-sm font-semibold">
-                                {currentQuestion.type === "OPEN_ENDED" ? "ملاحظات:" : "التوضيح:"}
+                                {currentQuestion.type === "SHORT_ANSWER" ? "ملاحظات:" : "التوضيح:"}
                               </span>
                             </div>
                             <div className="text-sm leading-relaxed" dir="auto">
@@ -1012,6 +1004,10 @@ export function QuizPanel({ session }: QuizPanelProps) {
                           <EphemeralChatRuntimeProvider
                             key={`question-chat-${currentQuestion.id}`}
                             endpoint={`/api/adaptive/questions/${currentQuestion.id}/chat`}
+                            initialMessages={chatHistoryMap[currentQuestion.id]}
+                            onMessagesChange={(msgs) =>
+                              setChatHistoryMap((prev) => ({ ...prev, [currentQuestion.id]: msgs }))
+                            }
                           >
                             <Thread />
                           </EphemeralChatRuntimeProvider>

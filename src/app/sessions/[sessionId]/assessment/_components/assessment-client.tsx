@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, Loader2, PenTool } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -64,11 +64,11 @@ export function AssessmentClient({
   const [error, setError] = useState<string | null>(null);
   const [questionStartTime, setQuestionStartTime] = useState<number>(0);
 
-  const isOpenEnded =
-    (currentQuestion?.type || "").toUpperCase() === "OPEN_ENDED" ||
+  const isShortAnswer =
+    (currentQuestion?.type || "").toUpperCase() === "SHORT_ANSWER" ||
     (currentQuestion?.options?.length ?? 0) === 0;
 
-  const hasAnswer = isOpenEnded
+  const hasAnswer = isShortAnswer
     ? (selectedAnswer ?? "").trim().length > 0
     : Boolean(selectedAnswer);
 
@@ -287,17 +287,12 @@ export function AssessmentClient({
                   <MarkdownRenderer content={currentQuestion.question} />
                 </div>
 
-                {isOpenEnded ? (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">اكتب إجابتك</Label>
-                    <Textarea
-                      dir="auto"
-                      value={selectedAnswer ?? ""}
-                      onChange={e => setSelectedAnswer(e.target.value)}
-                      placeholder="اكتب إجابتك هنا..."
-                      className="min-h-32"
-                    />
-                  </div>
+                {isShortAnswer ? (
+                  <ShortAnswerInput
+                    value={selectedAnswer ?? ""}
+                    onChange={setSelectedAnswer}
+                    disabled={isSubmitting}
+                  />
                 ) : (
                   <RadioGroup
                     value={selectedAnswer || ""}
@@ -444,6 +439,34 @@ export function AssessmentClient({
       <div className="text-center">
         <Loader2 className="text-primary mx-auto mb-4 size-8 animate-spin" />
         <p className="text-muted-foreground">جاري التحميل...</p>
+      </div>
+    </div>
+  );
+}
+
+// Short Answer Input Component
+function ShortAnswerInput({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <Textarea
+        placeholder="اكتب إجابتك هنا..."
+        className="min-h-[120px] resize-none border-border/50 bg-background/50 text-lg focus:border-primary/50 focus:ring-primary/20"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        dir="auto"
+      />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <PenTool className="h-3 w-3" />
+        <span>حاول أن تكون دقيقاً ومختصراً</span>
       </div>
     </div>
   );

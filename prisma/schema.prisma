@@ -29,7 +29,7 @@ enum QuestionType {
   MCQ_SINGLE
   MCQ_MULTI
   TRUE_FALSE
-  OPEN_ENDED
+  SHORT_ANSWER
 }
 
 enum CompletionType {
