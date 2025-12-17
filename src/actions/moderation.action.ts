@@ -797,7 +797,7 @@ export async function resolveReport(data: z.infer<typeof ResolveReportSchema>) {
       reportedContentTitle = reporterData.reportedComment.text.slice(0, 50);
     } else {
       reportedContentType = "QUIZ_COMMENT";
-      reportedContentTitle = reporterData.reportedQuizComment?.text.slice(
+      reportedContentTitle = reporterData.reportedQuizComment?.text?.slice(
         0,
         50
       );
