@@ -11,7 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useModerationAccess } from "@/hooks/use-moderation-access";
 import { cn } from "@/lib/utils";
-import { BookOpen, ChevronDown, LogOut, Shield, Users } from "lucide-react";
+import { BookOpen, ChevronDown, LogOut, Settings, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -120,6 +120,17 @@ export const NavigationDesktopAuth = ({
                 >
                   <Shield className="h-4 w-4" />
                   <span>الإشراف</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
+            {user.role === "ADMIN" && (
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/admin"
+                  className="flex flex-row-reverse items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>لوحة الإدارة</span>
                 </Link>
               </DropdownMenuItem>
             )}
