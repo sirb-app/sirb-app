@@ -57,6 +57,13 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum RagStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id        String   @id @default(uuid())
   createdAt DateTime
@@ -205,12 +212,13 @@ model Subject {
   imageUrl    String? // Subject cover image
   collegeId   Int
 
-  college     College            @relation(fields: [collegeId], references: [id], onDelete: Cascade)
-  chapters    Chapter[]
-  enrollments Enrollment[]
-  moderators  SubjectModerator[]
-  userPoints  UserPoints[]
+  college          College            @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  chapters         Chapter[]
+  enrollments      Enrollment[]
+  moderators       SubjectModerator[]
+  userPoints       UserPoints[]
   studyPlans  StudyPlan[]
+  subjectResources SubjectResource[]
 
   @@unique([code, collegeId])
   @@index([collegeId])
@@ -232,6 +240,7 @@ model Chapter {
   canvases           Canvas[]
   quizzes            Quiz[]
   chapterCompletions ChapterCompletion[]
+  subjectResources   SubjectResource[]
 
   @@unique([subjectId, sequence])
   @@index([subjectId])
@@ -1003,4 +1012,30 @@ enum ConfidenceLevel {
   UNSURE
   CONFIDENT
   CERTAIN
+}
+
+model SubjectResource {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  description String?
+  storageKey  String // R2 storage key
+  fileSize    BigInt // bytes
+  mimeType    String // application/pdf, image/png, etc
+
+  subjectId Int
+  chapterId Int?
+
+  isIndexed       Boolean    @default(false)
+  ragStatus       RagStatus?
+  topicsExtracted Boolean    @default(false)
+
+  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+
+  @@index([subjectId])
+  @@index([chapterId])
+  @@map("subject_resources")
 }

@@ -16,6 +16,7 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Settings,
   Shield,
   UserPlus,
   Users,
@@ -144,6 +145,16 @@ export const NavigationMobile = ({
                     >
                       <Shield className="h-4 w-4" />
                       <span>الإشراف</span>
+                    </Link>
+                  )}
+                  {user.role === "ADMIN" && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsSheetOpen(false)}
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span>لوحة الإدارة</span>
                     </Link>
                   )}
                   <Link
