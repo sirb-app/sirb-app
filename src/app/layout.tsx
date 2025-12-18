@@ -2,6 +2,7 @@ import { Footer } from "@/components/footer";
 import { Navigation } from "@/components/navigation";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
@@ -13,7 +14,7 @@ const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "سرب - تطبيق تعليمي",
+  title: "سرب",
   description: "تطبيق سرب التعليمي - منصة تعليمية متطورة",
   appleWebApp: {
     title: "Sirb",
@@ -36,10 +37,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Navigation />
-          <main className="min-h-screen pt-6">{children}</main>
-          <Footer />
+          <TooltipProvider>
+            <Navigation />
+            <main className="min-h-screen pt-6">{children}</main>
+            <Footer />
           <Toaster position="bottom-right" richColors />
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

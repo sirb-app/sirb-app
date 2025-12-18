@@ -2,6 +2,7 @@
 
 import { ContentStatus, QuestionType, UserRole } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
+import { notifyModeratorsOfSubmission } from "@/lib/email/email-service";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -12,13 +13,14 @@ const CreateCanvasSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().optional(),
   chapterId: z.number(),
+  imageUrl: z.string().url().optional(),
 });
 
 const UpdateCanvasSchema = z.object({
   canvasId: z.number(),
   title: z.string().min(3, "Title must be at least 3 characters").optional(),
   description: z.string().optional(),
-  imageUrl: z.string().optional(),
+  imageUrl: z.string().url().optional(),
 });
 
 const AddTextBlockSchema = z.object({
@@ -223,6 +225,7 @@ export async function createCanvas(data: z.infer<typeof CreateCanvasSchema>) {
     data: {
       title: validated.title,
       description: validated.description,
+      imageUrl: validated.imageUrl,
       chapterId: validated.chapterId,
       contributorId: session.user.id,
       sequence,
@@ -291,6 +294,31 @@ export async function submitCanvas(canvasId: number) {
     where: { id: canvasId },
     data: { status: ContentStatus.PENDING },
   });
+
+  // Notify moderators of the new submission (fire and forget)
+  const canvasData = await prisma.canvas.findUnique({
+    where: { id: canvasId },
+    include: {
+      contributor: { select: { name: true } },
+      chapter: {
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  if (canvasData) {
+    notifyModeratorsOfSubmission({
+      subjectId: canvasData.chapter.subject.id,
+      subjectName: canvasData.chapter.subject.name,
+      contentType: "CANVAS",
+      contentId: canvasData.id,
+      contentTitle: canvasData.title,
+      contributorName: canvasData.contributor.name,
+      chapterTitle: canvasData.chapter.title,
+    }).catch(err => console.error("[Email] Failed to notify moderators:", err));
+  }
 
   return { success: true };
 }

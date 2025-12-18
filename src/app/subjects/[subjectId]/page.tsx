@@ -1,5 +1,7 @@
+import { getStudyPlans } from "@/actions/study-plan.action";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import ChapterPlaylists from "./_components/chapter-playlists";
@@ -8,6 +10,28 @@ import SubjectInfoCard from "./_components/subject-info-card";
 type PageProps = {
   params: Promise<{ subjectId: string }>;
 };
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { subjectId } = await params;
+
+  const subject = await prisma.subject.findUnique({
+    where: { id: parseInt(subjectId) },
+    select: { name: true, code: true },
+  });
+
+  if (!subject) {
+    return {
+      title: "المادة غير موجودة | سرب",
+    };
+  }
+
+  return {
+    title: `${subject.name} (${subject.code}) | سرب`,
+    description: `استكشف محتوى مادة ${subject.name} في منصة سرب`,
+  };
+}
 
 async function getSubjectData(subjectId: string, userId: string | null) {
   const subject = await prisma.subject.findUnique({
@@ -100,11 +124,21 @@ export default async function Page({ params }: PageProps) {
   });
 
   const subject = await getSubjectData(subjectId, session?.user.id ?? null);
+  let sessions: Awaited<ReturnType<typeof getStudyPlans>> = [];
+  try {
+    sessions = await getStudyPlans(parseInt(subjectId));
+  } catch {
+    sessions = [];
+  }
 
   return (
     <div className="container mx-auto max-w-7xl px-3 py-8 md:px-8 lg:px-16">
       <section className="mb-12" aria-label="معلومات المقرر">
-        <SubjectInfoCard subject={subject} isAuthenticated={!!session} />
+        <SubjectInfoCard
+          subject={subject}
+          isAuthenticated={!!session}
+          sessions={sessions}
+        />
       </section>
 
       <section aria-label="فصول المقرر">

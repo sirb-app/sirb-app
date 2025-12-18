@@ -168,7 +168,7 @@ function CanvasCard({
         >
           <CardContent className="flex h-full flex-col p-0">
             {/* Thumbnail Area */}
-            <div className="relative aspect-video w-full overflow-hidden rounded-t-xl">
+            <div className="bg-muted relative aspect-video w-full overflow-hidden rounded-t-xl">
               {canvas.imageUrl ? (
                 <Image
                   src={canvas.imageUrl}
@@ -227,7 +227,7 @@ function CanvasCard({
             </div>
 
             {/* Canvas Info */}
-            <div className="flex flex-1 flex-col p-3">
+            <div className="flex h-28 flex-col p-3">
               <h3
                 className={cn(
                   "line-clamp-2 leading-tight font-semibold transition-colors",
@@ -238,20 +238,18 @@ function CanvasCard({
                 {stripTitlePrefix(canvas.title)}
               </h3>
 
-              {canvas.description && (
-                <p
-                  className={cn(
-                    "text-muted-foreground mt-2 line-clamp-3 flex-1 text-sm leading-relaxed",
-                    optimisticCompleted && "opacity-70"
-                  )}
-                >
-                  {canvas.description}
-                </p>
-              )}
+              <p
+                className={cn(
+                  "text-muted-foreground mt-2 line-clamp-2 flex-1 text-sm leading-relaxed",
+                  optimisticCompleted && "opacity-70"
+                )}
+              >
+                {canvas.description || ""}
+              </p>
 
               <div
                 className={cn(
-                  "text-muted-foreground mt-3 flex items-center gap-1.5 text-xs",
+                  "text-muted-foreground mt-auto flex items-center gap-1.5 text-xs",
                   optimisticCompleted && "opacity-70"
                 )}
               >

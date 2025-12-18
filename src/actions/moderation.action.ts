@@ -2,6 +2,10 @@
 
 import { ContentStatus, ReportStatus, UserRole } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
+import {
+  notifyContributorOfDecision,
+  notifyReporterOfResolution,
+} from "@/lib/email/email-service";
 import { awardPoints } from "@/lib/points";
 import { POINT_REASONS, POINT_VALUES } from "@/lib/points-config";
 import { prisma } from "@/lib/prisma";
@@ -324,6 +328,36 @@ export async function approveCanvas(canvasId: number) {
     });
   });
 
+  // Notify contributor of approval (fire and forget)
+  const canvasData = await prisma.canvas.findUnique({
+    where: { id: canvasId },
+    include: {
+      contributor: { select: { email: true, name: true } },
+      chapter: {
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  if (canvasData) {
+    notifyContributorOfDecision({
+      recipientEmail: canvasData.contributor.email,
+      recipientName: canvasData.contributor.name,
+      contentType: "CANVAS",
+      contentId: canvasData.id,
+      contentTitle: canvasData.title,
+      subjectId: canvasData.chapter.subject.id,
+      subjectName: canvasData.chapter.subject.name,
+      chapterTitle: canvasData.chapter.title,
+      chapterId: canvasData.chapterId,
+      decision: "APPROVED",
+    }).catch(err =>
+      console.error("[Email] Failed to notify contributor:", err)
+    );
+  }
+
   return { success: true };
 }
 
@@ -364,6 +398,37 @@ export async function rejectCanvas(data: z.infer<typeof RejectCanvasSchema>) {
       tx,
     });
   });
+
+  // Notify contributor of rejection (fire and forget)
+  const canvasData = await prisma.canvas.findUnique({
+    where: { id: validated.canvasId },
+    include: {
+      contributor: { select: { email: true, name: true } },
+      chapter: {
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  if (canvasData) {
+    notifyContributorOfDecision({
+      recipientEmail: canvasData.contributor.email,
+      recipientName: canvasData.contributor.name,
+      contentType: "CANVAS",
+      contentId: canvasData.id,
+      contentTitle: canvasData.title,
+      subjectId: canvasData.chapter.subject.id,
+      subjectName: canvasData.chapter.subject.name,
+      chapterTitle: canvasData.chapter.title,
+      chapterId: canvasData.chapterId,
+      decision: "REJECTED",
+      rejectionReason: validated.reason,
+    }).catch(err =>
+      console.error("[Email] Failed to notify contributor:", err)
+    );
+  }
 
   return { success: true };
 }
@@ -445,6 +510,36 @@ export async function approveQuiz(quizId: number) {
     });
   });
 
+  // Notify contributor of approval (fire and forget)
+  const quizData = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    include: {
+      contributor: { select: { email: true, name: true } },
+      chapter: {
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  if (quizData) {
+    notifyContributorOfDecision({
+      recipientEmail: quizData.contributor.email,
+      recipientName: quizData.contributor.name,
+      contentType: "QUIZ",
+      contentId: quizData.id,
+      contentTitle: quizData.title,
+      subjectId: quizData.chapter.subject.id,
+      subjectName: quizData.chapter.subject.name,
+      chapterTitle: quizData.chapter.title,
+      chapterId: quizData.chapterId,
+      decision: "APPROVED",
+    }).catch(err =>
+      console.error("[Email] Failed to notify contributor:", err)
+    );
+  }
+
   return { success: true };
 }
 
@@ -485,6 +580,37 @@ export async function rejectQuiz(data: z.infer<typeof RejectQuizSchema>) {
       tx,
     });
   });
+
+  // Notify contributor of rejection (fire and forget)
+  const quizData = await prisma.quiz.findUnique({
+    where: { id: validated.quizId },
+    include: {
+      contributor: { select: { email: true, name: true } },
+      chapter: {
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  if (quizData) {
+    notifyContributorOfDecision({
+      recipientEmail: quizData.contributor.email,
+      recipientName: quizData.contributor.name,
+      contentType: "QUIZ",
+      contentId: quizData.id,
+      contentTitle: quizData.title,
+      subjectId: quizData.chapter.subject.id,
+      subjectName: quizData.chapter.subject.name,
+      chapterTitle: quizData.chapter.title,
+      chapterId: quizData.chapterId,
+      decision: "REJECTED",
+      rejectionReason: validated.reason,
+    }).catch(err =>
+      console.error("[Email] Failed to notify contributor:", err)
+    );
+  }
 
   return { success: true };
 }
@@ -642,6 +768,49 @@ export async function resolveReport(data: z.infer<typeof ResolveReportSchema>) {
       });
     }
   });
+
+  // Notify the reporter that their report has been resolved (fire and forget)
+  const reporterData = await prisma.report.findUnique({
+    where: { id: validated.reportId },
+    include: {
+      reporter: { select: { email: true, name: true } },
+      reportedCanvas: { select: { title: true } },
+      reportedQuiz: { select: { title: true } },
+      reportedComment: { select: { text: true } },
+      reportedQuizComment: { select: { text: true } },
+    },
+  });
+
+  if (reporterData) {
+    // Determine reported content type
+    let reportedContentType: "CANVAS" | "QUIZ" | "COMMENT" | "QUIZ_COMMENT";
+    let reportedContentTitle: string | undefined;
+
+    if (reporterData.reportedCanvas) {
+      reportedContentType = "CANVAS";
+      reportedContentTitle = reporterData.reportedCanvas.title;
+    } else if (reporterData.reportedQuiz) {
+      reportedContentType = "QUIZ";
+      reportedContentTitle = reporterData.reportedQuiz.title;
+    } else if (reporterData.reportedComment) {
+      reportedContentType = "COMMENT";
+      reportedContentTitle = reporterData.reportedComment.text.slice(0, 50);
+    } else {
+      reportedContentType = "QUIZ_COMMENT";
+      reportedContentTitle = reporterData.reportedQuizComment?.text?.slice(
+        0,
+        50
+      );
+    }
+
+    notifyReporterOfResolution({
+      recipientEmail: reporterData.reporter.email,
+      recipientName: reporterData.reporter.name,
+      resolution: validated.resolution as "RESOLVED" | "DISMISSED",
+      reportedContentType,
+      reportedContentTitle,
+    }).catch(err => console.error("[Email] Failed to notify reporter:", err));
+  }
 
   return { success: true };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { createCanvas } from "@/actions/canvas-manage.action";
+import { CanvasImageUpload } from "@/components/canvas-image-upload";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 type CreateCanvasModalProps = {
@@ -31,6 +32,40 @@ export default function CreateCanvasModal({
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const imageKeyRef = useRef<string | null>(null);
+
+  const handleImageChange = (url: string | null, key: string | null) => {
+    setImageUrl(url);
+    imageKeyRef.current = key;
+  };
+
+  const cleanupTempImage = async () => {
+    if (imageKeyRef.current) {
+      try {
+        await fetch("/api/r2/delete/canvas-image", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: imageKeyRef.current }),
+        });
+      } catch (error) {
+        console.error("Failed to cleanup temp image:", error);
+      }
+    }
+  };
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setImageUrl(null);
+    imageKeyRef.current = null;
+  };
+
+  const handleClose = async () => {
+    await cleanupTempImage();
+    resetForm();
+    onClose();
+  };
 
   const handleCreate = async () => {
     if (!title.trim()) return;
@@ -41,9 +76,12 @@ export default function CreateCanvasModal({
         title,
         description,
         chapterId,
+        imageUrl: imageUrl || undefined,
       });
 
       if (result.success) {
+        // Don't cleanup the image since it's now saved with the canvas
+        resetForm();
         toast.success("تم إنشاء الدرس");
         router.push(`/manage/canvas/${result.canvasId}`);
       }
@@ -56,7 +94,7 @@ export default function CreateCanvasModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="space-y-4 sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>إضافة شرح جديد</DialogTitle>
@@ -75,20 +113,31 @@ export default function CreateCanvasModal({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">وصف مختصر (اختياري)</Label>
+            <Label htmlFor="description">وصف مختصر</Label>
             <Textarea
               id="description"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="اكتب نبذة عن محتوى الشرح..."
-              rows={4}
+              rows={3}
             />
+          </div>
+          <div className="space-y-2">
+            <Label>صورة الغلاف</Label>
+            <CanvasImageUpload
+              currentImageUrl={imageUrl}
+              onImageChange={handleImageChange}
+              disabled={isLoading}
+            />
+            <p className="text-muted-foreground text-xs">
+              صيغ مدعومة: PNG, JPEG, WebP. الحد الأقصى: 5 ميجابايت
+            </p>
           </div>
         </div>
         <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
           <Button
             variant="outline"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isLoading}
             className="w-full sm:w-auto"
           >

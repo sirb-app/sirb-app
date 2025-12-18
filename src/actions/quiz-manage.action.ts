@@ -2,6 +2,7 @@
 
 import { ContentStatus, UserRole } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
+import { notifyModeratorsOfSubmission } from "@/lib/email/email-service";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -152,6 +153,31 @@ export async function submitQuiz(quizId: number) {
     where: { id: quizId },
     data: { status: ContentStatus.PENDING },
   });
+
+  // Notify moderators of the new submission (fire and forget)
+  const quizData = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    include: {
+      contributor: { select: { name: true } },
+      chapter: {
+        include: {
+          subject: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  if (quizData) {
+    notifyModeratorsOfSubmission({
+      subjectId: quizData.chapter.subject.id,
+      subjectName: quizData.chapter.subject.name,
+      contentType: "QUIZ",
+      contentId: quizData.id,
+      contentTitle: quizData.title,
+      contributorName: quizData.contributor.name,
+      chapterTitle: quizData.chapter.title,
+    }).catch(err => console.error("[Email] Failed to notify moderators:", err));
+  }
 
   return { success: true };
 }

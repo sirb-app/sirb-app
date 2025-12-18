@@ -1,6 +1,7 @@
 "use client";
 
 import { deleteCanvas, updateCanvas } from "@/actions/canvas-manage.action";
+import { CanvasImageUpload } from "@/components/canvas-image-upload";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ContentStatus } from "@/generated/prisma";
 import {
@@ -31,14 +33,23 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "";
+
+function extractR2KeyFromUrl(url: string | null): string | null {
+  if (!url || !R2_PUBLIC_URL) return null;
+  if (!url.startsWith(R2_PUBLIC_URL)) return null;
+  return url.slice(R2_PUBLIC_URL.length + 1);
+}
 
 type CanvasHeaderProps = {
   canvas: {
     id: number;
     title: string;
     description: string | null;
+    imageUrl: string | null;
     status: ContentStatus;
     rejectionReason?: string | null;
     chapterId: number;
@@ -54,6 +65,13 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
 
   const [title, setTitle] = useState(canvas.title);
   const [description, setDescription] = useState(canvas.description || "");
+  const [imageUrl, setImageUrl] = useState(canvas.imageUrl);
+  const newImageKeyRef = useRef<string | null>(null);
+
+  const handleImageChange = (url: string | null, key: string | null) => {
+    setImageUrl(url);
+    newImageKeyRef.current = key;
+  };
 
   const getStatusBadge = () => {
     switch (canvas.status) {
@@ -80,13 +98,36 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
 
   const handleSaveDetails = async () => {
     if (!title.trim()) return;
+
+    // Track old image key before save (to delete after successful update)
+    const oldImageKey =
+      canvas.imageUrl !== imageUrl
+        ? extractR2KeyFromUrl(canvas.imageUrl)
+        : null;
+
     try {
       setIsLoading(true);
       await updateCanvas({
         canvasId: canvas.id,
         title,
         description,
+        imageUrl: imageUrl || undefined,
       });
+
+      // Delete old image after successful save (if image was changed)
+      if (oldImageKey) {
+        try {
+          await fetch("/api/r2/delete/canvas-image", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: oldImageKey }),
+          });
+        } catch (deleteError) {
+          console.error("Failed to delete old image:", deleteError);
+        }
+      }
+
+      newImageKeyRef.current = null;
       setIsEditing(false);
       toast.success("تم تحديث التفاصيل");
       router.refresh();
@@ -97,9 +138,23 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
     }
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = async () => {
+    // Cleanup newly uploaded image if user cancels
+    if (newImageKeyRef.current) {
+      try {
+        await fetch("/api/r2/delete/canvas-image", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: newImageKeyRef.current }),
+        });
+      } catch (error) {
+        console.error("Failed to cleanup image:", error);
+      }
+      newImageKeyRef.current = null;
+    }
     setTitle(canvas.title);
     setDescription(canvas.description || "");
+    setImageUrl(canvas.imageUrl);
     setIsEditing(false);
   };
 
@@ -128,18 +183,33 @@ export default function CanvasHeader({ canvas }: CanvasHeaderProps) {
           <div className="flex-1 space-y-2">
             {isEditing ? (
               <div className="max-w-xl space-y-3">
-                <Input
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  className="text-lg font-bold"
-                  placeholder="عنوان الشرح"
-                />
-                <Textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="وصف مختصر (اختياري)"
-                  rows={2}
-                />
+                <div className="space-y-2">
+                  <Label>صورة الغلاف</Label>
+                  <CanvasImageUpload
+                    currentImageUrl={imageUrl}
+                    onImageChange={handleImageChange}
+                    canvasId={canvas.id}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>عنوان الشرح</Label>
+                  <Input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    className="text-lg font-bold"
+                    placeholder="عنوان الشرح"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>وصف مختصر</Label>
+                  <Textarea
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder="اكتب نبذة عن محتوى الشرح..."
+                    rows={2}
+                  />
+                </div>
                 {/* Buttons in RTL order: Cancel then Save */}
                 <div className="flex gap-2">
                   <Button

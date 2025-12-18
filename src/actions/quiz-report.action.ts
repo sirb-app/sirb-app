@@ -2,6 +2,7 @@
 
 import { ReportReason } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
+import { notifyModeratorsOfReport } from "@/lib/email/email-service";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -73,6 +74,32 @@ export async function reportQuiz(data: z.infer<typeof ReportQuizSchema>) {
       },
     });
 
+    // Notify moderators of the new report (fire and forget)
+    const quizData = await prisma.quiz.findUnique({
+      where: { id: validated.quizId },
+      include: {
+        chapter: {
+          include: {
+            subject: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (quizData) {
+      notifyModeratorsOfReport({
+        subjectId: quizData.chapter.subject.id,
+        subjectName: quizData.chapter.subject.name,
+        reporterName: session.user.name,
+        reportReason: validated.reason,
+        reportDescription: validated.description,
+        reportedContentType: "QUIZ",
+        reportedContentTitle: quizData.title,
+      }).catch(err =>
+        console.error("[Email] Failed to notify moderators:", err)
+      );
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Error reporting quiz:", error);
@@ -110,6 +137,36 @@ export async function reportQuizComment(
         description: validated.description,
       },
     });
+
+    // Notify moderators of the new report (fire and forget)
+    const commentData = await prisma.quizComment.findUnique({
+      where: { id: validated.commentId },
+      include: {
+        quiz: {
+          include: {
+            chapter: {
+              include: {
+                subject: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (commentData) {
+      notifyModeratorsOfReport({
+        subjectId: commentData.quiz.chapter.subject.id,
+        subjectName: commentData.quiz.chapter.subject.name,
+        reporterName: session.user.name,
+        reportReason: validated.reason,
+        reportDescription: validated.description,
+        reportedContentType: "QUIZ_COMMENT",
+        reportedContentTitle: commentData.text.slice(0, 50),
+      }).catch(err =>
+        console.error("[Email] Failed to notify moderators:", err)
+      );
+    }
 
     return { success: true };
   } catch (error) {

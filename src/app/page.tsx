@@ -7,6 +7,13 @@ import {
   TestimonialsSection,
 } from "@/components/home";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "سرب",
+  description:
+    "منصة تعليمية تشاركية تجمع طلاب الجامعات للتعلم والتعليم من خلال المحتوى الذي ينشئه الطلاب",
+};
 
 export default async function Page() {
   // Parallel data fetching for better performance

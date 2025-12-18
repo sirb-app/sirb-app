@@ -31,6 +31,12 @@ enum QuestionType {
   TRUE_FALSE
 }
 
+enum AdaptiveQuestionType {
+  MCQ_SINGLE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
 enum CompletionType {
   AUTO
   MANUAL
@@ -104,6 +110,10 @@ model User {
   reportsSubmitted  Report[]           @relation("ReportedBy")
   reportsReceived   Report[]           @relation("ReportedUser")
   reportsResolved   Report[]           @relation("ResolvedBy")
+
+  // Adaptive learning relations
+  studyPlans         StudyPlan[]
+  globalTopicMastery GlobalTopicMastery[]
 
   @@map("users")
 }
@@ -207,6 +217,7 @@ model Subject {
   enrollments      Enrollment[]
   moderators       SubjectModerator[]
   userPoints       UserPoints[]
+  studyPlans  StudyPlan[]
   subjectResources SubjectResource[]
 
   @@unique([code, collegeId])
@@ -818,6 +829,189 @@ model UserPoints {
   @@index([earnedAt]) // for global leaderboards (sum across all subjects)
   @@index([reason]) // for point breakdown by type
   @@map("user_points")
+}
+
+// EMAIL NOTIFICATION TRACKING (for rate limiting)
+
+model EmailNotificationLog {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  type        String // SUBMISSION_PENDING, REPORT_SUBMITTED
+  contentType String? // CANVAS, QUIZ
+  contentId   Int?
+  subjectId   Int?
+  lastSentAt  DateTime @default(now())
+
+  @@unique([type, contentType, contentId])
+  @@index([type, contentType, contentId, lastSentAt])
+  @@map("email_notification_logs")
+}
+
+// ADAPTIVE LEARNING SYSTEM
+
+model StudyPlan {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title              String
+  status             StudyPlanStatus @default(SETUP)
+  selectedChapterIds Int[]
+  placementCompleted Boolean         @default(false)
+  progressPercentage Float           @default(0.0) // Overall mastery progress (0-100)
+  deletedAt          DateTime?       // Soft delete timestamp
+
+  userId    String
+  subjectId Int
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject         Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  masteryRecords  TopicMastery[]
+  adaptiveQuizzes AdaptiveQuiz[]
+  flashcards      Flashcard[]
+
+  @@index([userId, subjectId])
+  @@index([status])
+  @@map("study_plans")
+}
+
+model Flashcard {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  // Content
+  front String // Question/term (Markdown)
+  back  String // Answer/definition (Markdown)
+
+  // Relationships
+  studyPlanId   String
+  topicSlug     String // References topics.slug
+  sourceChunkId String? // Optional traceability to chunk
+
+  // FSRS scheduling (per-card)
+  stability      Float     @default(1.0)
+  difficulty     Float     @default(5.0)
+  dueAt          DateTime?
+  lastReviewedAt DateTime?
+  reviewCount    Int       @default(0)
+
+  studyPlan StudyPlan @relation(fields: [studyPlanId], references: [id], onDelete: Cascade)
+
+  @@index([studyPlanId])
+  @@index([studyPlanId, dueAt]) // For due card queries
+  @@index([topicSlug])
+  @@map("flashcards")
+}
+
+model TopicMastery {
+  id        Int      @id @default(autoincrement())
+  updatedAt DateTime @updatedAt
+
+  proficiencyScore Float @default(0.0) // 0-100 scale
+
+  // FSRS (Free Spaced Repetition Scheduler) fields for practice scheduling
+  stability      Float     @default(0.0) // Memory stability
+  difficulty     Float     @default(0.0) // Inherent difficulty of topic
+  lastReviewedAt DateTime?
+  nextReviewAt   DateTime? // When to show next practice question
+
+  studyPlanId String
+  topicSlug   String // References FastAPI topics.slug
+
+  studyPlan StudyPlan @relation(fields: [studyPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([studyPlanId, topicSlug]) // One mastery record per topic per plan
+  @@index([studyPlanId])
+  @@index([topicSlug])
+  @@index([nextReviewAt]) // For scheduling queries
+  @@map("topic_mastery")
+}
+
+model GlobalTopicMastery {
+  id        Int      @id @default(autoincrement())
+  updatedAt DateTime @updatedAt
+
+  proficiencyScore  Float     @default(0.0) // Moving average across all subjects
+  totalInteractions Int       @default(0) // Number of times seen
+  lastSeenAt        DateTime?
+
+  userId    String
+  topicSlug String // References FastAPI topics.slug
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicSlug]) // One global record per topic per user
+  @@index([userId])
+  @@index([topicSlug])
+  @@map("global_topic_mastery")
+}
+
+model AdaptiveQuiz {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  quizType    AdaptiveQuizType
+  completedAt DateTime? // null = in progress
+
+  studyPlanId String
+
+  studyPlan StudyPlan              @relation(fields: [studyPlanId], references: [id], onDelete: Cascade)
+  questions AdaptiveQuizQuestion[]
+
+  @@index([studyPlanId, quizType])
+  @@index([createdAt])
+  @@map("adaptive_quizzes")
+}
+
+model AdaptiveQuizQuestion {
+  id Int @id @default(autoincrement())
+
+  // Question snapshot (AI-generated)
+  questionText  String       @db.Text
+  questionType  AdaptiveQuestionType
+  options       String?      @db.Text // JSON string for MCQ options
+  correctAnswer String       @db.Text // Correct answer(s)
+  justification String?      @db.Text // Explanation
+
+  // User response
+  userAnswer  String           @db.Text
+  isCorrect   Boolean
+  timeTakenMs Int // Response time in milliseconds
+  confidence  ConfidenceLevel? // User-reported confidence (for placement tests)
+
+  // Retry system fields
+  attemptCount Int     @default(1) // Number of attempts (for diminishing returns)
+  hintUsed     Boolean @default(false) // Whether hint was viewed (reduces score weight)
+
+  topicSlug String // References FastAPI topics.slug
+  quizId    String
+
+  quiz AdaptiveQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@index([topicSlug])
+  @@map("adaptive_quiz_questions")
+}
+
+enum StudyPlanStatus {
+  SETUP
+  PLACEMENT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum AdaptiveQuizType {
+  PLACEMENT
+  PRACTICE
+}
+
+enum ConfidenceLevel {
+  GUESS
+  UNSURE
+  CONFIDENT
+  CERTAIN
 }
 
 model SubjectResource {
