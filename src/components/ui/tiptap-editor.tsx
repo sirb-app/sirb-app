@@ -22,6 +22,26 @@ import {
 import { cn } from "@/lib/utils";
 import { useEffect, useState, useCallback } from "react";
 
+function inferDirectionFromHtml(
+  html: string,
+  fallback: "rtl" | "ltr"
+): "rtl" | "ltr" {
+  const plainText = (html || "").replace(/<[^>]*>/g, "");
+  if (!plainText.trim()) return fallback;
+
+  const rtlChars = plainText.match(
+    /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/g
+  );
+  const ltrChars = plainText.match(/[A-Za-z]/g);
+
+  const rtlCount = rtlChars?.length ?? 0;
+  const ltrCount = ltrChars?.length ?? 0;
+
+  if (ltrCount === 0 && rtlCount === 0) return fallback;
+  if (ltrCount === rtlCount) return fallback;
+  return ltrCount > rtlCount ? "ltr" : "rtl";
+}
+
 type TipTapEditorProps = {
   readonly content: string;
   readonly onChange: (content: string) => void;
@@ -39,7 +59,9 @@ export function TipTapEditor({
   className,
   defaultDirection = "rtl",
 }: TipTapEditorProps) {
-  const [direction, setDirection] = useState<"rtl" | "ltr">(defaultDirection);
+  const [direction, setDirection] = useState<"rtl" | "ltr">(() =>
+    inferDirectionFromHtml(content, defaultDirection)
+  );
 
   const editor = useEditor({
     extensions: [
@@ -83,8 +105,9 @@ export function TipTapEditor({
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content);
+      setDirection(inferDirectionFromHtml(content, defaultDirection));
     }
-  }, [content, editor]);
+  }, [content, editor, defaultDirection]);
 
   const toggleDirection = useCallback(() => {
     setDirection(prev => (prev === "rtl" ? "ltr" : "rtl"));
