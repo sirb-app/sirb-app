@@ -2,14 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import {
-  BarChart3,
-  BookOpen,
-  FileText,
-  Flag,
-  LayoutDashboard,
-  Users,
-} from "lucide-react";
+import { BookOpen, FileText, Flag, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PropsWithChildren, ReactElement } from "react";
@@ -79,14 +72,15 @@ export function AdminSidebarContent({
   linkWrapper?: (node: ReactElement) => ReactElement;
   showHeader?: boolean;
 }) {
-  const overview: NavItem[] = [
-    {
-      label: "لوحة التحكم",
-      href: "/admin",
-      exact: true,
-      icon: LayoutDashboard,
-    },
-  ];
+  // TODO: Dashboard page - implement with KPIs and platform health metrics
+  // const overview: NavItem[] = [
+  //   {
+  //     label: "لوحة التحكم",
+  //     href: "/admin",
+  //     exact: true,
+  //     icon: LayoutDashboard,
+  //   },
+  // ];
 
   const moderation: NavItem[] = [
     { label: "إدارة المحتوى", href: "/admin/content", icon: FileText },
@@ -96,7 +90,8 @@ export function AdminSidebarContent({
   const platform: NavItem[] = [
     { label: "إدارة الجامعات", href: "/admin/universities", icon: BookOpen },
     { label: "إدارة المستخدمين", href: "/admin/users", icon: Users },
-    { label: "التحليلات", href: "/admin/analytics", icon: BarChart3 },
+    // TODO: Analytics page - implement with charts and statistics
+    // { label: "التحليلات", href: "/admin/analytics", icon: BarChart3 },
   ];
 
   return (
@@ -111,12 +106,14 @@ export function AdminSidebarContent({
         role="navigation"
         aria-label="Admin navigation"
       >
+        {/* TODO: Re-enable when Dashboard is implemented
         <NavSection title="نظرة عامة">
           {overview.map(item => (
             <NavLink key={item.href} item={item} wrap={linkWrapper} />
           ))}
         </NavSection>
         <div className="border-border my-2 border-t" />
+        */}
         <NavSection title="الإشراف">
           {moderation.map(item => (
             <NavLink key={item.href} item={item} wrap={linkWrapper} />

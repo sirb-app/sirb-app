@@ -21,10 +21,8 @@ export const Navigation = () => {
 
   return (
     <>
-      {/* Background mask to hide content scrolling behind nav */}
-      <div className="sticky top-0 h-4 w-full">
-        <div className="bg-background absolute inset-0 -z-10" />
-      </div>
+      {/* Spacer for sticky nav positioning */}
+      <div className="h-4 w-full" />
       <nav className="pointer-events-none sticky top-4 isolate z-50 w-full">
         <div className="mx-auto max-w-[1200px] px-3 md:px-8 lg:px-[150px]">
           <div className="bg-card pointer-events-auto rounded-lg border px-4 py-3 shadow-md md:px-6 md:py-4">
