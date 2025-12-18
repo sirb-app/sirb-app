@@ -1,26 +1,10 @@
 "use client";
 
 import type { ReportWithRelations } from "@/actions/admin-report.actions";
-import {
-  resolveReportWithAction,
-  updateReportStatus,
-} from "@/actions/admin-report.actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,7 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
+
 import { ReportReason, ReportStatus } from "@/generated/prisma";
 import {
   AlertTriangle,
@@ -72,7 +56,8 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import DismissReportDialog from "./dismiss-report-dialog";
+import ResolveReportDialog from "./resolve-report-dialog";
 
 const statusFilters = [
   { value: "PENDING", label: "قيد الانتظار" },
@@ -140,14 +125,14 @@ export function ReportsManager({
   const [selectedReport, setSelectedReport] =
     useState<ReportWithRelations | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [actionType, setActionType] = useState<"resolve" | "dismiss" | null>(
-    null
-  );
-  const [resolutionNotes, setResolutionNotes] = useState("");
-  const [deleteContent, setDeleteContent] = useState(false);
-  const [banUser, setBanUser] = useState(false);
-  const [banReason, setBanReason] = useState("");
-  const [banDuration, setBanDuration] = useState<string>("7");
+  const [resolveDialogState, setResolveDialogState] = useState({
+    isOpen: false,
+    reportId: null as number | null,
+  });
+  const [dismissDialogState, setDismissDialogState] = useState({
+    isOpen: false,
+    reportId: null as number | null,
+  });
 
   const totalPages = Math.ceil(total / 10);
 
@@ -190,65 +175,16 @@ export function ReportsManager({
     setDetailsOpen(true);
   };
 
-  const openAction = (
-    type: "resolve" | "dismiss",
-    report: ReportWithRelations
-  ) => {
-    setActionType(type);
-    setSelectedReport(report);
-    setResolutionNotes("");
+  const openResolveDialog = (reportId: number) => {
+    setResolveDialogState({ isOpen: true, reportId });
   };
 
-  const closeAction = () => {
-    setActionType(null);
-    if (!detailsOpen) {
-      setSelectedReport(null);
-    }
-    setResolutionNotes("");
-    setDeleteContent(false);
-    setBanUser(false);
-    setBanReason("");
-    setBanDuration("7");
+  const openDismissDialog = (reportId: number) => {
+    setDismissDialogState({ isOpen: true, reportId });
   };
 
-  const handleAction = () => {
-    if (!selectedReport || !actionType) return;
-
-    startTransition(async () => {
-      try {
-        if (actionType === "resolve") {
-          await resolveReportWithAction(selectedReport.id, {
-            deleteContent,
-            banUser,
-            banReason: banReason.trim() || undefined,
-            banDuration:
-              banUser && banDuration ? parseInt(banDuration) : undefined,
-            resolutionNotes: resolutionNotes.trim() || undefined,
-          });
-        } else {
-          await updateReportStatus(
-            selectedReport.id,
-            "DISMISSED",
-            resolutionNotes.trim() || undefined
-          );
-        }
-
-        toast.success(
-          actionType === "resolve"
-            ? "تم حل البلاغ بنجاح"
-            : "تم تجاهل البلاغ بنجاح"
-        );
-        closeAction();
-        setDetailsOpen(false);
-        router.refresh();
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "حدث خطأ أثناء تحديث حالة البلاغ"
-        );
-      }
-    });
+  const handleDialogSuccess = () => {
+    router.refresh();
   };
 
   const formatDate = (date: Date) => {
@@ -696,7 +632,7 @@ export function ReportsManager({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => openAction("resolve", report)}
+                                onClick={() => openResolveDialog(report.id)}
                                 className="text-green-600 hover:bg-green-50 hover:text-green-700"
                                 title="حل البلاغ"
                               >
@@ -705,7 +641,7 @@ export function ReportsManager({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => openAction("dismiss", report)}
+                                onClick={() => openDismissDialog(report.id)}
                                 className="text-muted-foreground hover:bg-muted"
                                 title="تجاهل البلاغ"
                               >
@@ -879,14 +815,14 @@ export function ReportsManager({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => openAction("resolve", report)}
+                            onClick={() => openResolveDialog(report.id)}
                             className="text-green-600"
                           >
                             <CheckCircle className="ml-2 h-4 w-4" />
                             حل البلاغ
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => openAction("dismiss", report)}
+                            onClick={() => openDismissDialog(report.id)}
                           >
                             <XCircle className="ml-2 h-4 w-4" />
                             تجاهل البلاغ
@@ -1282,7 +1218,9 @@ export function ReportsManager({
                 <div className="flex gap-3 border-t pt-4">
                   <Button
                     className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={() => openAction("resolve", selectedReport)}
+                    onClick={() =>
+                      selectedReport && openResolveDialog(selectedReport.id)
+                    }
                   >
                     <CheckCircle className="ml-2 h-4 w-4" />
                     حل البلاغ
@@ -1290,7 +1228,9 @@ export function ReportsManager({
                   <Button
                     variant="secondary"
                     className="flex-1"
-                    onClick={() => openAction("dismiss", selectedReport)}
+                    onClick={() =>
+                      selectedReport && openDismissDialog(selectedReport.id)
+                    }
                   >
                     <XCircle className="ml-2 h-4 w-4" />
                     تجاهل البلاغ
@@ -1302,196 +1242,20 @@ export function ReportsManager({
         </SheetContent>
       </Sheet>
 
-      <Dialog open={!!actionType} onOpenChange={open => !open && closeAction()}>
-        <DialogContent dir="rtl" className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {actionType === "resolve" ? (
-                <>
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  حل البلاغ
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-5 w-5" />
-                  تجاهل البلاغ
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {actionType === "resolve" && selectedReport && (
-              <>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  اختر الإجراءات المناسبة لحل هذا البلاغ:
-                </p>
 
-                {(selectedReport.reportedCanvasId ||
-                  selectedReport.reportedCommentId) && (
-                  <div
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-all ${
-                      deleteContent
-                        ? "border-red-500 bg-red-50 shadow-sm dark:bg-red-950/30"
-                        : "hover:bg-muted/50 hover:border-muted-foreground/20"
-                    }`}
-                    onClick={() => setDeleteContent(!deleteContent)}
-                  >
-                    <input
-                      type="checkbox"
-                      id="delete-content"
-                      checked={deleteContent}
-                      onChange={e => setDeleteContent(e.target.checked)}
-                      className="mt-1 h-4 w-4 cursor-pointer accent-red-600"
-                      onClick={e => e.stopPropagation()}
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label
-                        htmlFor="delete-content"
-                        className={`cursor-pointer font-medium ${
-                          deleteContent ? "text-red-700 dark:text-red-400" : ""
-                        }`}
-                      >
-                        حذف المحتوى المُبلَّغ عنه
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        {selectedReport.reportedCanvasId
-                          ? "سيتم حذف الدرس نهائياً من النظام"
-                          : "سيتم حذف التعليق نهائياً"}
-                      </p>
-                    </div>
-                  </div>
-                )}
+      <ResolveReportDialog
+        isOpen={resolveDialogState.isOpen}
+        reportId={resolveDialogState.reportId}
+        onClose={() => setResolveDialogState({ isOpen: false, reportId: null })}
+        onSuccess={handleDialogSuccess}
+      />
 
-                <div
-                  className={`space-y-3 rounded-lg border p-3 transition-all ${
-                    banUser
-                      ? "border-orange-500 bg-orange-50 shadow-sm dark:bg-orange-950/30"
-                      : "hover:border-muted-foreground/20"
-                  }`}
-                >
-                  <div
-                    className="flex cursor-pointer items-start gap-3"
-                    onClick={() => setBanUser(!banUser)}
-                  >
-                    <input
-                      type="checkbox"
-                      id="ban-user"
-                      checked={banUser}
-                      onChange={e => setBanUser(e.target.checked)}
-                      className="mt-1 h-4 w-4 cursor-pointer accent-orange-600"
-                      onClick={e => e.stopPropagation()}
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label
-                        htmlFor="ban-user"
-                        className={`cursor-pointer font-medium ${
-                          banUser ? "text-orange-700 dark:text-orange-400" : ""
-                        }`}
-                      >
-                        حظر المستخدم
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        {selectedReport.reportedUserId
-                          ? "حظر المستخدم المُبلَّغ عنه"
-                          : selectedReport.reportedCanvasId
-                            ? "حظر المساهم الذي أنشأ الدرس"
-                            : "حظر صاحب التعليق"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {banUser && (
-                    <div className="space-y-3 pr-9">
-                      <div className="space-y-2">
-                        <Label htmlFor="ban-reason" className="text-sm">
-                          سبب الحظر
-                        </Label>
-                        <Textarea
-                          id="ban-reason"
-                          value={banReason}
-                          onChange={e => setBanReason(e.target.value)}
-                          rows={2}
-                          placeholder="اذكر سبب الحظر..."
-                          className="resize-none text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ban-duration" className="text-sm">
-                          مدة الحظر
-                        </Label>
-                        <Select
-                          value={banDuration}
-                          onValueChange={setBanDuration}
-                        >
-                          <SelectTrigger id="ban-duration">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">يوم واحد</SelectItem>
-                            <SelectItem value="3">3 أيام</SelectItem>
-                            <SelectItem value="7">7 أيام</SelectItem>
-                            <SelectItem value="14">14 يوم</SelectItem>
-                            <SelectItem value="30">30 يوم</SelectItem>
-                            <SelectItem value="0">دائم</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {actionType === "dismiss" && (
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                سيتم وضع علامة على هذا البلاغ كـ &quot;تم التجاهل&quot; بدون اتخاذ أي
-                إجراء.
-              </p>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="resolution-notes">
-                ملاحظات {actionType === "dismiss" ? "" : "(اختياري)"}
-              </Label>
-              <Textarea
-                id="resolution-notes"
-                value={resolutionNotes}
-                onChange={e => setResolutionNotes(e.target.value)}
-                disabled={isPending}
-                rows={3}
-                placeholder="أضف ملاحظات توضيحية..."
-                className="resize-none"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={closeAction}
-              disabled={isPending}
-            >
-              إلغاء
-            </Button>
-            <Button
-              type="button"
-              variant={actionType === "resolve" ? "default" : "secondary"}
-              onClick={handleAction}
-              disabled={
-                isPending ||
-                (actionType === "resolve" && banUser && !banReason.trim())
-              }
-              className={
-                actionType === "resolve"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : ""
-              }
-            >
-              {isPending ? "جارٍ الحفظ..." : "تأكيد"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DismissReportDialog
+        isOpen={dismissDialogState.isOpen}
+        reportId={dismissDialogState.reportId}
+        onClose={() => setDismissDialogState({ isOpen: false, reportId: null })}
+        onSuccess={handleDialogSuccess}
+      />
     </div>
   );
 }
