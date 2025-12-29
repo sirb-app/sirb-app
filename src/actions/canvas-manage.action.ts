@@ -210,12 +210,9 @@ export async function createCanvas(data: z.infer<typeof CreateCanvasSchema>) {
 
   const validated = CreateCanvasSchema.parse(data);
 
-  // Get next sequence (exclude soft-deleted canvases)
+  // Get next sequence
   const lastCanvas = await prisma.canvas.findFirst({
-    where: {
-      chapterId: validated.chapterId,
-      isDeleted: false,
-    },
+    where: { chapterId: validated.chapterId },
     orderBy: { sequence: "desc" },
     select: { sequence: true },
   });

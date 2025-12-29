@@ -9,7 +9,7 @@ export function submissionPendingTemplate(
   data: ModeratorNotificationData
 ): string {
   const contentTypeArabic = getContentTypeArabic(data.contentType);
-  const reviewUrl = `${process.env.BETTER_AUTH_URL || ""}/subjects/${data.subjectId}/moderation`;
+  const reviewUrl = `${process.env.BETTER_AUTH_URL || ""}/moderation?subjectId=${data.subjectId}`;
 
   const content = `
     <h1 style="margin:0 0 24px;font-size:24px;font-weight:700;color:${COLORS.foreground};line-height:1.4;">

@@ -62,12 +62,9 @@ export async function createQuiz(data: z.infer<typeof CreateQuizSchema>) {
 
   const validated = CreateQuizSchema.parse(data);
 
-  // Get next sequence (exclude soft-deleted quizzes)
+  // Get next sequence
   const lastQuiz = await prisma.quiz.findFirst({
-    where: {
-      chapterId: validated.chapterId,
-      isDeleted: false,
-    },
+    where: { chapterId: validated.chapterId },
     orderBy: { sequence: "desc" },
     select: { sequence: true },
   });

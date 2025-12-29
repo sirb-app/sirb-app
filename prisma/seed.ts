@@ -70,10 +70,9 @@ async function main() {
   const imamSubjects = [
     // CS subjects (10 subjects - focus more here)
     {
-      name: "مقدمة في البرمجة",
-      code: "CS101",
-      description:
-        "أساسيات البرمجة باستخدام لغة Python، المتغيرات، الحلقات، والدوال",
+      name: "أساسيات الحوسبة والأخلاقيات",
+      code: "CS1110",
+      description: "أساسيات علوم الحاسب والمعلومات والأخلاقيات المهنية",
       collegeId: csCollegeImam.id,
       imageUrl:
         "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop",
@@ -443,7 +442,11 @@ async function main() {
 
   // Create chapters for the first subject only
   const subject = firstSubject;
-  const chapterCount = Math.floor(Math.random() * 4) + 3; // 3-6 chapters per subject
+  // Use specific chapter count for subjects with predefined chapters
+  const predefinedChapterCounts: Record<string, number> = {
+    "أساسيات الحوسبة والأخلاقيات": 2,
+  };
+  const chapterCount = predefinedChapterCounts[subject.name] ?? Math.floor(Math.random() * 4) + 3; // Use predefined count or 3-6 chapters
 
   for (let i = 1; i <= chapterCount; i++) {
     const chapter = await prisma.chapter.create({
@@ -563,6 +566,10 @@ async function main() {
 // Helper functions to generate chapter and canvas titles/descriptions
 function getChapterTitle(subjectName: string, chapterNum: number): string {
   const chapterTitles: Record<string, string[]> = {
+    "أساسيات الحوسبة والأخلاقيات": [
+      "نظم التشغيل",
+      "الشبكات والإنترنت",
+    ],
     "مقدمة في البرمجة": [
       "مقدمة في البرمجة",
       "المتغيرات وأنواع البيانات",
@@ -623,6 +630,26 @@ function getCanvasTitle(
   chapterNum: number,
   canvasNum: number
 ): string {
+  // Specific canvas titles for أساسيات الحوسبة والأخلاقيات
+  if (subjectName === "أساسيات الحوسبة والأخلاقيات") {
+    const osCanvasTitles = [
+      "مقدمة في نظم التشغيل",
+      "إدارة العمليات والذاكرة",
+      "نظام الملفات",
+    ];
+    const networkCanvasTitles = [
+      "مقدمة في الشبكات",
+      "بروتوكولات الإنترنت",
+      "أمن الشبكات",
+    ];
+
+    if (chapterNum === 1) {
+      return osCanvasTitles[canvasNum - 1] || `محتوى نظم التشغيل ${canvasNum}`;
+    } else if (chapterNum === 2) {
+      return networkCanvasTitles[canvasNum - 1] || `محتوى الشبكات ${canvasNum}`;
+    }
+  }
+
   const canvasTitles = [
     "المقدمة والنظرة العامة",
     "المفاهيم الأساسية",
@@ -659,6 +686,26 @@ function getTextContent(
   chapterNum: number,
   textNum: number
 ): string {
+  // Specific content for أساسيات الحوسبة والأخلاقيات
+  if (subjectName === "أساسيات الحوسبة والأخلاقيات") {
+    const osContents = [
+      "نظام التشغيل هو البرنامج الأساسي الذي يدير موارد الحاسوب ويوفر واجهة بين المستخدم والعتاد. يقوم بإدارة العمليات، الذاكرة، أجهزة الإدخال والإخراج، ونظام الملفات. من أشهر نظم التشغيل: Windows، Linux، و macOS.",
+      "إدارة العمليات تتضمن إنشاء العمليات وإنهائها، جدولتها، والتزامن بينها. أما إدارة الذاكرة فتشمل تخصيص الذاكرة للعمليات، الذاكرة الافتراضية، والتبديل (Swapping). هذه المفاهيم أساسية لفهم كيفية عمل الحاسوب بكفاءة.",
+      "نظام الملفات ينظم طريقة تخزين البيانات واسترجاعها على وحدات التخزين. يتضمن مفاهيم مثل الملفات، المجلدات، الأذونات، والروابط. تختلف أنظمة الملفات مثل NTFS و ext4 في خصائصها وأدائها.",
+    ];
+    const networkContents = [
+      "الشبكات الحاسوبية تربط الأجهزة معاً لتبادل البيانات والموارد. تصنف حسب النطاق الجغرافي إلى شبكات محلية (LAN)، شبكات واسعة (WAN)، وشبكات المدن (MAN). الإنترنت هي أكبر شبكة عالمية تربط ملايين الأجهزة.",
+      "بروتوكولات الإنترنت هي قواعد تحكم نقل البيانات. نموذج TCP/IP يتكون من أربع طبقات: طبقة التطبيقات (HTTP, FTP)، طبقة النقل (TCP, UDP)، طبقة الإنترنت (IP)، وطبقة الوصول للشبكة. عناوين IP تحدد هوية كل جهاز على الشبكة.",
+      "أمن الشبكات يحمي البيانات من الوصول غير المصرح به. يشمل التشفير، جدران الحماية (Firewalls)، وبروتوكولات الأمان مثل HTTPS و SSL/TLS. الوعي بالتهديدات السيبرانية مثل التصيد والبرمجيات الخبيثة ضروري للحماية.",
+    ];
+
+    if (chapterNum === 1) {
+      return osContents[textNum - 1] || osContents[0];
+    } else if (chapterNum === 2) {
+      return networkContents[textNum - 1] || networkContents[0];
+    }
+  }
+
   const contents = [
     "في هذا القسم سنتعلم المفاهيم الأساسية بشكل مفصل. من المهم فهم هذه المبادئ جيداً قبل الانتقال للأمثلة العملية. سنغطي النقاط الرئيسية ونشرح كل منها بالتفصيل مع أمثلة توضيحية.",
     "تطبيقات عملية: سنستخدم ما تعلمناه في أمثلة واقعية لتعزيز الفهم وتطوير المهارات العملية. هذه الأمثلة مستوحاة من حالات حقيقية في سوق العمل وستساعدك على فهم كيفية تطبيق المفاهيم النظرية في الواقع.",
