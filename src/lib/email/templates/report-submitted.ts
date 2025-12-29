@@ -35,7 +35,7 @@ export function reportSubmittedTemplate(data: ReportNotificationData): string {
   const contentTypeArabic = getReportedContentTypeArabic(
     data.reportedContentType
   );
-  const reviewUrl = `${process.env.BETTER_AUTH_URL || ""}/subjects/${data.subjectId}/moderation`;
+  const reviewUrl = `${process.env.BETTER_AUTH_URL || ""}/moderation?subjectId=${data.subjectId}`;
 
   const infoItems = [
     { label: "المادة", value: data.subjectName },
