@@ -402,11 +402,8 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
       });
 
       if (res.status === 409) {
-        // Server-side guard: don't allow scheduled reviews when not due.
-        // Refresh the due list to keep the UI in sync.
         await fetchDueCards();
         await fetchStats();
-        alert("هذه البطاقة ليست مستحقة للمراجعة الآن");
         return;
       }
 
@@ -640,7 +637,7 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
                 {generating ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
-                    جارٍ الإنشاء...
+                    جاري الإنشاء...
                   </>
                 ) : (
                   <>
@@ -818,7 +815,7 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
                     {creating ? (
                       <>
                         <Loader2 className="ml-2 size-4 animate-spin" />
-                        جارٍ الإضافة...
+                        جاري الإضافة...
                       </>
                     ) : (
                       <>

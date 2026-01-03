@@ -134,7 +134,7 @@ export function ModeratorsManager({
                 onClick={handleAssign}
                 disabled={isPending || !selectedUser}
               >
-                {isPending ? "جارٍ التعيين..." : "تعيين"}
+                {isPending ? "جاري التعيين..." : "تعيين"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -228,7 +228,7 @@ export function ModeratorsManager({
               disabled={isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isPending ? "جارٍ الإزالة..." : "إزالة"}
+              {isPending ? "جاري الإزالة..." : "إزالة"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

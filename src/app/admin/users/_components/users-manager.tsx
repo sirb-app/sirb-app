@@ -792,7 +792,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
               onClick={handleBan}
               disabled={isPending || !banReason.trim()}
             >
-              {isPending ? "جارٍ الحظر..." : "حظر"}
+              {isPending ? "جاري الحظر..." : "حظر"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -819,7 +819,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
               }}
               disabled={isPending}
             >
-              {isPending ? "جارٍ الإلغاء..." : "إلغاء الحظر"}
+              {isPending ? "جاري الإلغاء..." : "إلغاء الحظر"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -847,7 +847,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
               disabled={isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isPending ? "جارٍ الحذف..." : "حذف"}
+              {isPending ? "جاري الحذف..." : "حذف"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -911,7 +911,7 @@ export function UsersManager({ users, total, currentPage }: UsersManagerProps) {
                 isPending || (newRole === "ADMIN" && !targetUser?.emailVerified)
               }
             >
-              {isPending ? "جارٍ التحديث..." : "تحديث"}
+              {isPending ? "جاري التحديث..." : "تحديث"}
             </Button>
           </DialogFooter>
         </DialogContent>

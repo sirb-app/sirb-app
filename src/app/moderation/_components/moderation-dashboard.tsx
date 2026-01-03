@@ -697,7 +697,7 @@ export default function ModerationDashboard({
               }`}
             >
               {isResolvingReport
-                ? "جارٍ المعالجة..."
+                ? "جاري المعالجة..."
                 : reportDialogState.resolution === "RESOLVED"
                   ? "تأكيد البلاغ"
                   : "رفض البلاغ"}

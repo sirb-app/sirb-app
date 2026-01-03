@@ -132,7 +132,7 @@ export function UserSearch({
         <div className="space-y-2">
           {isSearching ? (
             <p className="text-muted-foreground text-center text-sm">
-              جارٍ البحث...
+              جاري البحث...
             </p>
           ) : searchResults.length === 0 ? (
             <div className="text-center">
