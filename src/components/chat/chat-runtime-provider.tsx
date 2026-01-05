@@ -147,7 +147,10 @@ function createChatModelAdapter(
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({
+            content,
+            local_time: new Date().toLocaleString(),
+          }),
           signal: abortSignal,
         }
       );
