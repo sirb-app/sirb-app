@@ -1,23 +1,68 @@
 "use client";
 
 import { Thread } from "@/components/assistant-ui/thread";
-import { ChatRuntimeProvider } from "@/components/chat/chat-runtime-provider";
+import { ChatRuntimeProvider, useClearChat } from "@/components/chat/chat-runtime-provider";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { FileText, X } from "lucide-react";
+import { FileText, Trash2, X } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SessionData } from "./session-client";
 
 const SlideViewer = dynamic(
   () => import("./slide-viewer").then((mod) => mod.SlideViewer),
   { ssr: false }
 );
+
+// Import type from slide-viewer dynamically loaded module
+type SlideViewerHandle = {
+  navigateToPage: (resourceId: number, page: number) => void;
+};
+
+function ClearChatButton() {
+  const clearChat = useClearChat();
+  
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-2">
+          <Trash2 className="size-4" />
+          محادثة جديدة
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>مسح المحادثة؟</AlertDialogTitle>
+          <AlertDialogDescription>
+            سيتم حذف جميع الرسائل في هذه المحادثة. لا يمكن التراجع عن هذا الإجراء.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="gap-2 sm:gap-0">
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+          <AlertDialogAction onClick={clearChat}>
+            مسح
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 interface ChatPanelProps {
   session: SessionData;
@@ -27,11 +72,29 @@ interface ChatPanelProps {
 
 export function ChatPanel({ session, showSlides, setShowSlides }: ChatPanelProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [pendingNavigation, setPendingNavigation] = useState<{ resourceId: number; page: number } | null>(null);
 
   const chapterIds = useMemo(
     () => session.chapters.map((c) => c.id),
     [session.chapters]
   );
+
+  // Handle navigation events from source citations
+  const handleNavigateToSource = useCallback((event: CustomEvent<{ resourceId: number; page: number }>) => {
+    const { resourceId, page } = event.detail;
+    // Open slides panel if closed
+    if (!showSlides) {
+      setShowSlides(true);
+    }
+    // Set pending navigation - SlideViewer will process it when ready
+    setPendingNavigation({ resourceId, page });
+  }, [showSlides, setShowSlides]);
+
+  useEffect(() => {
+    const handler = handleNavigateToSource as EventListener;
+    window.addEventListener("navigate-to-source", handler);
+    return () => window.removeEventListener("navigate-to-source", handler);
+  }, [handleNavigateToSource]);
 
   return (
     <ChatRuntimeProvider
@@ -39,8 +102,9 @@ export function ChatPanel({ session, showSlides, setShowSlides }: ChatPanelProps
       chapterIds={chapterIds}
       studyPlanId={session.id}
     >
-      <div className="relative flex h-full flex-col overflow-hidden text-right">
-        <div className="flex items-center justify-end border-b px-4 py-2 shrink-0">
+      <div className="relative flex h-full flex-col overflow-hidden">
+        <div className="flex items-center justify-between border-b px-4 py-2 shrink-0">
+          <ClearChatButton />
           <Button
             variant={showSlides ? "secondary" : "outline"}
             size="sm"
@@ -75,7 +139,12 @@ export function ChatPanel({ session, showSlides, setShowSlides }: ChatPanelProps
                     maxSize={70}
                     className="bg-muted/30"
                   >
-                    <SlideViewer studyPlanId={session.id} chapters={session.chapters} />
+                    <SlideViewer
+                      studyPlanId={session.id}
+                      chapters={session.chapters}
+                      pendingNavigation={pendingNavigation}
+                      onNavigationProcessed={() => setPendingNavigation(null)}
+                    />
                   </ResizablePanel>
                 </>
               )}
@@ -98,7 +167,12 @@ export function ChatPanel({ session, showSlides, setShowSlides }: ChatPanelProps
                   </Button>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <SlideViewer studyPlanId={session.id} chapters={session.chapters} />
+                  <SlideViewer
+                    studyPlanId={session.id}
+                    chapters={session.chapters}
+                    pendingNavigation={pendingNavigation}
+                    onNavigationProcessed={() => setPendingNavigation(null)}
+                  />
                 </div>
               </div>
             </>

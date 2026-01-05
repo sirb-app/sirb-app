@@ -22,8 +22,6 @@ import {
 import type { FC } from "react";
 
 import {
-  ComposerAddAttachment,
-  ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
@@ -161,27 +159,24 @@ const Composer: FC = () => {
       className="aui-composer-root relative flex w-full flex-col"
       dir="rtl"
     >
-      <ComposerPrimitive.AttachmentDropzone className="aui-composer-attachment-dropzone border-input bg-background has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-ring/50 data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 dark:bg-background flex w-full flex-col rounded-3xl border px-1 pt-2 shadow-xs transition-[color,box-shadow] outline-none has-[textarea:focus-visible]:ring-[3px] data-[dragging=true]:border-dashed">
-        <ComposerAttachments />
+      <div className="border-input bg-background has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-ring/50 dark:bg-background flex w-full flex-col rounded-3xl border px-1 pt-2 shadow-xs transition-[color,box-shadow] outline-none has-[textarea:focus-visible]:ring-[3px]">
         <ComposerPrimitive.Input
           placeholder="اكتب رسالتك هنا..."
-          className="aui-composer-input placeholder:text-muted-foreground mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none focus-visible:ring-0"
-          dir="auto"
+          className="aui-composer-input placeholder:text-muted-foreground placeholder:text-right mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none focus-visible:ring-0"
+          dir="rtl"
           rows={1}
           autoFocus
           aria-label="حقل الرسالة"
         />
         <ComposerAction />
-      </ComposerPrimitive.AttachmentDropzone>
+      </div>
     </ComposerPrimitive.Root>
   );
 };
 
 const ComposerAction: FC = () => {
   return (
-    <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex flex-row-reverse items-center justify-between">
-      <ComposerAddAttachment />
-
+    <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex items-center justify-start">
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>
           <TooltipIconButton
@@ -232,7 +227,7 @@ const AssistantMessage: FC = () => {
       data-role="assistant"
     >
       <div
-        className="aui-assistant-message-content text-foreground mx-2 leading-7 wrap-break-word"
+        className="aui-assistant-message-content text-foreground mx-2 leading-7 wrap-break-word text-start"
         dir="auto"
       >
         <MessagePrimitive.Parts
@@ -251,6 +246,8 @@ const AssistantMessage: FC = () => {
     </MessagePrimitive.Root>
   );
 };
+
+
 
 const AssistantActionBar: FC = () => {
   return (

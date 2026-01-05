@@ -1,6 +1,5 @@
 "use client";
 
-import "@assistant-ui/react-markdown/styles/dot.css";
 import "katex/dist/katex.min.css";
 
 import {
@@ -9,7 +8,8 @@ import {
   unstable_memoizeMarkdownComponents as memoizeMarkdownComponents,
   useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { useAssistantState } from "@assistant-ui/react";
+import { CheckIcon, CopyIcon, FileText } from "lucide-react";
 import { type FC, memo, useCallback, useEffect, useRef, useState } from "react";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -21,10 +21,19 @@ import { cn } from "@/lib/utils";
 const MarkdownTextImpl = () => {
   return (
     <MarkdownTextPrimitive
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeKatex]}
+      remarkPlugins={[
+        remarkGfm, 
+        [remarkMath, { singleDollarTextMath: true }]
+      ]}
+      rehypePlugins={[
+        [rehypeKatex, { 
+          strict: 'ignore', // Don't throw or warn on parse errors
+          errorColor: 'currentColor' // Use text color instead of red for errors
+        }]
+      ]}
       className="aui-md"
       components={defaultComponents}
+      urlTransform={(url) => url}
     />
   );
 };
@@ -163,17 +172,50 @@ const defaultComponents = memoizeMarkdownComponents({
       {...props}
     />
   ),
-  a: ({ className, ...props }) => (
-    <a
-      target="_blank"
-      rel="noopener noreferrer"
-      className={cn(
-        "aui-md-a text-primary font-medium underline underline-offset-4",
-        className
-      )}
-      {...props}
-    />
-  ),
+  a: ({ className, children, ...props }) => {
+    const message = useAssistantState(({ message }) => message);
+    const href = props.href;
+    
+    // Handle source citations
+    if (href?.startsWith("source:")) {
+      const index = parseInt(href.split(":")[1] || "0", 10) - 1;
+      const sources = (message.metadata?.custom as { sources?: { resource_id: number; page_start: number }[] })?.sources;
+      const source = sources?.[index];
+
+      if (source) {
+        return (
+          <sup
+            className="aui-source-citation cursor-pointer text-primary hover:text-primary/70 mx-0.5 select-none inline-flex items-center"
+            title={`ص. ${source.page_start}`}
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("navigate-to-source", {
+                  detail: { resourceId: source.resource_id, page: source.page_start },
+                })
+              );
+            }}
+          >
+            <FileText className="size-3" />
+          </sup>
+        );
+      }
+      
+      // Source not found - render as plain text to avoid broken link
+      return <span className="text-muted-foreground">{children}</span>;
+    }
+
+    return (
+      <a
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "aui-md-a text-primary font-medium underline underline-offset-4",
+          className
+        )}
+        {...props}
+      />
+    );
+  },
   blockquote: ({ className, ...props }) => (
     <blockquote
       dir="auto"

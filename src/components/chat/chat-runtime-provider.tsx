@@ -9,15 +9,19 @@ import {
   type ThreadHistoryAdapter,
 } from "@assistant-ui/react";
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import type { Message, Thread } from "@/lib/chat-api";
+import type { ChunkInfo, Message, Thread } from "@/lib/chat-api";
 import { parseSSEStream } from "@/lib/chat-api";
+
+// Re-export for use in UI components
+export type { ChunkInfo };
 
 interface ChatContextValue {
   subjectId: number;
   chapterIds?: number[];
   studyPlanId?: string;
+  clearChat: () => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -28,6 +32,11 @@ export function useChatContext() {
     throw new Error("useChatContext must be used within ChatRuntimeProvider");
   }
   return ctx;
+}
+
+export function useClearChat() {
+  const { clearChat } = useChatContext();
+  return clearChat;
 }
 
 function convertMessagesToRepository(
@@ -119,15 +128,10 @@ async function getOrCreateThread(
 }
 
 function createChatModelAdapter(
-  getThreadId: () => string | null
+  threadId: string
 ): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal }): AsyncGenerator<ChatModelRunResult> {
-      const threadId = getThreadId();
-      if (!threadId) {
-        throw new Error("Thread not initialized");
-      }
-
       const lastMessage = messages[messages.length - 1];
       if (!lastMessage || lastMessage.role !== "user") {
         throw new Error("Expected user message");
@@ -158,14 +162,23 @@ function createChatModelAdapter(
       }
 
       let fullText = "";
+      let sources: ChunkInfo[] = [];
 
       for await (const event of parseSSEStream(response)) {
-        if (event.type === "delta") {
+        if (event.type === "chunks") {
+          sources = event.data as ChunkInfo[];
+        } else if (event.type === "delta") {
           const delta = (event.data as { content: string }).content;
           fullText += delta;
-          yield { content: [{ type: "text", text: fullText }] };
+          yield { 
+            content: [{ type: "text", text: fullText }],
+            metadata: { custom: { sources } },
+          };
         } else if (event.type === "done") {
-          yield { content: [{ type: "text", text: fullText }] };
+          yield { 
+            content: [{ type: "text", text: fullText }],
+            metadata: { custom: { sources } },
+          };
         }
       }
     },
@@ -179,6 +192,40 @@ interface ChatRuntimeProviderProps {
   studyPlanId?: string;
 }
 
+// Inner component that uses hooks - only rendered after loading
+function ChatRuntimeInner({
+  children,
+  threadId,
+  initialMessages,
+}: {
+  children: ReactNode;
+  threadId: string;
+  initialMessages: ExportedMessageRepository;
+}) {
+  const adapter = useMemo(
+    () => createChatModelAdapter(threadId),
+    [threadId]
+  );
+
+  const history = useMemo<ThreadHistoryAdapter>(
+    () => ({
+      async load(): Promise<ExportedMessageRepository> {
+        return initialMessages;
+      },
+      async append() {},
+    }),
+    [initialMessages]
+  );
+
+  const runtime = useLocalRuntime(adapter, { adapters: { history } });
+
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      {children}
+    </AssistantRuntimeProvider>
+  );
+}
+
 export function ChatRuntimeProvider({
   children,
   subjectId,
@@ -187,19 +234,35 @@ export function ChatRuntimeProvider({
 }: ChatRuntimeProviderProps) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [initialMessages, setInitialMessages] = useState<
-    ExportedMessageRepository | undefined
-  >(undefined);
+    ExportedMessageRepository | null
+  >(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const contextValue = useMemo(
-    () => ({ subjectId, chapterIds, studyPlanId }),
-    [subjectId, chapterIds, studyPlanId]
-  );
+  const [version, setVersion] = useState(0); // Used to force remount after clear
 
   const chapterIdsKey = chapterIds ? JSON.stringify(chapterIds) : undefined;
 
-  // Initialize thread on mount
+  // Clear chat function - deletes thread and forces remount
+  const clearChat = useCallback(async () => {
+    if (threadId) {
+      try {
+        await fetch(`/api/chat/threads/${threadId}`, { method: "DELETE" });
+      } catch (e) {
+        console.error("Failed to delete thread:", e);
+      }
+    }
+    // Reset state and increment version to force new thread creation
+    setThreadId(null);
+    setInitialMessages(null);
+    setVersion((v) => v + 1);
+  }, [threadId]);
+
+  const contextValue = useMemo(
+    () => ({ subjectId, chapterIds, studyPlanId, clearChat }),
+    [subjectId, chapterIds, studyPlanId, clearChat]
+  );
+
+  // Initialize thread on mount or after clear
   useEffect(() => {
     let cancelled = false;
 
@@ -219,6 +282,11 @@ export function ChatRuntimeProvider({
           if (!cancelled) {
             setInitialMessages(convertMessagesToRepository(data.messages));
           }
+        } else {
+          // No messages yet - set empty
+          if (!cancelled) {
+            setInitialMessages({ messages: [] });
+          }
         }
       } catch (e) {
         if (!cancelled) {
@@ -236,26 +304,9 @@ export function ChatRuntimeProvider({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjectId, chapterIdsKey, studyPlanId]);
+  }, [subjectId, chapterIdsKey, studyPlanId, version]);
 
-  const adapter = useMemo(
-    () => createChatModelAdapter(() => threadId),
-    [threadId]
-  );
-
-  const history = useMemo<ThreadHistoryAdapter>(
-    () => ({
-      async load(): Promise<ExportedMessageRepository> {
-        return initialMessages ?? { messages: [] };
-      },
-      async append() {},
-    }),
-    [initialMessages]
-  );
-
-  const runtime = useLocalRuntime(adapter, { adapters: { history } });
-
-  if (isLoading) {
+  if (isLoading || !threadId || !initialMessages) {
     return (
       <ChatContext.Provider value={contextValue}>
         <div className="flex h-full items-center justify-center">
@@ -277,9 +328,12 @@ export function ChatRuntimeProvider({
 
   return (
     <ChatContext.Provider value={contextValue}>
-      <AssistantRuntimeProvider runtime={runtime}>
+      <ChatRuntimeInner
+        threadId={threadId}
+        initialMessages={initialMessages}
+      >
         {children}
-      </AssistantRuntimeProvider>
+      </ChatRuntimeInner>
     </ChatContext.Provider>
   );
 }

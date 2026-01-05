@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { PDFViewer, ZoomMode } from "@embedpdf/react-pdf-viewer";
+import { PDFViewer, PDFViewerRef, PluginRegistry, ZoomMode } from "@embedpdf/react-pdf-viewer";
 import { Check, ChevronDown, FileText, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,13 +33,24 @@ interface Chapter {
 interface SlideViewerProps {
   studyPlanId: string;
   chapters: Chapter[];
+  pendingNavigation?: { resourceId: number; page: number } | null;
+  onNavigationProcessed?: () => void;
 }
 
-export function SlideViewer({ studyPlanId, chapters }: SlideViewerProps) {
+export function SlideViewer({ studyPlanId, chapters, pendingNavigation, onNavigationProcessed }: SlideViewerProps) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [targetPage, setTargetPage] = useState<number | null>(null);
+  const targetPageRef = useRef<number | null>(null);
+  const pdfViewerRef = useRef<PDFViewerRef>(null);
+  const registryRef = useRef<PluginRegistry | null>(null);
+
+  const updateTargetPage = (page: number | null) => {
+    setTargetPage(page);
+    targetPageRef.current = page;
+  };
 
   useEffect(() => {
     async function fetchResources() {
@@ -81,6 +92,38 @@ export function SlideViewer({ studyPlanId, chapters }: SlideViewerProps) {
     () => selectedResource ? getChapterLabel(selectedResource.chapter_id) : null,
     [selectedResource, getChapterLabel]
   );
+
+  // Process pending navigation from prop when resources become available
+  useEffect(() => {
+    if (pendingNavigation && resources.length > 0) {
+      const resource = resources.find((r) => r.id === pendingNavigation.resourceId);
+      if (resource) {
+        if (selectedResource?.id !== resource.id) {
+          registryRef.current = null;
+        }
+        setSelectedResource(resource);
+        updateTargetPage(pendingNavigation.page);
+      }
+      onNavigationProcessed?.();
+    }
+  }, [pendingNavigation, resources, selectedResource, onNavigationProcessed]);
+
+  // Navigate to targetPage when set and registry is ready
+  useEffect(() => {
+    if (targetPage !== null && registryRef.current) {
+      try {
+        // Get the scroll plugin via capability provider
+        const scrollPlugin = registryRef.current.getCapabilityProvider('scroll');
+        if (scrollPlugin && 'scrollToPage' in scrollPlugin) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (scrollPlugin as any).scrollToPage({ pageNumber: targetPage });
+        }
+      } catch (e) {
+        console.warn('Could not scroll to page:', e);
+      }
+      setTargetPage(null);
+    }
+  }, [targetPage]);
 
   if (loading) {
     return (
@@ -194,6 +237,25 @@ export function SlideViewer({ studyPlanId, chapters }: SlideViewerProps) {
             disabledCategories: ["document-open"],
           }}
           style={{ width: "100%", height: "100%" }}
+          ref={pdfViewerRef}
+          onReady={(registry) => {
+            registryRef.current = registry;
+            // If targetPage is already set (via ref to avoid stale closure), navigate now
+            if (targetPageRef.current !== null) {
+              setTimeout(() => {
+                try {
+                  const scrollPlugin = registry.getCapabilityProvider('scroll');
+                  if (scrollPlugin && 'scrollToPage' in scrollPlugin) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (scrollPlugin as any).scrollToPage({ pageNumber: targetPageRef.current });
+                    updateTargetPage(null);
+                  }
+                } catch (e) {
+                  console.warn('Could not scroll to page on ready:', e);
+                }
+              }, 500); // Wait for document to render
+            }
+          }}
         />
       </div>
     </div>
