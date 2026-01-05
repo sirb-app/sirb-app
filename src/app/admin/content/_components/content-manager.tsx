@@ -796,7 +796,7 @@ export function ContentManager({
               إلغاء
             </Button>
             <Button type="button" onClick={handleApprove} disabled={isPending}>
-              {isPending ? "جارٍ الموافقة..." : "موافقة"}
+              {isPending ? "جاري الموافقة..." : "موافقة"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -874,7 +874,7 @@ export function ContentManager({
               onClick={handleReject}
               disabled={isPending || !rejectionReason.trim()}
             >
-              {isPending ? "جارٍ الرفض..." : "رفض"}
+              {isPending ? "جاري الرفض..." : "رفض"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -909,7 +909,7 @@ export function ContentManager({
               disabled={isPending}
               className={cn("bg-destructive hover:bg-destructive/90")}
             >
-              {isPending ? "جارٍ الحذف..." : "حذف"}
+              {isPending ? "جاري الحذف..." : "حذف"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -20,6 +20,7 @@ export interface ChunkInfo {
   chunk_id: string;
   content: string;
   score: number;
+  resource_id: number;
   page_start: number;
   page_end: number;
 }

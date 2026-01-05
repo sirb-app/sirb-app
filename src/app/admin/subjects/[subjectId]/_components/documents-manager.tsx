@@ -609,7 +609,7 @@ export function DocumentsManager({
               {uploadProgress !== null && (
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span>جارٍ الرفع...</span>
+                    <span>جاري الرفع...</span>
                     <span>{uploadProgress}%</span>
                   </div>
                   <div className="bg-muted h-2 overflow-hidden rounded-full">
@@ -633,7 +633,7 @@ export function DocumentsManager({
                   type="submit"
                   disabled={isPending || uploadProgress !== null}
                 >
-                  {uploadProgress !== null ? "جارٍ الرفع..." : "رفع"}
+                  {uploadProgress !== null ? "جاري الرفع..." : "رفع"}
                 </Button>
               </DialogFooter>
             </form>
@@ -844,7 +844,7 @@ export function DocumentsManager({
               disabled={isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isPending ? "جارٍ الحذف..." : "حذف"}
+              {isPending ? "جاري الحذف..." : "حذف"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

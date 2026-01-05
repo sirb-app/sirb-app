@@ -2,28 +2,26 @@
 
 import {
   AssistantRuntimeProvider,
-  RuntimeAdapterProvider,
-  useAssistantApi,
-  useAssistantState,
   useLocalRuntime,
-  unstable_useRemoteThreadListRuntime as useRemoteThreadListRuntime,
   type ChatModelAdapter,
   type ChatModelRunResult,
   type ExportedMessageRepository,
-  type unstable_RemoteThreadListAdapter as RemoteThreadListAdapter,
   type ThreadHistoryAdapter,
 } from "@assistant-ui/react";
-import { createAssistantStream } from "assistant-stream";
 import type { ReactNode } from "react";
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import type { Message, Thread } from "@/lib/chat-api";
+import type { ChunkInfo, Message, Thread } from "@/lib/chat-api";
 import { parseSSEStream } from "@/lib/chat-api";
+
+// Re-export for use in UI components
+export type { ChunkInfo };
 
 interface ChatContextValue {
   subjectId: number;
   chapterIds?: number[];
   studyPlanId?: string;
+  clearChat: () => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -36,55 +34,9 @@ export function useChatContext() {
   return ctx;
 }
 
-function createChatModelAdapter(
-  getThreadId: () => Promise<string>
-): ChatModelAdapter {
-  return {
-    async *run({ messages, abortSignal }): AsyncGenerator<ChatModelRunResult> {
-      const threadId = await getThreadId();
-
-      const lastMessage = messages[messages.length - 1];
-      if (!lastMessage || lastMessage.role !== "user") {
-        throw new Error("Expected user message");
-      }
-
-      const content = lastMessage.content
-        .filter(c => c.type === "text")
-        .map(c => c.text)
-        .join("\n");
-
-      const response = await fetch(
-        `/api/chat/threads/${threadId}/messages/stream`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ content }),
-          signal: abortSignal,
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
-        throw new Error(error.error || `HTTP ${response.status}`);
-      }
-
-      let fullText = "";
-
-      for await (const event of parseSSEStream(response)) {
-        if (event.type === "delta") {
-          const delta = (event.data as { content: string }).content;
-          fullText += delta;
-          yield { content: [{ type: "text", text: fullText }] };
-        } else if (event.type === "done") {
-          yield { content: [{ type: "text", text: fullText }] };
-        }
-      }
-    },
-  };
+export function useClearChat() {
+  const { clearChat } = useChatContext();
+  return clearChat;
 }
 
 function convertMessagesToRepository(
@@ -95,7 +47,7 @@ function convertMessagesToRepository(
   }
 
   let parentId: string | null = null;
-  const repoMessages = messages.map(m => {
+  const repoMessages = messages.map((m) => {
     const baseContent = [{ type: "text" as const, text: m.content }];
 
     let message;
@@ -139,184 +91,94 @@ function convertMessagesToRepository(
   };
 }
 
-function createThreadListAdapter(
+async function getOrCreateThread(
   subjectId: number,
   chapterIds?: number[],
   studyPlanId?: string
-): RemoteThreadListAdapter {
+): Promise<Thread> {
+  if (studyPlanId) {
+    const listRes = await fetch(
+      `/api/chat/threads?subject_id=${subjectId}&study_plan_id=${studyPlanId}&include_archived=false`
+    );
+    if (listRes.ok) {
+      const threads: Thread[] = await listRes.json();
+      if (threads.length > 0) {
+        return threads[0];
+      }
+    }
+  }
+
+  const response = await fetch("/api/chat/threads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subject_id: subjectId,
+      chapter_ids: chapterIds,
+      study_plan_id: studyPlanId,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to create thread");
+  }
+
+  return await response.json();
+}
+
+function createChatModelAdapter(
+  threadId: string
+): ChatModelAdapter {
   return {
-    async list() {
-      const params = new URLSearchParams();
-      params.set("subject_id", String(subjectId));
-      params.set("include_archived", "false");
-      if (studyPlanId) {
-        params.set("study_plan_id", studyPlanId);
+    async *run({ messages, abortSignal }): AsyncGenerator<ChatModelRunResult> {
+      const lastMessage = messages[messages.length - 1];
+      if (!lastMessage || lastMessage.role !== "user") {
+        throw new Error("Expected user message");
       }
 
-      const response = await fetch(`/api/chat/threads?${params}`);
-      if (!response.ok) {
-        throw new Error("Failed to list threads");
-      }
+      const content = lastMessage.content
+        .filter((c) => c.type === "text")
+        .map((c) => c.text)
+        .join("\n");
 
-      const threads: Thread[] = await response.json();
-
-      return {
-        threads: threads.map(t => ({
-          status: t.is_archived ? ("archived" as const) : ("regular" as const),
-          remoteId: t.id,
-          title: t.title || undefined,
-        })),
-      };
-    },
-
-    async initialize(_threadId: string) {
-      void _threadId;
-      const response = await fetch("/api/chat/threads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject_id: subjectId,
-          chapter_ids: chapterIds,
-          study_plan_id: studyPlanId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create thread");
-      }
-
-      const thread: Thread = await response.json();
-      return {
-        remoteId: thread.id,
-        externalId: thread.id,
-      };
-    },
-
-    async fetch(threadId: string) {
-      const response = await fetch(`/api/chat/threads/${threadId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch thread");
-      }
-
-      const data: { thread: Thread } = await response.json();
-      return {
-        status: data.thread.is_archived
-          ? ("archived" as const)
-          : ("regular" as const),
-        remoteId: data.thread.id,
-        externalId: data.thread.id,
-        title: data.thread.title || undefined,
-      };
-    },
-
-    async rename(remoteId: string, newTitle: string) {
-      const response = await fetch(`/api/chat/threads/${remoteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to rename thread");
-      }
-    },
-
-    async archive(remoteId: string) {
-      const response = await fetch(`/api/chat/threads/${remoteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_archived: true }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to archive thread");
-      }
-    },
-
-    async unarchive(remoteId: string) {
-      const response = await fetch(`/api/chat/threads/${remoteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_archived: false }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to unarchive thread");
-      }
-    },
-
-    async delete(remoteId: string) {
-      const response = await fetch(`/api/chat/threads/${remoteId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete thread");
-      }
-    },
-
-    async generateTitle(remoteId: string, messages) {
-      const firstUserMessage = messages.find(m => m.role === "user");
-      const title = firstUserMessage
-        ? firstUserMessage.content
-            .filter(c => c.type === "text")
-            .map(c => c.text)
-            .join(" ")
-            .slice(0, 50)
-        : "محادثة جديدة";
-
-      const response = await fetch(`/api/chat/threads/${remoteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update thread title");
-      }
-
-      return createAssistantStream(controller => {
-        controller.appendText(title);
-        controller.close();
-      });
-    },
-
-    unstable_Provider: function UnstableProvider({
-      children,
-    }: {
-      children?: ReactNode;
-    }) {
-      const remoteId = useAssistantState(
-        ({ threadListItem }) => threadListItem?.remoteId ?? null
-      );
-
-      const history = useMemo<ThreadHistoryAdapter>(
-        () => ({
-          async load(): Promise<ExportedMessageRepository> {
-            if (!remoteId) return { messages: [] };
-
-            const response = await fetch(`/api/chat/threads/${remoteId}`);
-            if (!response.ok) {
-              return { messages: [] };
-            }
-
-            const data: { thread: Thread; messages: Message[] } =
-              await response.json();
-            return convertMessagesToRepository(data.messages);
+      const response = await fetch(
+        `/api/chat/threads/${threadId}/messages/stream`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-
-          async append() {},
-        }),
-        [remoteId]
+          body: JSON.stringify({ content }),
+          signal: abortSignal,
+        }
       );
 
-      const adapters = useMemo(() => ({ history }), [history]);
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
 
-      return (
-        <RuntimeAdapterProvider adapters={adapters}>
-          {children}
-        </RuntimeAdapterProvider>
-      );
+      let fullText = "";
+      let sources: ChunkInfo[] = [];
+
+      for await (const event of parseSSEStream(response)) {
+        if (event.type === "chunks") {
+          sources = event.data as ChunkInfo[];
+        } else if (event.type === "delta") {
+          const delta = (event.data as { content: string }).content;
+          fullText += delta;
+          yield { 
+            content: [{ type: "text", text: fullText }],
+            metadata: { custom: { sources } },
+          };
+        } else if (event.type === "done") {
+          yield { 
+            content: [{ type: "text", text: fullText }],
+            metadata: { custom: { sources } },
+          };
+        }
+      }
     },
   };
 }
@@ -328,46 +190,143 @@ interface ChatRuntimeProviderProps {
   studyPlanId?: string;
 }
 
+// Inner component that uses hooks - only rendered after loading
+function ChatRuntimeInner({
+  children,
+  threadId,
+  initialMessages,
+}: {
+  children: ReactNode;
+  threadId: string;
+  initialMessages: ExportedMessageRepository;
+}) {
+  const adapter = useMemo(
+    () => createChatModelAdapter(threadId),
+    [threadId]
+  );
+
+  const history = useMemo<ThreadHistoryAdapter>(
+    () => ({
+      async load(): Promise<ExportedMessageRepository> {
+        return initialMessages;
+      },
+      async append() {},
+    }),
+    [initialMessages]
+  );
+
+  const runtime = useLocalRuntime(adapter, { adapters: { history } });
+
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      {children}
+    </AssistantRuntimeProvider>
+  );
+}
+
 export function ChatRuntimeProvider({
   children,
   subjectId,
   chapterIds,
   studyPlanId,
 }: ChatRuntimeProviderProps) {
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [initialMessages, setInitialMessages] = useState<
+    ExportedMessageRepository | null
+  >(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0); // Used to force remount after clear
+
+  const chapterIdsKey = chapterIds ? JSON.stringify(chapterIds) : undefined;
+
+  const clearChat = useCallback(async () => {
+    if (threadId) {
+      try {
+        await fetch(`/api/chat/threads/${threadId}`, { method: "DELETE" });
+      } catch (e) {
+        console.error("Failed to delete thread:", e);
+      }
+    }
+    setThreadId(null);
+    setInitialMessages(null);
+    setVersion((v) => v + 1);
+  }, [threadId]);
+
   const contextValue = useMemo(
-    () => ({ subjectId, chapterIds, studyPlanId }),
-    [subjectId, chapterIds, studyPlanId]
+    () => ({ subjectId, chapterIds, studyPlanId, clearChat }),
+    [subjectId, chapterIds, studyPlanId, clearChat]
   );
 
-  const threadListAdapter = useMemo(
-    () => createThreadListAdapter(subjectId, chapterIds, studyPlanId),
-    [subjectId, chapterIds, studyPlanId]
-  );
+  useEffect(() => {
+    let cancelled = false;
 
-  const runtime = useRemoteThreadListRuntime({
-    runtimeHook: () => {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const api = useAssistantApi();
+    async function init() {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const [adapter] = useState(() =>
-        createChatModelAdapter(async () => {
-          const { remoteId } = await api.threadListItem().initialize();
-          return remoteId;
-        })
-      );
+        const thread = await getOrCreateThread(subjectId, chapterIds, studyPlanId);
+        if (cancelled) return;
+        setThreadId(thread.id);
 
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      return useLocalRuntime(adapter);
-    },
-    adapter: threadListAdapter,
-  });
+        const res = await fetch(`/api/chat/threads/${thread.id}`);
+        if (res.ok) {
+          const data: { thread: Thread; messages: Message[] } = await res.json();
+          if (!cancelled) {
+            setInitialMessages(convertMessagesToRepository(data.messages));
+          }
+        } else {
+          if (!cancelled) {
+            setInitialMessages({ messages: [] });
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to initialize chat");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    init();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectId, chapterIdsKey, studyPlanId, version]);
+
+  if (isLoading || !threadId || !initialMessages) {
+    return (
+      <ChatContext.Provider value={contextValue}>
+        <div className="flex h-full items-center justify-center">
+          <div className="text-muted-foreground text-sm">جاري التحميل...</div>
+        </div>
+      </ChatContext.Provider>
+    );
+  }
+
+  if (error) {
+    return (
+      <ChatContext.Provider value={contextValue}>
+        <div className="flex h-full items-center justify-center">
+          <div className="text-destructive text-sm">{error}</div>
+        </div>
+      </ChatContext.Provider>
+    );
+  }
 
   return (
     <ChatContext.Provider value={contextValue}>
-      <AssistantRuntimeProvider runtime={runtime}>
+      <ChatRuntimeInner
+        threadId={threadId}
+        initialMessages={initialMessages}
+      >
         {children}
-      </AssistantRuntimeProvider>
+      </ChatRuntimeInner>
     </ChatContext.Provider>
   );
 }

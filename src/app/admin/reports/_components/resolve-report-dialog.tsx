@@ -202,7 +202,7 @@ export default function ResolveReportDialog({
             disabled={isLoading}
             className="w-full bg-green-600 hover:bg-green-700 sm:w-auto"
           >
-            {isLoading ? "جارٍ الحل..." : "حل البلاغ"}
+            {isLoading ? "جاري الحل..." : "حل البلاغ"}
           </Button>
         </DialogFooter>
       </DialogContent>

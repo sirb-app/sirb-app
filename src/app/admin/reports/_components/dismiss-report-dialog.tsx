@@ -101,7 +101,7 @@ export default function DismissReportDialog({
             disabled={isLoading}
             className="w-full sm:w-auto"
           >
-            {isLoading ? "جارٍ التجاهل..." : "تجاهل البلاغ"}
+            {isLoading ? "جاري التجاهل..." : "تجاهل البلاغ"}
           </Button>
         </DialogFooter>
       </DialogContent>
