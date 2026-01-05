@@ -132,7 +132,7 @@ export function SubjectHeaderActions({
               إلغاء
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "جارٍ الحفظ..." : "حفظ"}
+              {isPending ? "جاري الحفظ..." : "حفظ"}
             </Button>
           </DialogFooter>
         </form>

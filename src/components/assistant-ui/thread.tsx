@@ -22,8 +22,6 @@ import {
 import type { FC } from "react";
 
 import {
-  ComposerAddAttachment,
-  ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
@@ -33,7 +31,11 @@ import { Button } from "@/components/ui/button";
 
 import { cn } from "@/lib/utils";
 
-export const Thread: FC = () => {
+interface ThreadProps {
+  hideSuggestions?: boolean;
+}
+
+export const Thread: FC<ThreadProps> = ({ hideSuggestions = false }) => {
   return (
     <ThreadPrimitive.Root
       className="aui-root aui-thread-root bg-background @container flex h-full flex-col"
@@ -43,7 +45,7 @@ export const Thread: FC = () => {
     >
       <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4">
         <ThreadPrimitive.Empty>
-          <ThreadWelcome />
+          <ThreadWelcome hideSuggestions={hideSuggestions} />
         </ThreadPrimitive.Empty>
 
         <ThreadPrimitive.Messages
@@ -77,7 +79,11 @@ const ThreadScrollToBottom: FC = () => {
   );
 };
 
-const ThreadWelcome: FC = () => {
+interface ThreadWelcomeProps {
+  hideSuggestions?: boolean;
+}
+
+const ThreadWelcome: FC<ThreadWelcomeProps> = ({ hideSuggestions }) => {
   return (
     <div
       className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col"
@@ -93,7 +99,7 @@ const ThreadWelcome: FC = () => {
           </div>
         </div>
       </div>
-      <ThreadSuggestions />
+      {!hideSuggestions && <ThreadSuggestions />}
     </div>
   );
 };
@@ -106,24 +112,24 @@ const ThreadSuggestions: FC = () => {
     >
       {[
         {
-          title: "اشرح لي مفهوم",
-          label: "بطريقة مبسطة",
-          action: "اشرح لي هذا المفهوم بطريقة مبسطة مع أمثلة",
+          title: "ما هو",
+          label: "تعريف أو مفهوم",
+          action: "ما هو ",
         },
         {
-          title: "ساعدني في حل",
-          label: "مسألة أو تمرين",
-          action: "ساعدني في حل هذه المسألة خطوة بخطوة",
+          title: "كيف",
+          label: "أحل أو أفهم",
+          action: "كيف ",
         },
         {
-          title: "لخص لي الدرس",
-          label: "بالنقاط الرئيسية",
-          action: "لخص لي هذا الدرس بالنقاط الرئيسية",
+          title: "ما الفرق بين",
+          label: "مقارنة",
+          action: "ما الفرق بين ",
         },
         {
-          title: "أعطني أسئلة",
-          label: "للمراجعة والتدريب",
-          action: "أعطني أسئلة للمراجعة والتدريب على هذا الموضوع",
+          title: "أعطني مثال على",
+          label: "تطبيق عملي",
+          action: "أعطني مثال على ",
         },
       ].map((suggestedAction, index) => (
         <div
@@ -133,7 +139,6 @@ const ThreadSuggestions: FC = () => {
         >
           <ThreadPrimitive.Suggestion
             prompt={suggestedAction.action}
-            send
             asChild
           >
             <Button
@@ -161,27 +166,24 @@ const Composer: FC = () => {
       className="aui-composer-root relative flex w-full flex-col"
       dir="rtl"
     >
-      <ComposerPrimitive.AttachmentDropzone className="aui-composer-attachment-dropzone border-input bg-background has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-ring/50 data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 dark:bg-background flex w-full flex-col rounded-3xl border px-1 pt-2 shadow-xs transition-[color,box-shadow] outline-none has-[textarea:focus-visible]:ring-[3px] data-[dragging=true]:border-dashed">
-        <ComposerAttachments />
+      <div className="border-input bg-background has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-ring/50 dark:bg-background flex w-full flex-col rounded-3xl border px-1 pt-2 shadow-xs transition-[color,box-shadow] outline-none has-[textarea:focus-visible]:ring-[3px]">
         <ComposerPrimitive.Input
           placeholder="اكتب رسالتك هنا..."
-          className="aui-composer-input placeholder:text-muted-foreground mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none focus-visible:ring-0"
-          dir="auto"
+          className="aui-composer-input placeholder:text-muted-foreground placeholder:text-right mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none focus-visible:ring-0"
+          dir="rtl"
           rows={1}
           autoFocus
           aria-label="حقل الرسالة"
         />
         <ComposerAction />
-      </ComposerPrimitive.AttachmentDropzone>
+      </div>
     </ComposerPrimitive.Root>
   );
 };
 
 const ComposerAction: FC = () => {
   return (
-    <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex flex-row-reverse items-center justify-between">
-      <ComposerAddAttachment />
-
+    <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex items-center justify-start">
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>
           <TooltipIconButton
@@ -232,7 +234,7 @@ const AssistantMessage: FC = () => {
       data-role="assistant"
     >
       <div
-        className="aui-assistant-message-content text-foreground mx-2 leading-7 wrap-break-word"
+        className="aui-assistant-message-content text-foreground mx-2 leading-7 wrap-break-word text-start"
         dir="auto"
       >
         <MessagePrimitive.Parts
@@ -251,6 +253,8 @@ const AssistantMessage: FC = () => {
     </MessagePrimitive.Root>
   );
 };
+
+
 
 const AssistantActionBar: FC = () => {
   return (

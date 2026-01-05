@@ -184,7 +184,7 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
                   إلغاء
                 </Button>
                 <Button type="submit" disabled={isPending}>
-                  {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                  {isPending ? "جاري الحفظ..." : "حفظ"}
                 </Button>
               </DialogFooter>
             </form>
@@ -345,7 +345,7 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
                 إلغاء
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                {isPending ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </DialogFooter>
           </form>
@@ -382,7 +382,7 @@ export function ChaptersManager({ subjectId, chapters }: ChaptersManagerProps) {
               onClick={handleDelete}
               disabled={isPending}
             >
-              {isPending ? "جارٍ الحذف..." : "حذف"}
+              {isPending ? "جاري الحذف..." : "حذف"}
             </Button>
           </DialogFooter>
         </DialogContent>

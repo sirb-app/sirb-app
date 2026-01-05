@@ -789,7 +789,7 @@ export default function UniversitiesManager({
                       إلغاء
                     </Button>
                     <Button type="submit" disabled={isPending}>
-                      {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                      {isPending ? "جاري الحفظ..." : "حفظ"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -908,7 +908,7 @@ export default function UniversitiesManager({
                 إلغاء
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                {isPending ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </DialogFooter>
           </form>
@@ -939,7 +939,7 @@ export default function UniversitiesManager({
               disabled={isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isPending ? "جارٍ الحذف..." : "حذف"}
+              {isPending ? "جاري الحذف..." : "حذف"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -989,7 +989,7 @@ export default function UniversitiesManager({
                 إلغاء
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                {isPending ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </DialogFooter>
           </form>
@@ -1042,7 +1042,7 @@ export default function UniversitiesManager({
                 إلغاء
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                {isPending ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </DialogFooter>
           </form>
@@ -1075,7 +1075,7 @@ export default function UniversitiesManager({
               disabled={isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isPending ? "جارٍ الحذف..." : "حذف"}
+              {isPending ? "جاري الحذف..." : "حذف"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1149,7 +1149,7 @@ export default function UniversitiesManager({
                 إلغاء
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                {isPending ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </DialogFooter>
           </form>
@@ -1227,7 +1227,7 @@ export default function UniversitiesManager({
                 إلغاء
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "جارٍ الحفظ..." : "حفظ"}
+                {isPending ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </DialogFooter>
           </form>
@@ -1260,7 +1260,7 @@ export default function UniversitiesManager({
               disabled={isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isPending ? "جارٍ الحذف..." : "حذف"}
+              {isPending ? "جاري الحذف..." : "حذف"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

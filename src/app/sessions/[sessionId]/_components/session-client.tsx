@@ -44,13 +44,14 @@ interface SessionClientProps {
 
 export function SessionClient({ session }: SessionClientProps) {
   const [view, setView] = useState<"chat" | "quiz" | "flashcards">("chat");
+  const [showSlides, setShowSlides] = useState(false);
 
   return (
-    <div className="flex h-screen flex-col" dir="rtl">
+    <div className="flex h-dvh flex-col overflow-hidden" dir="rtl">
       <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
         <div className="container mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" asChild>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Button variant="ghost" size="icon" asChild className="shrink-0">
               <Link
                 href={`/subjects/${session.subject.id}`}
                 aria-label="العودة إلى المادة"
@@ -58,18 +59,18 @@ export function SessionClient({ session }: SessionClientProps) {
                 <ArrowRight className="size-5" />
               </Link>
             </Button>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold">{session.title}</h1>
-                <Badge variant="secondary" className="text-xs">
+                <h1 className="truncate text-base font-semibold">{session.title}</h1>
+                <Badge variant="secondary" className="shrink-0 text-xs">
                   {session.subject.code}
                 </Badge>
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground truncate text-xs">
                 {session.subject.name}
               </p>
               {session.chapters.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
+                <div className="mt-1 hidden flex-wrap gap-1 sm:flex">
                   {session.chapters.map(ch => (
                     <Badge key={ch.id} variant="outline" className="text-xs">
                       {ch.sequence}. {ch.title}
@@ -80,7 +81,7 @@ export function SessionClient({ session }: SessionClientProps) {
             </div>
           </div>
 
-          <nav className="flex gap-1" role="tablist" aria-label="أقسام الجلسة">
+          <nav className="flex shrink-0 gap-1" role="tablist" aria-label="أقسام الجلسة">
             <Button
               variant={view === "chat" ? "default" : "ghost"}
               size="sm"
@@ -132,7 +133,7 @@ export function SessionClient({ session }: SessionClientProps) {
             aria-labelledby="tab-chat"
             className="h-full"
           >
-            <ChatPanel session={session} />
+            <ChatPanel session={session} showSlides={showSlides} setShowSlides={setShowSlides} />
           </div>
         )}
         {view === "quiz" && (

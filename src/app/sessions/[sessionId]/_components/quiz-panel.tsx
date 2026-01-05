@@ -1009,7 +1009,7 @@ export function QuizPanel({ session }: QuizPanelProps) {
                               setChatHistoryMap((prev) => ({ ...prev, [currentQuestion.id]: msgs }))
                             }
                           >
-                            <Thread />
+                            <Thread hideSuggestions />
                           </EphemeralChatRuntimeProvider>
                         )}
                       </div>

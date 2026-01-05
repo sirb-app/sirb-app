@@ -561,7 +561,7 @@ export function AdaptiveLearningSection({
                     {isSubmitting ? (
                       <>
                         <Loader2 className="me-2 size-4 animate-spin" />
-                        جارٍ الإنشاء...
+                        جاري الإنشاء...
                       </>
                     ) : (
                       "ابدأ الجلسة"

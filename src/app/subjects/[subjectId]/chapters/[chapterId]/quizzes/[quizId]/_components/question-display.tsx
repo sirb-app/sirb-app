@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { TipTapViewer } from "@/components/ui/tiptap-viewer";
+import { MathText } from "@/components/ui/math-text";
 import { QuestionType } from "@/generated/prisma";
 import { useEffect, useState } from "react";
 
@@ -108,8 +108,8 @@ export default function QuestionDisplay({
             {getQuestionTypeBadge()}
           </div>
 
-          <div className="text-xl leading-relaxed font-bold">
-            <TipTapViewer content={question.questionText} />
+          <div className="text-xl leading-relaxed font-bold" dir="auto">
+            <MathText content={question.questionText} />
           </div>
 
           {question.questionType === QuestionType.MCQ_MULTI && !isAnswered && (
@@ -247,8 +247,8 @@ export default function QuestionDisplay({
         {isAnswered && question.justification && (
           <div className="bg-accent/15 border-accent/30 rounded-md border px-4 py-3 text-sm">
             <p className="mb-1 font-semibold">التوضيح:</p>
-            <div className="leading-relaxed">
-              <TipTapViewer content={question.justification} />
+            <div className="leading-relaxed" dir="auto">
+              <MathText content={question.justification} />
             </div>
           </div>
         )}

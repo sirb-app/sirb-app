@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 
-const FASTAPI_BASE_URL =
-  process.env.FASTAPI_BASE_URL || "http://localhost:8000";
+const FASTAPI_BASE_URL = (
+  process.env.FASTAPI_BASE_URL || "http://localhost:8000"
+).replace(/\/+$/, "");
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2MB
