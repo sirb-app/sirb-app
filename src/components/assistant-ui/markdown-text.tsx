@@ -172,7 +172,7 @@ const defaultComponents = memoizeMarkdownComponents({
       {...props}
     />
   ),
-  a: ({ className, children, ...props }) => {
+  a: function AnchorComponent({ className, children, ...props }) {
     const message = useAssistantState(({ message }) => message);
     const href = props.href;
     
