@@ -176,7 +176,6 @@ const defaultComponents = memoizeMarkdownComponents({
     const message = useAssistantState(({ message }) => message);
     const href = props.href;
     
-    // Handle source citations
     if (href?.startsWith("source:")) {
       const index = parseInt(href.split(":")[1] || "0", 10) - 1;
       const sources = (message.metadata?.custom as { sources?: { resource_id: number; page_start: number }[] })?.sources;
@@ -187,12 +186,24 @@ const defaultComponents = memoizeMarkdownComponents({
           <sup
             className="aui-source-citation cursor-pointer text-primary hover:text-primary/70 mx-0.5 select-none inline-flex items-center"
             title={`ص. ${source.page_start}`}
+            role="button"
+            tabIndex={0}
             onClick={() => {
               window.dispatchEvent(
                 new CustomEvent("navigate-to-source", {
                   detail: { resourceId: source.resource_id, page: source.page_start },
                 })
               );
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                window.dispatchEvent(
+                  new CustomEvent("navigate-to-source", {
+                    detail: { resourceId: source.resource_id, page: source.page_start },
+                  })
+                );
+              }
             }}
           >
             <FileText className="size-3" />

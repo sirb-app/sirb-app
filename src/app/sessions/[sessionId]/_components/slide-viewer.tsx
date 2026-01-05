@@ -93,7 +93,6 @@ export function SlideViewer({ studyPlanId, chapters, pendingNavigation, onNaviga
     [selectedResource, getChapterLabel]
   );
 
-  // Process pending navigation from prop when resources become available
   useEffect(() => {
     if (pendingNavigation && resources.length > 0) {
       const resource = resources.find((r) => r.id === pendingNavigation.resourceId);
@@ -103,24 +102,22 @@ export function SlideViewer({ studyPlanId, chapters, pendingNavigation, onNaviga
         }
         setSelectedResource(resource);
         updateTargetPage(pendingNavigation.page);
+        onNavigationProcessed?.();
+      } else {
+        onNavigationProcessed?.();
       }
-      onNavigationProcessed?.();
     }
   }, [pendingNavigation, resources, selectedResource, onNavigationProcessed]);
 
-  // Navigate to targetPage when set and registry is ready
   useEffect(() => {
     if (targetPage !== null && registryRef.current) {
       try {
-        // Get the scroll plugin via capability provider
         const scrollPlugin = registryRef.current.getCapabilityProvider('scroll');
         if (scrollPlugin && 'scrollToPage' in scrollPlugin) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (scrollPlugin as any).scrollToPage({ pageNumber: targetPage });
         }
-      } catch (e) {
-        console.warn('Could not scroll to page:', e);
-      }
+      } catch {}
       setTargetPage(null);
     }
   }, [targetPage]);
@@ -250,10 +247,8 @@ export function SlideViewer({ studyPlanId, chapters, pendingNavigation, onNaviga
                     (scrollPlugin as any).scrollToPage({ pageNumber: targetPageRef.current });
                     updateTargetPage(null);
                   }
-                } catch (e) {
-                  console.warn('Could not scroll to page on ready:', e);
-                }
-              }, 500); // Wait for document to render
+                } catch {}
+              }, 500);
             }
           }}
         />

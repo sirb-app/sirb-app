@@ -79,14 +79,11 @@ export function ChatPanel({ session, showSlides, setShowSlides }: ChatPanelProps
     [session.chapters]
   );
 
-  // Handle navigation events from source citations
   const handleNavigateToSource = useCallback((event: CustomEvent<{ resourceId: number; page: number }>) => {
     const { resourceId, page } = event.detail;
-    // Open slides panel if closed
     if (!showSlides) {
       setShowSlides(true);
     }
-    // Set pending navigation - SlideViewer will process it when ready
     setPendingNavigation({ resourceId, page });
   }, [showSlides, setShowSlides]);
 

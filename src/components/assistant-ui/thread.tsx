@@ -104,24 +104,24 @@ const ThreadSuggestions: FC = () => {
     >
       {[
         {
-          title: "اشرح لي مفهوم",
-          label: "بطريقة مبسطة",
-          action: "اشرح لي هذا المفهوم بطريقة مبسطة مع أمثلة",
+          title: "ما هو",
+          label: "تعريف أو مفهوم",
+          action: "ما هو ",
         },
         {
-          title: "ساعدني في حل",
-          label: "مسألة أو تمرين",
-          action: "ساعدني في حل هذه المسألة خطوة بخطوة",
+          title: "كيف",
+          label: "أحل أو أفهم",
+          action: "كيف ",
         },
         {
-          title: "لخص لي الدرس",
-          label: "بالنقاط الرئيسية",
-          action: "لخص لي هذا الدرس بالنقاط الرئيسية",
+          title: "ما الفرق بين",
+          label: "مقارنة",
+          action: "ما الفرق بين ",
         },
         {
-          title: "أعطني أسئلة",
-          label: "للمراجعة والتدريب",
-          action: "أعطني أسئلة للمراجعة والتدريب على هذا الموضوع",
+          title: "أعطني مثال على",
+          label: "تطبيق عملي",
+          action: "أعطني مثال على ",
         },
       ].map((suggestedAction, index) => (
         <div
@@ -131,7 +131,6 @@ const ThreadSuggestions: FC = () => {
         >
           <ThreadPrimitive.Suggestion
             prompt={suggestedAction.action}
-            send
             asChild
           >
             <Button

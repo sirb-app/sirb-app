@@ -96,7 +96,6 @@ async function getOrCreateThread(
   chapterIds?: number[],
   studyPlanId?: string
 ): Promise<Thread> {
-  // Try to get existing thread for this study plan
   if (studyPlanId) {
     const listRes = await fetch(
       `/api/chat/threads?subject_id=${subjectId}&study_plan_id=${studyPlanId}&include_archived=false`
@@ -109,7 +108,6 @@ async function getOrCreateThread(
     }
   }
 
-  // Create new thread
   const response = await fetch("/api/chat/threads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -242,7 +240,6 @@ export function ChatRuntimeProvider({
 
   const chapterIdsKey = chapterIds ? JSON.stringify(chapterIds) : undefined;
 
-  // Clear chat function - deletes thread and forces remount
   const clearChat = useCallback(async () => {
     if (threadId) {
       try {
@@ -251,7 +248,6 @@ export function ChatRuntimeProvider({
         console.error("Failed to delete thread:", e);
       }
     }
-    // Reset state and increment version to force new thread creation
     setThreadId(null);
     setInitialMessages(null);
     setVersion((v) => v + 1);
@@ -262,7 +258,6 @@ export function ChatRuntimeProvider({
     [subjectId, chapterIds, studyPlanId, clearChat]
   );
 
-  // Initialize thread on mount or after clear
   useEffect(() => {
     let cancelled = false;
 
@@ -275,7 +270,6 @@ export function ChatRuntimeProvider({
         if (cancelled) return;
         setThreadId(thread.id);
 
-        // Load existing messages
         const res = await fetch(`/api/chat/threads/${thread.id}`);
         if (res.ok) {
           const data: { thread: Thread; messages: Message[] } = await res.json();
@@ -283,7 +277,6 @@ export function ChatRuntimeProvider({
             setInitialMessages(convertMessagesToRepository(data.messages));
           }
         } else {
-          // No messages yet - set empty
           if (!cancelled) {
             setInitialMessages({ messages: [] });
           }

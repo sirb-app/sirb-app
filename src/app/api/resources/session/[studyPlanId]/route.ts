@@ -25,17 +25,17 @@ export async function GET(
 
   const targetUrl = `${FASTAPI_BASE_URL}/api/v1/resources/session/${studyPlanId}`;
 
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    timeoutId = setTimeout(() => controller.abort(), 30000);
 
     const response = await fetch(targetUrl, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       return Response.json(
@@ -51,5 +51,7 @@ export async function GET(
       return Response.json({ error: "Request timeout" }, { status: 504 });
     }
     return Response.json({ error: "Failed to fetch resources" }, { status: 500 });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
