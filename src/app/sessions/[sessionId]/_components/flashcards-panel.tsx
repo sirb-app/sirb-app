@@ -1062,7 +1062,7 @@ export function FlashcardsPanel({ session }: FlashcardsPanelProps) {
                         key={`flashcard-chat-${card.id}`}
                         endpoint={`/api/flashcards/${card.id}/chat`}
                       >
-                        <Thread />
+                        <Thread hideSuggestions />
                       </EphemeralChatRuntimeProvider>
                     )}
                   </div>

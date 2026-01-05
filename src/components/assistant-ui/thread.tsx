@@ -31,7 +31,11 @@ import { Button } from "@/components/ui/button";
 
 import { cn } from "@/lib/utils";
 
-export const Thread: FC = () => {
+interface ThreadProps {
+  hideSuggestions?: boolean;
+}
+
+export const Thread: FC<ThreadProps> = ({ hideSuggestions = false }) => {
   return (
     <ThreadPrimitive.Root
       className="aui-root aui-thread-root bg-background @container flex h-full flex-col"
@@ -41,7 +45,7 @@ export const Thread: FC = () => {
     >
       <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4">
         <ThreadPrimitive.Empty>
-          <ThreadWelcome />
+          <ThreadWelcome hideSuggestions={hideSuggestions} />
         </ThreadPrimitive.Empty>
 
         <ThreadPrimitive.Messages
@@ -75,7 +79,11 @@ const ThreadScrollToBottom: FC = () => {
   );
 };
 
-const ThreadWelcome: FC = () => {
+interface ThreadWelcomeProps {
+  hideSuggestions?: boolean;
+}
+
+const ThreadWelcome: FC<ThreadWelcomeProps> = ({ hideSuggestions }) => {
   return (
     <div
       className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col"
@@ -91,7 +99,7 @@ const ThreadWelcome: FC = () => {
           </div>
         </div>
       </div>
-      <ThreadSuggestions />
+      {!hideSuggestions && <ThreadSuggestions />}
     </div>
   );
 };
