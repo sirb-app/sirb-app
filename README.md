@@ -88,7 +88,7 @@ For developers interested in the technical details:
 ### Core Stack
 
 - **Framework:** [Next.js](https://nextjs.org) with App Router for a modern React-based web application
-- **Database:** PostgreSQL with Drizzle ORM for type-safe database operations
+- **Database:** PostgreSQL with Prisma ORM for type-safe database operations
 - **Authentication:** Better-auth, email & password and OAuth (Google & GitHub).
 - **File Storage:** Cloudflare R2 for storing user-uploaded documents and files
 
